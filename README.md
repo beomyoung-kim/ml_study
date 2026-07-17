@@ -45,10 +45,7 @@ python3 -m http.server 8811
 
 ## 📦 Deploy to GitHub Pages
 
-Two options — pick one:
-
-1. **Deploy from a branch** (simplest): repo *Settings → Pages → Source: Deploy from a branch → `main` / `/root`*. The included `.nojekyll` ensures files serve verbatim.
-2. **GitHub Actions**: *Settings → Pages → Source: GitHub Actions*. The included `.github/workflows/pages.yml` publishes on every push to `main`.
+One-time setup: repo *Settings → Pages → Build and deployment → Source: **Deploy from a branch** → Branch: `main` / `/ (root)` → Save*. The included `.nojekyll` ensures files serve verbatim. After that, every push to `main` republishes automatically — no build step, no workflow.
 
 Because links use hash routing (`#/path`), deep links work without any server rewrite rules.
 
