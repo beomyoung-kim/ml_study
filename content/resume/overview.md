@@ -97,6 +97,7 @@ Recite the abstract. Fabricate internal metrics (FaceSign, on-device, FG-API are
   <a class="card" href="#/resume/facesign"><div class="card-emoji">🛡️</div><div class="card-title">FaceSign</div><div class="card-desc">Government-certified face anti-spoofing in production. Threat models & compliance framing.</div></a>
   <a class="card" href="#/resume/on-device-segmentation"><div class="card-emoji">⚡</div><div class="card-title">On-Device Seg</div><div class="card-desc">~10ms mobile-CPU human segmentation via ONNX. Frame-budget engineering.</div></a>
   <a class="card" href="#/resume/grounded-vlm-agents"><div class="card-emoji">🧭</div><div class="card-title">Grounded VLM & Agents</div><div class="card-desc">Ongoing: verifiable grounding + training-free visual reasoning agents that diagnose their own failures.</div></a>
+  <a class="card" href="#/resume/neurips26-spatial-reasoning"><div class="card-emoji">🔺</div><div class="card-title">Spatial-Reasoning Agent (NeurIPS'26)</div><div class="card-desc">Under review: typed diagnosis + program repair for 3D spatial reasoning. Rivals frontier VLMs, no task-specific training.</div></a>
 </div>
 
 ## Cheat-sheet — headline facts

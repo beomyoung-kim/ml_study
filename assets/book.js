@@ -135,6 +135,7 @@ window.BOOK = {
         { id: "dd-facesign",     title: "Deep-Dive: FaceSign",           file: "resume/facesign" },
         { id: "dd-ondevice",     title: "Deep-Dive: On-Device Seg",      file: "resume/on-device-segmentation" },
         { id: "dd-grounded",     title: "Deep-Dive: Grounded VLM/Agents", file: "resume/grounded-vlm-agents" },
+        { id: "dd-nra",          title: "Deep-Dive: Spatial-Reasoning Agent (NeurIPS'26)", file: "resume/neurips26-spatial-reasoning", badge: "2026" },
       ],
     },
     {

@@ -10,6 +10,9 @@
 
 **Résumé anchors (do not over-specify beyond these):** grounded VLMs connecting language reasoning with pixel/region evidence, resolving region queries, reasoning verifiably; training-free program synthesis building query-specific workflows from specialist models; a 3D-spatial diagnostic framework: silent failures → typed diagnoses → targeted repair. Backing chapters: [Grounding & Region Reasoning](#/vlm/grounding), [Visual Reasoning Agents](#/vlm/visual-agents), [Agentic AI & Tool Use](#/llm/agents), [VLM Pretraining](#/vlm/pretraining).
 
+> [!NOTE] The concrete paper behind thread 2
+> The NeurIPS'26 submission has its own chapter — full mechanism, architecture diagram, results framing, the co-requisite ablation, and hard-follow-up Q&A: **[Deep-Dive: Spatial-Reasoning Agent](#/resume/neurips26-spatial-reasoning)**. That chapter is where you rehearse the *technical* depth; keep *this* chapter for the higher-level narrative and the "how to talk about unpublished work" framing. (The public version is redacted — codename and exact numbers are held offline while under double-blind review.)
+
 ## The core research question
 
 > *When a language model produces a visually plausible sentence, how do we (a) bind it to pixel/region evidence and executable perception tools, and (b) when a tool is silently wrong, **diagnose and repair** rather than fail silently?*
