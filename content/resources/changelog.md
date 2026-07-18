@@ -18,6 +18,24 @@
 
 ---
 
+## 2026-07-18 — PEFT + deeper RL detail
+
+**Added**
+- **PEFT section** in [Post-Training & Alignment](#/llm/alignment) — full FT vs parameter-efficient tuning, LoRA (with the $W_0+\frac{\alpha}{r}BA$ math and why $B$ inits to zero), a QLoRA/DoRA/adapters/prefix/prompt/IA³ comparison table, a "which to pick" guide, and a LoRA-vs-full-FT Q&A. Cross-linked to [ECLIPSE](#/resume/eclipse) (visual prompt tuning) and [VLM practical](#/vlm/practical).
+
+**Changed**
+- Enriched **GRPO** in [Post-Training & Alignment](#/llm/alignment) with the full clipped-surrogate + KL objective and per-token importance ratio, and how Dr. GRPO / GSPO modify it. Added PEFT/LoRA/QLoRA rows to the cheat-sheet.
+- (RLVR, RLHF, SFT, DPO, GRPO were already covered in depth — this pass filled the PEFT gap and added method-level RL math.)
+
+---
+
+## 2026-07-17 — CV deep-dive: NeurIPS'26 spatial-reasoning agent
+
+**Added**
+- [Deep-Dive: Spatial-Reasoning Agent (NeurIPS'26)](#/resume/neurips26-spatial-reasoning) — redacted public write-up of the under-review submission (mechanism, architecture, ablation insight, limitations, hard-follow-up Q&A). Codename/exact numbers held offline during double-blind review. Cross-linked from [Grounded VLM/Agents](#/resume/grounded-vlm-agents) and the [CV overview](#/resume/overview).
+
+---
+
 ## 2026-07-17 — Initial comprehensive edition
 
 Full rebuild as an online book — a client-side Markdown SPA replacing the prior scratch notes. All parts written and current to July 2026.

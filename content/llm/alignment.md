@@ -1,6 +1,6 @@
 # Post-Training & Alignment <span class="badge badge-2026">2026-current</span>
 
-<div class="tag-row"><span class="tag">SFT</span><span class="tag">DPO</span><span class="tag">KTO / ORPO / SimPO</span><span class="tag">RLHF vs RLAIF</span><span class="tag">Constitutional AI</span><span class="tag">GRPO / GSPO</span><span class="tag">reward hacking</span></div>
+<div class="tag-row"><span class="tag">SFT</span><span class="tag">PEFT / LoRA / QLoRA</span><span class="tag">DPO</span><span class="tag">KTO / ORPO / SimPO</span><span class="tag">RLHF vs RLAIF</span><span class="tag">Constitutional AI</span><span class="tag">GRPO / GSPO</span><span class="tag">reward hacking</span></div>
 
 > [!TIP] Say this first
 > Alignment turns a next-token predictor into something *helpful, honest, and harmless*. The 2024 story was "DPO replaced PPO." The **2026** story is a **zoo of critic-free RL and offline-preference methods**, and what an interviewer rewards is naming the **axes** — reference-free vs reference-based, learned reward vs verifier, token- vs sequence-level — not reciting acronyms. Lead with the canonical stack, then locate each method on those axes.
@@ -21,6 +21,51 @@ flowchart LR
 ## 1 · Stage 1 — SFT (instruction tuning)
 
 Supervised fine-tuning on `(prompt, good response)` demonstrations. It teaches **format, instruction-following, and style** — but only *imitates* demonstrations; it can't express "answer B is better than answer A." It regresses toward the average demonstrator and inherits their ceiling. That's the gap preference optimization fills.
+
+## PEFT — how you actually run every stage
+
+**Full fine-tuning** updates all $N$ parameters — for a modern LLM that means storing weights, gradients, and optimizer state (Adam keeps 2 moments) in high precision: roughly **12–16 bytes/param**, so a 70B model needs ~1 TB of optimizer memory. **Parameter-Efficient Fine-Tuning (PEFT)** freezes the pretrained weights and trains a *tiny* set of new parameters instead. It applies to **every** stage above — SFT, DPO, and RLVR are almost always run with LoRA in practice.
+
+### LoRA — the default
+
+**LoRA (Low-Rank Adaptation, Hu et al. 2021)** *(verifiable)*. A weight update learned during fine-tuning is empirically **low-rank** (it lives in a small intrinsic-dimension subspace), so parameterize it as a product of two thin matrices instead of a dense $d\times k$ update:
+
+$$
+W' = W_0 + \Delta W = W_0 + \frac{\alpha}{r}\,BA,\qquad B\in\mathbb R^{d\times r},\; A\in\mathbb R^{r\times k},\; r\ll \min(d,k)
+$$
+
+Only $A,B$ are trained ($W_0$ frozen); $A$ is init random-Gaussian and $B$ init **zero**, so $\Delta W=0$ at step 0 (training starts exactly at the pretrained model). $r$ is the rank (typically 8–64), $\alpha$ a scaling constant. Trainable params drop by **100–10,000×**.
+
+<dl class="kv">
+<dt>Why it works</dt><dd>Adaptation has low <b>intrinsic dimensionality</b> — you're re-aiming a capable model, not teaching it from scratch.</dd>
+<dt>Zero inference cost</dt><dd>Merge $BA$ back into $W_0$ after training → <b>no</b> added latency (unlike adapters). Or keep it separate to hot-swap many task LoRAs on one frozen base.</dd>
+<dt>Where to place it</dt><dd>Usually the attention projections ($q,k,v,o$); adding the MLP layers helps on harder tasks. More target modules + higher $r$ ↑ capacity ↑ cost.</dd>
+</dl>
+
+### The PEFT family — locate each on cost vs expressiveness
+
+| Method | What's trained | Note |
+| --- | --- | --- |
+| **LoRA** | low-rank $BA$ on chosen weight matrices | the default; merges to zero inference cost |
+| **QLoRA** (2023) | LoRA on top of a **4-bit (NF4) quantized frozen base** | fits 65B fine-tuning on **one 48 GB GPU**; adds double-quantization + paged optimizers |
+| **DoRA** (2024) | decompose weight into **magnitude + direction**, LoRA the direction | closes more of the gap to full FT at similar cost |
+| **Adapters** (2019) | small bottleneck MLPs inserted between layers | adds inference latency (not mergeable) |
+| **Prefix / P-Tuning v2** | trainable "virtual token" vectors prepended to keys/values | prompt lives in activation space, base untouched |
+| **Prompt tuning** | a few trainable soft-prompt embeddings only | cheapest; competitive only at large scale |
+| **IA³** | learned per-channel rescaling vectors | extremely few params |
+
+> [!TIP] Which one to pick
+> **LoRA** is the right default. Go **QLoRA** when memory-bound (single-GPU fine-tuning of a big base). Reach for **DoRA** when LoRA leaves accuracy on the table on a hard task. Use **full fine-tuning** only when you have the compute *and* a large domain shift where the low-rank assumption breaks (e.g. a new language/modality). This is the same instinct behind my **[ECLIPSE](#/resume/eclipse)** work — freeze a strong backbone, train a tiny **visual prompt** per task to avoid catastrophic forgetting — and behind freezing the LLM/vision-encoder when tuning a [VLM](#/vlm/practical).
+
+<details class="qa"><summary>Does LoRA match full fine-tuning? When does it fall short?</summary>
+<div class="qa-body">
+
+**Short:** on most instruction-tuning / preference / style tasks it's within noise of full FT at a fraction of the cost. It falls short when the update is *genuinely* high-rank — large domain/knowledge shift, new language or modality — where the low-rank bottleneck can't express the change.
+
+**Deep:** knobs when LoRA underperforms: **raise the rank** $r$, **add target modules** (MLP, not just attention), tune the **$\alpha/r$ scale**, or switch to **DoRA**. Two gotchas: (1) LoRA can't recover knowledge the frozen base never had — it re-aims, it doesn't add capacity. (2) merging many LoRAs or stacking with quantization can degrade quality, so validate the *merged* model, not just the adapter. For RL (GRPO), LoRA on the policy is common but the frozen reference for KL should be the *base*, not a merged checkpoint.
+
+**Follow-ups:** Why init $B=0$? · What's the memory breakdown that makes QLoRA fit on one GPU? · Why does LoRA add zero inference latency but adapters don't?
+</div></details>
 
 ## 2 · Stage 2 — Preference optimization
 
@@ -112,7 +157,13 @@ $$
 \hat A_i=\frac{r_i-\operatorname{mean}(r_1,\dots,r_G)}{\operatorname{std}(r_1,\dots,r_G)}
 $$
 
-The group mean *is* the baseline — no separate critic to train, roughly halving memory and removing a source of instability. Then a PPO-style clipped policy-gradient update on the token log-probs.
+The group mean *is* the baseline — no separate critic to train, roughly halving memory and removing a source of instability. The advantage $\hat A_i$ is broadcast to **every token** of completion $i$, then optimized with a PPO-style clipped surrogate plus a direct KL leash to the reference:
+
+$$
+\mathcal J_{\text{GRPO}}=\mathbb E\Big[\tfrac1G\textstyle\sum_i \tfrac1{|o_i|}\sum_t \min\big(\rho_{i,t}\hat A_i,\ \operatorname{clip}(\rho_{i,t},1{-}\epsilon,1{+}\epsilon)\hat A_i\big)-\beta\,\mathrm{KL}(\pi_\theta\|\pi_{\text{ref}})\Big]
+$$
+
+where $\rho_{i,t}=\dfrac{\pi_\theta(o_{i,t}\mid x,o_{i,<t})}{\pi_{\theta_{\text{old}}}(o_{i,t}\mid x,o_{i,<t})}$ is the per-token importance ratio. Note there is **no value network** anywhere in that objective — the only models resident are the policy and a frozen reference. (Dr. GRPO's fix is to drop the $\tfrac1{|o_i|}$ length normalization and the std in $\hat A_i$; GSPO's is to make $\rho$ a *sequence*-level ratio.)
 
 ### The GRPO successors — each fixes a specific bug
 
@@ -161,6 +212,9 @@ You've run this loop before under different names: **noisy pseudo-labels → ite
 | Ask | One-liner |
 | --- | --- |
 | SFT | imitate demonstrations; teaches format, can't express "better" |
+| PEFT | freeze base, train a tiny add-on; used for SFT *and* DPO *and* RLVR |
+| LoRA | low-rank $W_0+\frac{\alpha}{r}BA$; ~100–10,000× fewer params; merges to zero latency |
+| QLoRA | LoRA on a 4-bit (NF4) frozen base → big-model fine-tuning on one GPU |
 | DPO | RLHF's closed-form optimum → one classification loss on pairs; reference = implicit regularizer |
 | KTO / ORPO / SimPO | unpaired data / reference-free single-stage / length-normalized reference-free |
 | DPO failure modes | likelihood displacement, length bias, offline coverage, reference sensitivity |
