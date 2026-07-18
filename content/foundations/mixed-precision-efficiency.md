@@ -112,7 +112,13 @@ Autoregressive decoding caches past K/V; the cache grows with context and domina
 <dt>GQA / MQA</dt><dd>Share K/V heads across query heads to shrink the cache (architecture-level).</dd>
 <dt>MLA</dt><dd>Multi-head Latent Attention (DeepSeek): compress K/V into a low-rank latent; reported ~2.7–4.7× KV reduction vs GQA <span class="badge badge-med">secondary</span>.</dd>
 <dt>Quantized KV</dt><dd>INT8 ≈ 2×, FP4 ≈ 4× cache reduction.</dd>
+<dt>Prefix / prompt caching</dt><dd>Reuse the KV of a shared prefix (system prompt, RAG context, few-shot) across requests → skip re-prefilling it. Big win for agents and long fixed contexts.</dd>
+<dt>Chunked prefill</dt><dd>Split a long prompt's prefill into chunks and interleave them with ongoing decode steps in the same batch → smoother latency, no head-of-line blocking from one huge prompt.</dd>
+<dt>Disaggregated serving</dt><dd>Run <b>prefill</b> and <b>decode</b> on <i>separate</i> worker pools (their compute profiles differ), streaming the KV between them → each phase scales independently. A 2025–2026 production pattern.</dd>
 </dl>
+
+> [!NOTE] Where the serving story continues
+> These are the phase-level and cluster-level serving levers. The end-to-end design — routing, autoscaling, TTFT/TPOT SLOs, cost-per-token, and where each of these fits — is in [Designing LLM/Agent Systems](#/system-design/llm-systems). The prefill-vs-decode split that motivates all of it is in [LLM Fundamentals §6](#/llm/fundamentals).
 
 ## Speculative decoding
 
