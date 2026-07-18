@@ -191,6 +191,104 @@
     host.appendChild(el("div", "w-caption", "Each row is a softmax over keys → sums to 1. Darker = more attention. Note the diagonal (self) and the two “the” tokens attending to each other."));
   };
 
+  /* ---------- Runnable code lab (Pyodide, lazy-loaded on first Run) ---------- */
+  const PYODIDE_BASE = "https://cdn.jsdelivr.net/pyodide/v0.26.2/full/";
+  let _pyodide = null;
+  function ensurePyodide() {
+    if (_pyodide) return _pyodide;
+    _pyodide = new Promise((resolve, reject) => {
+      const go = () => window.loadPyodide({ indexURL: PYODIDE_BASE }).then(resolve, reject);
+      if (window.loadPyodide) return go();
+      const s = document.createElement("script");
+      s.src = PYODIDE_BASE + "pyodide.js";
+      s.onload = go;
+      s.onerror = () => { _pyodide = null; reject(new Error("Could not load the Python runtime (network blocked?).")); };
+      document.head.appendChild(s);
+    });
+    return _pyodide;
+  }
+  function jsonEq(a, b, unordered) {
+    if (unordered && Array.isArray(a) && Array.isArray(b)) {
+      const sa = a.map((x) => JSON.stringify(x)).sort(), sb = b.map((x) => JSON.stringify(x)).sort();
+      return JSON.stringify(sa) === JSON.stringify(sb);
+    }
+    return JSON.stringify(a) === JSON.stringify(b);
+  }
+  const fmt = (v) => JSON.stringify(v);
+
+  registry.code = (host) => {
+    let cfg;
+    try { cfg = JSON.parse(host.querySelector("script.code-config").textContent); }
+    catch (e) { host.innerHTML = "<em>code widget: invalid config</em>"; return; }
+    host.innerHTML = "";
+    if (cfg.title) host.appendChild(el("div", "w-title", cfg.title));
+    const editor = el("textarea", "w-code-editor");
+    editor.spellcheck = false;
+    editor.value = cfg.starter || "";
+    editor.rows = Math.max(6, (cfg.starter || "").split("\n").length + 1);
+    editor.addEventListener("keydown", (e) => {
+      if (e.key === "Tab") {
+        e.preventDefault();
+        const a = editor.selectionStart, b = editor.selectionEnd;
+        editor.value = editor.value.slice(0, a) + "    " + editor.value.slice(b);
+        editor.selectionStart = editor.selectionEnd = a + 4;
+      }
+    });
+    host.appendChild(editor);
+    const bar = el("div", "w-code-bar");
+    const runBtn = el("button", "w-chip on", "▶ Run tests");
+    const resetBtn = el("button", "w-chip", "Reset");
+    const solBtn = el("button", "w-chip", "Solution");
+    bar.append(runBtn, resetBtn);
+    if (cfg.solution) bar.append(solBtn);
+    host.appendChild(bar);
+    const out = el("div", "w-code-out");
+    host.appendChild(out);
+    const solWrap = el("div");
+    host.appendChild(solWrap);
+
+    resetBtn.onclick = () => { editor.value = cfg.starter || ""; out.className = "w-code-out"; out.textContent = ""; };
+    solBtn.onclick = () => {
+      if (solWrap.firstChild) { solWrap.innerHTML = ""; solBtn.textContent = "Solution"; return; }
+      const pre = el("pre"); const c = document.createElement("code");
+      c.className = "language-python"; c.textContent = cfg.solution;
+      pre.appendChild(c); solWrap.appendChild(pre);
+      if (window.hljs) { try { hljs.highlightElement(c); } catch (e) {} }
+      solBtn.textContent = "Hide solution";
+    };
+    runBtn.onclick = async () => {
+      runBtn.disabled = true;
+      out.className = "w-code-out"; out.textContent = "Loading Python… (first run downloads the runtime, ~10 MB — later runs are instant)";
+      let py;
+      try { py = await ensurePyodide(); }
+      catch (e) { out.className = "w-code-out err"; out.textContent = "⚠ " + e.message; runBtn.disabled = false; return; }
+      try { await py.runPythonAsync(editor.value); }
+      catch (e) { out.className = "w-code-out err"; out.textContent = "❌ Your code raised an error:\n" + (e.message || e); runBtn.disabled = false; return; }
+      const fn = py.globals.get(cfg.func);
+      if (!fn) { out.className = "w-code-out err"; out.textContent = "❌ No function named `" + cfg.func + "` was defined."; runBtn.disabled = false; return; }
+      let pass = 0; const fails = [];
+      (cfg.tests || []).forEach((tc) => {
+        const proxies = [];
+        try {
+          const args = (tc.args || []).map((a) => { const p = py.toPy(a); if (p && p.destroy) proxies.push(p); return p; });
+          let r = fn(...args);
+          if (r && r.toJs) r = r.toJs();
+          const ok = jsonEq(r, tc.expect, tc.unordered);
+          if (ok) pass++;
+          else fails.push("  ✗ " + cfg.func + "(" + (tc.args || []).map(fmt).join(", ") + ") → got " + fmt(r) + ", want " + fmt(tc.expect));
+        } catch (e) {
+          fails.push("  ✗ " + cfg.func + "(" + (tc.args || []).map(fmt).join(", ") + ") → error: " + (e.message || e));
+        }
+        proxies.forEach((p) => { try { p.destroy(); } catch (e) {} });
+      });
+      try { if (fn.destroy) fn.destroy(); } catch (e) {}
+      const total = (cfg.tests || []).length;
+      if (pass === total) { out.className = "w-code-out ok"; out.textContent = "✓ All " + total + " tests passed. Well done."; }
+      else { out.className = "w-code-out err"; out.textContent = pass + "/" + total + " passed\n" + fails.slice(0, 8).join("\n") + (fails.length > 8 ? "\n  … " + (fails.length - 8) + " more" : ""); }
+      runBtn.disabled = false;
+    };
+  };
+
   function init(root) {
     (root || document).querySelectorAll(".widget:not([data-ready])").forEach((host) => {
       const name = host.dataset.widget;

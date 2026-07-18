@@ -396,3 +396,16 @@ figcaption { text-align: center; color: var(--text-faint); font-size: 13px; marg
 .w-attn-corner, .w-attn-h { color: var(--text-faint); font-weight: 600; text-align: center; padding: 3px; }
 .w-attn-h { color: var(--text-dim); }
 .w-attn-cell { text-align: center; padding: 6px 2px; border-radius: 4px; color: var(--text-strong); font-variant-numeric: tabular-nums; cursor: default; transition: outline .1s; }
+
+/* Code lab (Pyodide) */
+.w-code-editor { width: 100%; box-sizing: border-box; font-family: var(--mono); font-size: 13px; line-height: 1.55; background: var(--bg-code); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; resize: vertical; tab-size: 4; }
+.w-code-editor:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--hl-bg); }
+.w-code-bar { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.w-code-bar .w-chip { cursor: pointer; }
+.w-code-bar .w-chip:disabled { opacity: .5; cursor: progress; }
+.w-code-out { margin-top: 10px; font-family: var(--mono); font-size: 12.5px; line-height: 1.5; white-space: pre-wrap; word-break: break-word; padding: 10px 14px; border-radius: 8px; background: var(--bg-soft); border: 1px solid var(--border); }
+.w-code-out:empty { display: none; }
+.w-code-out.ok { color: var(--ok); border-color: var(--ok); background: rgba(18, 161, 80, .10); }
+.w-code-out.err { color: var(--bad); border-color: var(--bad); background: rgba(220, 38, 38, .07); }
+:root[data-theme="dark"] .w-code-out.err { color: #fca5a5; }
+.w-host .w-code-editor + .w-code-bar { margin-top: 8px; }

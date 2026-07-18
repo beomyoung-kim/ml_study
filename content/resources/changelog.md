@@ -18,6 +18,16 @@
 
 ---
 
+## 2026-07-18 — Interactive code lab (pilot)
+
+**Added**
+- A **runnable Python code lab** (Pyodide, lazy-loaded): write a solution in the browser, hit **Run tests** to check it against test cases (pass/fail), and reveal a reference **Solution** — attempt-first practice. Piloted on [Two Pointers & Sliding Window](#/coding/two-pointers-sliding-window) (6 problems, EN + KO) with LeetCode links. Powered by a new `data-widget="code"` widget in `assets/widgets.js`.
+
+**Planned**
+- Roll the code lab out to the remaining coding pattern chapters and the ML-coding chapters after the pilot's UX is confirmed.
+
+---
+
 ## 2026-07-18 — Korean / English language toggle
 
 **Added**

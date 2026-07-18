@@ -42,134 +42,82 @@ def sliding_window(s: str) -> int:
     return best
 ```
 
-## Worked examples
+## Practice — 직접 구현하고 실행·테스트
 
-### 1. Valid Palindrome <span class="badge badge-easy">Easy</span>
+> [!TIP] 이 섹션 사용법
+> 아래 각 문제에는 **라이브 Python 에디터**가 있습니다. 직접 풀이를 작성하고 **▶ Run tests**를 누르면 어떤 케이스가 통과하는지 보여줍니다. 막히면 참고용 **Solution**을 열어볼 수 있지만, 먼저 직접 시도하세요 — 그 씨름이 곧 연습입니다. 첫 Run에서 작은 Python 런타임(~10 MB)을 내려받고, 이후 실행은 즉시입니다. 본인 에디터가 편하면 각 문제의 **LeetCode** 링크로 이동하세요.
+
+two-pointer 워밍업을 먼저, 그다음 Easy → Hard로 이어지는 sliding-window 순서로 대략 진행하세요.
+
+### 1. Valid Palindrome <span class="badge badge-easy">Easy</span> · [LeetCode ↗](https://leetcode.com/problems/valid-palindrome/)
 
 non-alphanumeric와 대소문자를 무시하고, `s`가 palindrome인가요?
 
-```python
-def is_palindrome(s: str) -> bool:
-    left, right = 0, len(s) - 1
-    while left < right:
-        while left < right and not s[left].isalnum():
-            left += 1
-        while left < right and not s[right].isalnum():
-            right -= 1
-        if s[left].lower() != s[right].lower():
-            return False
-        left, right = left + 1, right - 1
-    return True
-```
+<div class="widget" data-widget="code">
+<script type="application/json" class="code-config">
+{"func":"is_palindrome","starter":"def is_palindrome(s: str) -> bool:\n    # two pointers from both ends; skip non-alphanumerics\n    pass","tests":[{"args":["A man, a plan, a canal: Panama"],"expect":true},{"args":["race a car"],"expect":false},{"args":[" "],"expect":true},{"args":["0P"],"expect":false},{"args":[""],"expect":true}],"solution":"def is_palindrome(s: str) -> bool:\n    left, right = 0, len(s) - 1\n    while left < right:\n        while left < right and not s[left].isalnum():\n            left += 1\n        while left < right and not s[right].isalnum():\n            right -= 1\n        if s[left].lower() != s[right].lower():\n            return False\n        left, right = left + 1, right - 1\n    return True"}
+</script>
+</div>
 
 *O(N) time, O(1) space.* **Pitfall:** 먼저 filter된 복사본을 만들면 O(N) space를 씁니다 — in-place two-pointer가 기대되는 답입니다.
 
-### 2. Two Sum II — Sorted Input <span class="badge badge-easy">Easy</span>
+### 2. Two Sum II — Sorted Input <span class="badge badge-easy">Easy</span> · [LeetCode ↗](https://leetcode.com/problems/two-sum-ii-input-array-is-sorted/)
 
 sorted array에서 `target`에 합해지는 1-indexed 쌍을 반환하세요.
 
-```python
-def two_sum(numbers: list[int], target: int) -> list[int]:
-    lo, hi = 0, len(numbers) - 1
-    while lo < hi:
-        s = numbers[lo] + numbers[hi]
-        if s == target:
-            return [lo + 1, hi + 1]
-        if s < target:
-            lo += 1
-        else:
-            hi -= 1
-    return []
-```
+<div class="widget" data-widget="code">
+<script type="application/json" class="code-config">
+{"func":"two_sum","starter":"def two_sum(numbers: list[int], target: int) -> list[int]:\n    # converging pointers on the sorted array; return the 1-indexed pair\n    pass","tests":[{"args":[[2,7,11,15],9],"expect":[1,2]},{"args":[[2,3,4],6],"expect":[1,3]},{"args":[[-1,0],-1],"expect":[1,2]},{"args":[[5,25,75],100],"expect":[2,3]}],"solution":"def two_sum(numbers: list[int], target: int) -> list[int]:\n    lo, hi = 0, len(numbers) - 1\n    while lo < hi:\n        s = numbers[lo] + numbers[hi]\n        if s == target:\n            return [lo + 1, hi + 1]\n        if s < target:\n            lo += 1\n        else:\n            hi -= 1\n    return []"}
+</script>
+</div>
 
 *O(N) time, O(1) space.* **Pitfall:** 여기서 hash-map [Two Sum](#/coding/hashing)을 쓰면 sorted 보장과 O(1) space를 낭비합니다 — 면접관은 일부러 sortedness를 준 겁니다.
 
-### 3. Container With Most Water <span class="badge badge-med">Medium</span>
+### 3. Container With Most Water <span class="badge badge-med">Medium</span> · [LeetCode ↗](https://leetcode.com/problems/container-with-most-water/)
 
 가장 많은 물을 담는 container를 이루는 두 line; 최대 area를 반환하세요.
 
-```python
-def max_area(height: list[int]) -> int:
-    lo, hi, best = 0, len(height) - 1, 0
-    while lo < hi:
-        best = max(best, min(height[lo], height[hi]) * (hi - lo))
-        if height[lo] < height[hi]:
-            lo += 1                  # move the shorter side
-        else:
-            hi -= 1
-    return best
-```
+<div class="widget" data-widget="code">
+<script type="application/json" class="code-config">
+{"func":"max_area","starter":"def max_area(height: list[int]) -> int:\n    # two pointers; always move the shorter wall inward\n    pass","tests":[{"args":[[1,8,6,2,5,4,8,3,7]],"expect":49},{"args":[[1,1]],"expect":1},{"args":[[4,3,2,1,4]],"expect":16},{"args":[[1,2,1]],"expect":2}],"solution":"def max_area(height: list[int]) -> int:\n    lo, hi, best = 0, len(height) - 1, 0\n    while lo < hi:\n        best = max(best, min(height[lo], height[hi]) * (hi - lo))\n        if height[lo] < height[hi]:\n            lo += 1\n        else:\n            hi -= 1\n    return best"}
+</script>
+</div>
 
 *O(N) time, O(1) space.* **왜 더 짧은 쪽을 이동하나요?** pointer가 수렴하며 width는 줄기만 하고, area는 더 짧은 벽으로 bound됩니다. 더 큰 쪽을 이동해도 `min(...)`을 결코 늘릴 수 없으므로, 그건 엄격히 열등한 선택입니다.
 
-### 4. Longest Substring Without Repeating Characters <span class="badge badge-med">Medium</span>
+### 4. Longest Substring Without Repeating Characters <span class="badge badge-med">Medium</span> · [LeetCode ↗](https://leetcode.com/problems/longest-substring-without-repeating-characters/)
 
 모든 문자가 서로 다른 가장 긴 substring의 길이.
 
-```python
-def length_of_longest_substring(s: str) -> int:
-    last_seen: dict[str, int] = {}
-    start = best = 0
-    for i, ch in enumerate(s):
-        if ch in last_seen and last_seen[ch] >= start:
-            start = last_seen[ch] + 1     # jump past the earlier occurrence
-        last_seen[ch] = i
-        best = max(best, i - start + 1)
-    return best
-```
+<div class="widget" data-widget="code">
+<script type="application/json" class="code-config">
+{"func":"length_of_longest_substring","starter":"def length_of_longest_substring(s: str) -> int:\n    # sliding window with a last-seen index map\n    pass","tests":[{"args":["abcabcbb"],"expect":3},{"args":["bbbbb"],"expect":1},{"args":["pwwkew"],"expect":3},{"args":[""],"expect":0},{"args":["dvdf"],"expect":3}],"solution":"def length_of_longest_substring(s: str) -> int:\n    last_seen = {}\n    start = best = 0\n    for i, ch in enumerate(s):\n        if ch in last_seen and last_seen[ch] >= start:\n            start = last_seen[ch] + 1\n        last_seen[ch] = i\n        best = max(best, i - start + 1)\n    return best"}
+</script>
+</div>
 
 *O(N) time, O(min(N, alphabet)) space.* **Pitfall:** `last_seen[ch] >= start` guard는 필수입니다 — 이게 없으면 window 밖의 낡은 index가 `start`를 뒤로 끌어당깁니다.
 
-### 5. Longest Repeating Character Replacement <span class="badge badge-med">Medium</span>
+### 5. Longest Repeating Character Replacement <span class="badge badge-med">Medium</span> · [LeetCode ↗](https://leetcode.com/problems/longest-repeating-character-replacement/)
 
 최대 `k`개의 문자를 교체한 뒤 하나의 반복 문자로 이루어진 가장 긴 substring.
 
-```python
-from collections import defaultdict
-
-def character_replacement(s: str, k: int) -> int:
-    count: dict[str, int] = defaultdict(int)
-    left = max_freq = best = 0
-    for right, ch in enumerate(s):
-        count[ch] += 1
-        max_freq = max(max_freq, count[ch])
-        # chars to replace = window size − most frequent char count
-        if (right - left + 1) - max_freq > k:
-            count[s[left]] -= 1
-            left += 1
-        best = max(best, right - left + 1)
-    return best
-```
+<div class="widget" data-widget="code">
+<script type="application/json" class="code-config">
+{"func":"character_replacement","starter":"from collections import defaultdict\n\ndef character_replacement(s: str, k: int) -> int:\n    # window stays valid while (window_size - max_freq) <= k\n    pass","tests":[{"args":["ABAB",2],"expect":4},{"args":["AABABBA",1],"expect":4},{"args":["AAAA",0],"expect":4},{"args":["ABCDE",1],"expect":2}],"solution":"from collections import defaultdict\n\ndef character_replacement(s: str, k: int) -> int:\n    count = defaultdict(int)\n    left = max_freq = best = 0\n    for right, ch in enumerate(s):\n        count[ch] += 1\n        max_freq = max(max_freq, count[ch])\n        if (right - left + 1) - max_freq > k:\n            count[s[left]] -= 1\n            left += 1\n        best = max(best, right - left + 1)\n    return best"}
+</script>
+</div>
 
 *O(N) time, O(alphabet) space.* **Pitfall:** shrink할 때 `max_freq`를 재계산하지 마세요 — 역대 최댓값을 유지하는 게 옳습니다. `best`는 window가 커질 때만 커지기 때문입니다.
 
-### 6. Minimum Window Substring <span class="badge badge-hard">Hard</span>
+### 6. Minimum Window Substring <span class="badge badge-hard">Hard</span> · [LeetCode ↗](https://leetcode.com/problems/minimum-window-substring/)
 
 `t`의 모든 문자를(중복 포함) 담는 `s`의 가장 작은 substring.
 
-```python
-from collections import Counter
-
-def min_window(s: str, t: str) -> str:
-    if not s or not t:
-        return ""
-    need = Counter(t)
-    missing = len(t)                  # total chars still required (with dups)
-    left = best_start = 0
-    best_len = float("inf")
-    for right, ch in enumerate(s):
-        if need[ch] > 0:
-            missing -= 1
-        need[ch] -= 1                 # negative = surplus
-        while missing == 0:           # window is valid; shrink from left
-            if right - left + 1 < best_len:
-                best_len, best_start = right - left + 1, left
-            need[s[left]] += 1
-            if need[s[left]] > 0:
-                missing += 1
-            left += 1
-    return "" if best_len == float("inf") else s[best_start:best_start + best_len]
-```
+<div class="widget" data-widget="code">
+<script type="application/json" class="code-config">
+{"func":"min_window","starter":"from collections import Counter\n\ndef min_window(s: str, t: str) -> str:\n    # expand right; when t is fully covered, shrink left to minimize\n    pass","tests":[{"args":["ADOBECODEBANC","ABC"],"expect":"BANC"},{"args":["a","a"],"expect":"a"},{"args":["a","aa"],"expect":""},{"args":["cabwefgewcwaefgcf","cae"],"expect":"cwae"}],"solution":"from collections import Counter\n\ndef min_window(s: str, t: str) -> str:\n    if not s or not t:\n        return \"\"\n    need = Counter(t)\n    missing = len(t)\n    left = best_start = 0\n    best_len = float(\"inf\")\n    for right, ch in enumerate(s):\n        if need[ch] > 0:\n            missing -= 1\n        need[ch] -= 1\n        while missing == 0:\n            if right - left + 1 < best_len:\n                best_len, best_start = right - left + 1, left\n            need[s[left]] += 1\n            if need[s[left]] > 0:\n                missing += 1\n            left += 1\n    return \"\" if best_len == float(\"inf\") else s[best_start:best_start + best_len]"}
+</script>
+</div>
 
 *O(|s| + |t|) time, O(alphabet) space.* **Pitfall:** `missing`을 (중복을 세는) 총 필요 문자 수로 추적하고, 음수 `need`를 surplus로 취급하세요 — 스스로 납득하도록 dry-run 하세요.
 

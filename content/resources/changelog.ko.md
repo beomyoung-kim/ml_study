@@ -18,6 +18,16 @@
 
 ---
 
+## 2026-07-18 — 인터랙티브 코드 랩 (파일럿)
+
+**Added**
+- **실행 가능한 Python 코드 랩**(Pyodide, 지연 로드): 브라우저에서 직접 풀이를 작성하고 **Run tests**로 테스트 케이스에 대해 채점(pass/fail)하며, 참고용 **Solution**을 열어볼 수 있습니다 — attempt-first 연습. [Two Pointers & Sliding Window](#/coding/two-pointers-sliding-window) 챕터에 파일럿 적용(문제 6개, 영어+한국어), LeetCode 링크 포함. `assets/widgets.js`의 새 `data-widget="code"` 위젯으로 구동.
+
+**Planned**
+- 파일럿 UX 확인 후 나머지 코딩 패턴 챕터와 ML-coding 챕터로 코드 랩 확장.
+
+---
+
 ## 2026-07-18 — 한국어 / 영어 언어 토글
 
 **Added**
