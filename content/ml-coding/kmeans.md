@@ -105,6 +105,53 @@ if __name__ == "__main__":
 > [!NOTE] Framework one-liner
 > `sklearn.cluster.KMeans(n_clusters=k, init="k-means++")`; at scale, `MiniBatchKMeans` or FAISS k-means (GPU, used for vector-quantization codebooks).
 
+## Practice — implement, run, test
+
+> [!TIP] How to use this section
+> Each problem below has a **live Python editor** with **NumPy** available. Write your solution, hit **▶ Run tests**, and see which cases pass. Stuck? Reveal a reference **Solution** — but attempt first; the struggle *is* the practice. The first Run downloads a small Python runtime plus NumPy (~15 MB); later runs are instant.
+
+Build k-means bottom-up — the distance matrix, then the two Lloyd steps, then the full seeded loop.
+
+### 1. Squared-Distance Matrix <span class="badge badge-easy">Easy</span>
+
+The $(N,K)$ distances via the $\lVert x\rVert^2+\lVert c\rVert^2-2xc^\top$ expansion, clamped $\ge 0$.
+
+<div class="widget" data-widget="code">
+<script type="application/json" class="code-config">
+{"func":"sq_dists","packages":["numpy"],"approx":true,"starter":"import numpy as np\n\ndef sq_dists(x, c):\n    # x:(N,D) c:(K,D) -> (N,K) squared Euclidean via the expansion trick; clamp >= 0\n    pass","tests":[{"args":[[[0.0,0.0],[3.0,4.0]],[[0.0,0.0],[3.0,0.0]]],"expect":[[0.0,9.0],[25.0,16.0]]},{"args":[[[1.0,1.0]],[[1.0,1.0],[4.0,5.0]]],"expect":[[0.0,25.0]]},{"args":[[[2.0,0.0],[0.0,2.0]],[[0.0,0.0]]],"expect":[[4.0],[4.0]]}],"solution":"import numpy as np\n\ndef sq_dists(x, c):\n    x = np.asarray(x, dtype=float)\n    c = np.asarray(c, dtype=float)\n    x2 = np.sum(x ** 2, axis=1, keepdims=True)\n    c2 = np.sum(c ** 2, axis=1)\n    d = x2 + c2[None, :] - 2.0 * x @ c.T\n    return np.maximum(d, 0.0)"}
+</script>
+</div>
+
+### 2. Assign Step <span class="badge badge-easy">Easy</span>
+
+Label each point with the index of its nearest centroid (`argmin` over K).
+
+<div class="widget" data-widget="code">
+<script type="application/json" class="code-config">
+{"func":"assign_clusters","packages":["numpy"],"approx":true,"starter":"import numpy as np\n\ndef assign_clusters(x, c):\n    # squared distances to each centroid, then argmin over axis=1; return a list of ints\n    pass","tests":[{"args":[[[0.0,0.0],[0.2,0.0],[5.0,5.0],[4.8,5.0]],[[0.0,0.0],[5.0,5.0]]],"expect":[0,0,1,1]},{"args":[[[1.0,1.0],[9.0,9.0],[1.0,0.0]],[[9.0,9.0],[0.0,0.0]]],"expect":[1,0,1]},{"args":[[[0.0,0.0]],[[1.0,0.0],[0.0,1.0]]],"expect":[0]}],"solution":"import numpy as np\n\ndef assign_clusters(x, c):\n    x = np.asarray(x, dtype=float)\n    c = np.asarray(c, dtype=float)\n    x2 = np.sum(x ** 2, axis=1, keepdims=True)\n    c2 = np.sum(c ** 2, axis=1)\n    d = np.maximum(x2 + c2[None, :] - 2.0 * x @ c.T, 0.0)\n    return np.argmin(d, axis=1).tolist()"}
+</script>
+</div>
+
+### 3. Update Step <span class="badge badge-easy">Easy</span>
+
+Recompute each centroid as the mean of its assigned members.
+
+<div class="widget" data-widget="code">
+<script type="application/json" class="code-config">
+{"func":"update_centroids","packages":["numpy"],"approx":true,"starter":"import numpy as np\n\ndef update_centroids(x, labels, k):\n    # for each cluster j in range(k), set centroid to the mean of x[labels == j]\n    pass","tests":[{"args":[[[0.0,0.0],[2.0,0.0],[10.0,10.0],[12.0,10.0]],[0,0,1,1],2],"expect":[[1.0,0.0],[11.0,10.0]]},{"args":[[[1.0,1.0],[3.0,3.0],[5.0,5.0]],[0,0,1],2],"expect":[[2.0,2.0],[5.0,5.0]]},{"args":[[[4.0,2.0],[2.0,4.0]],[1,1],2],"expect":[[0.0,0.0],[3.0,3.0]]}],"solution":"import numpy as np\n\ndef update_centroids(x, labels, k):\n    x = np.asarray(x, dtype=float)\n    labels = np.asarray(labels)\n    new_c = np.zeros((k, x.shape[1]))\n    for j in range(k):\n        members = x[labels == j]\n        if len(members):\n            new_c[j] = members.mean(0)\n    return new_c"}
+</script>
+</div>
+
+### 4. Full K-Means (seeded) <span class="badge badge-med">Medium</span>
+
+K-means++ init + Lloyd iterations. Seeded RNG makes the returned centers reproducible.
+
+<div class="widget" data-widget="code">
+<script type="application/json" class="code-config">
+{"func":"kmeans_centers","packages":["numpy"],"approx":true,"starter":"import numpy as np\n\ndef kmeans_centers(x, k, seed=0, max_iter=100, tol=1e-4):\n    # seed np.random.default_rng(seed); k-means++ init, then alternate assign/update; return centers (k,D)\n    pass","tests":[{"args":[[[0.0,0.0],[0.1,0.1],[0.2,0.0],[5.0,5.0],[5.1,4.9],[4.9,5.0]],2,0],"expect":[[5.0,4.966666666666667],[0.10000000000000002,0.03333333333333333]],"tol":0.0001},{"args":[[[0.0,0.0],[1.0,0.0],[0.0,1.0],[10.0,10.0],[10.0,11.0],[11.0,10.0]],2,0],"expect":[[10.333333333333334,10.333333333333334],[0.3333333333333333,0.3333333333333333]],"tol":0.0001}],"solution":"import numpy as np\n\ndef kmeans_centers(x, k, seed=0, max_iter=100, tol=1e-4):\n    x = np.asarray(x, dtype=float)\n    rng = np.random.default_rng(seed)\n    n = x.shape[0]\n    def sqd(a, b):\n        a2 = np.sum(a ** 2, axis=1, keepdims=True)\n        b2 = np.sum(b ** 2, axis=1)\n        return np.maximum(a2 + b2[None, :] - 2.0 * a @ b.T, 0.0)\n    c = np.empty((k, x.shape[1]))\n    c[0] = x[rng.integers(n)]\n    closest = sqd(x, c[:1]).ravel()\n    for i in range(1, k):\n        probs = closest / closest.sum()\n        c[i] = x[rng.choice(n, p=probs)]\n        closest = np.minimum(closest, sqd(x, c[i:i + 1]).ravel())\n    labels = np.zeros(n, dtype=np.int64)\n    for _ in range(max_iter):\n        d = sqd(x, c)\n        labels = np.argmin(d, axis=1)\n        new_c = np.empty_like(c)\n        for j in range(k):\n            members = x[labels == j]\n            new_c[j] = members.mean(0) if len(members) else x[rng.integers(n)]\n        shift = np.linalg.norm(new_c - c)\n        c = new_c\n        if shift < tol:\n            break\n    return c"}
+</script>
+</div>
+
 ## Common bugs interviewers watch for
 
 - **Naive distances:** an explicit $(N,K,D)$ broadcast difference wastes memory; use the expansion + matmul.

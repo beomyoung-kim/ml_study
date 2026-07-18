@@ -17,106 +17,74 @@ The trade is time for space: you spend O(N) memory to remember what you've seen 
 | Longest consecutive run | set for O(1) neighbor checks | O(N) / O(N) |
 | O(1) get/put with eviction | hash + ordering structure | O(1)/op |
 
-## Worked examples
+## Practice — implement, run, test
 
-### 1. Two Sum <span class="badge badge-easy">Easy</span>
+> [!TIP] How to use this section
+> Each problem below has a **live Python editor**. Write your solution, hit **▶ Run tests**, and see which cases pass. Stuck? Reveal a reference **Solution** — but attempt first; the struggle *is* the practice. The first Run downloads a small Python runtime (~10 MB); later runs are instant. Prefer your own editor? Each problem links out to **LeetCode**.
+
+### 1. Two Sum <span class="badge badge-easy">Easy</span> · [LeetCode ↗](https://leetcode.com/problems/two-sum/)
 
 Indices of the two numbers adding to `target`.
 
-```python
-def two_sum(nums: list[int], target: int) -> list[int]:
-    index_of: dict[int, int] = {}
-    for i, value in enumerate(nums):
-        if target - value in index_of:      # check BEFORE inserting
-            return [index_of[target - value], i]
-        index_of[value] = i
-    return []
-```
+<div class="widget" data-widget="code">
+<script type="application/json" class="code-config">
+{"func":"two_sum","starter":"def two_sum(nums: list[int], target: int) -> list[int]:\n    # store value -> index; look up the complement before inserting\n    pass","tests":[{"args":[[2,7,11,15],9],"expect":[0,1]},{"args":[[3,2,4],6],"expect":[1,2]},{"args":[[3,3],6],"expect":[0,1]},{"args":[[-3,4,3,90],0],"expect":[0,2]}],"solution":"def two_sum(nums: list[int], target: int) -> list[int]:\n    index_of = {}\n    for i, value in enumerate(nums):\n        if target - value in index_of:\n            return [index_of[target - value], i]\n        index_of[value] = i\n    return []"}
+</script>
+</div>
 
 *O(N) time, O(N) space.* **Pitfall:** insert *after* the complement check, or you can pair an element with itself. (If the array were sorted, prefer the O(1)-space [two-pointer](#/coding/two-pointers-sliding-window) version.)
 
-### 2. Contains Duplicate <span class="badge badge-easy">Easy</span>
+### 2. Contains Duplicate <span class="badge badge-easy">Easy</span> · [LeetCode ↗](https://leetcode.com/problems/contains-duplicate/)
 
 Return `True` if any value repeats.
 
-```python
-def contains_duplicate(nums: list[int]) -> bool:
-    seen: set[int] = set()
-    for x in nums:
-        if x in seen:
-            return True
-        seen.add(x)
-    return False
-```
+<div class="widget" data-widget="code">
+<script type="application/json" class="code-config">
+{"func":"contains_duplicate","starter":"def contains_duplicate(nums: list[int]) -> bool:\n    # track seen values in a set; True on the first repeat\n    pass","tests":[{"args":[[1,2,3,1]],"expect":true},{"args":[[1,2,3,4]],"expect":false},{"args":[[1,1,1,3,3,4,3,2,4,2]],"expect":true},{"args":[[]],"expect":false}],"solution":"def contains_duplicate(nums: list[int]) -> bool:\n    seen = set()\n    for x in nums:\n        if x in seen:\n            return True\n        seen.add(x)\n    return False"}
+</script>
+</div>
 
 *O(N) time, O(N) space.* Sorting + adjacent comparison is O(N log N) with O(1) extra but destroys order — mention both and the trade-off.
 
-### 3. Subarray Sum Equals K <span class="badge badge-med">Medium</span>
+### 3. Subarray Sum Equals K <span class="badge badge-med">Medium</span> · [LeetCode ↗](https://leetcode.com/problems/subarray-sum-equals-k/)
 
 Count contiguous subarrays summing to `k` (values may be negative).
 
 **Approach.** With prefix sum `S`, a subarray `(i, j]` sums to `k` iff `S[j] − S[i] = k`, i.e. `S[i] = S[j] − k`. As you scan, count how many earlier prefix sums equal `running − k`.
 
-```python
-from collections import defaultdict
-
-def subarray_sum(nums: list[int], k: int) -> int:
-    count: dict[int, int] = defaultdict(int)
-    count[0] = 1                 # empty prefix, so a prefix itself can equal k
-    running = answer = 0
-    for x in nums:
-        running += x
-        answer += count[running - k]
-        count[running] += 1
-    return answer
-```
+<div class="widget" data-widget="code">
+<script type="application/json" class="code-config">
+{"func":"subarray_sum","starter":"from collections import defaultdict\n\ndef subarray_sum(nums: list[int], k: int) -> int:\n    # prefix sum + hash; count earlier prefixes equal to running - k\n    pass","tests":[{"args":[[1,1,1],2],"expect":2},{"args":[[1,2,3],3],"expect":2},{"args":[[1,-1,0],0],"expect":3},{"args":[[3,4,7,2,-3,1,4,2],7],"expect":4}],"solution":"from collections import defaultdict\n\ndef subarray_sum(nums: list[int], k: int) -> int:\n    count = defaultdict(int)\n    count[0] = 1\n    running = answer = 0\n    for x in nums:\n        running += x\n        answer += count[running - k]\n        count[running] += 1\n    return answer"}
+</script>
+</div>
 
 *O(N) time, O(N) space.* **Pitfall:** the `count[0] = 1` seed — without it you miss subarrays starting at index 0. Sliding window can't be used here because negatives break monotonicity; hashing is required.
 
-### 4. Top K Frequent Elements <span class="badge badge-med">Medium</span>
+### 4. Top K Frequent Elements <span class="badge badge-med">Medium</span> · [LeetCode ↗](https://leetcode.com/problems/top-k-frequent-elements/)
 
 The `k` most frequent values (any order).
 
 **Approach.** Count with a `Counter`, then **bucket sort by frequency** for O(N). A [heap](#/coding/heap-priority-queue) of size k is the O(N log k) alternative — mention it as the streaming-friendly option.
 
-```python
-from collections import Counter
-
-def top_k_frequent(nums: list[int], k: int) -> list[int]:
-    freq = Counter(nums)
-    buckets: list[list[int]] = [[] for _ in range(len(nums) + 1)]
-    for val, c in freq.items():
-        buckets[c].append(val)                 # index by frequency
-    out: list[int] = []
-    for c in range(len(buckets) - 1, 0, -1):   # high frequency first
-        for val in buckets[c]:
-            out.append(val)
-            if len(out) == k:
-                return out
-    return out
-```
+<div class="widget" data-widget="code">
+<script type="application/json" class="code-config">
+{"func":"top_k_frequent","starter":"from collections import Counter\n\ndef top_k_frequent(nums: list[int], k: int) -> list[int]:\n    # count, then bucket-sort by frequency; collect the top k\n    pass","tests":[{"args":[[1,1,1,2,2,3],2],"expect":[1,2],"unordered":true},{"args":[[1],1],"expect":[1],"unordered":true},{"args":[[4,1,-1,2,-1,2,3],2],"expect":[-1,2],"unordered":true}],"solution":"from collections import Counter\n\ndef top_k_frequent(nums: list[int], k: int) -> list[int]:\n    freq = Counter(nums)\n    buckets = [[] for _ in range(len(nums) + 1)]\n    for val, c in freq.items():\n        buckets[c].append(val)\n    out = []\n    for c in range(len(buckets) - 1, 0, -1):\n        for val in buckets[c]:\n            out.append(val)\n            if len(out) == k:\n                return out\n    return out"}
+</script>
+</div>
 
 *O(N) time, O(N) space.* **Pitfall:** `sorted(freq, key=freq.get)` is an easy O(N log N) answer — write it if stuck, but volunteer the bucket/heap improvement.
 
-### 5. Longest Consecutive Sequence <span class="badge badge-med">Medium</span>
+### 5. Longest Consecutive Sequence <span class="badge badge-med">Medium</span> · [LeetCode ↗](https://leetcode.com/problems/longest-consecutive-sequence/)
 
 Length of the longest run of consecutive integers, in O(N), unsorted.
 
 **Approach.** Put everything in a set; only start counting from a value that has no left neighbor (`num − 1` absent), so each run is walked exactly once.
 
-```python
-def longest_consecutive(nums: list[int]) -> int:
-    num_set = set(nums)
-    best = 0
-    for num in num_set:
-        if num - 1 in num_set:
-            continue                 # not a run start
-        length, cur = 1, num
-        while cur + 1 in num_set:
-            cur, length = cur + 1, length + 1
-        best = max(best, length)
-    return best
-```
+<div class="widget" data-widget="code">
+<script type="application/json" class="code-config">
+{"func":"longest_consecutive","starter":"def longest_consecutive(nums: list[int]) -> int:\n    # put all in a set; only count runs from a value with no left neighbor\n    pass","tests":[{"args":[[100,4,200,1,3,2]],"expect":4},{"args":[[0,3,7,2,5,8,4,6,0,1]],"expect":9},{"args":[[]],"expect":0},{"args":[[1,2,0,1]],"expect":3}],"solution":"def longest_consecutive(nums: list[int]) -> int:\n    num_set = set(nums)\n    best = 0\n    for num in num_set:\n        if num - 1 in num_set:\n            continue\n        length, cur = 1, num\n        while cur + 1 in num_set:\n            cur, length = cur + 1, length + 1\n        best = max(best, length)\n    return best"}
+</script>
+</div>
 
 *O(N) time, O(N) space.* **Pitfall:** running the inner `while` from *every* element is O(N²); the "start-only" guard is what keeps it linear.
 

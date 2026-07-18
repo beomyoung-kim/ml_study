@@ -83,15 +83,26 @@ class DecoderBlock(nn.Module):
 
 ## LayerNorm from scratch
 
-```python
-def layer_norm(x, gamma, beta, eps=1e-5):
-    """Normalize over the last dim (per token), not the batch."""
-    mu = x.mean(-1, keepdims=True)
-    var = x.var(-1, keepdims=True)               # biased variance
-    return gamma * (x - mu) / np.sqrt(var + eps) + beta
-```
+> [!TIP] Live code — implement, run, test
+> The NumPy blocks below are **live editors**. Fill in the body, hit **▶ Run tests**, and watch the cases pass. Stuck? Reveal the reference **Solution** — but attempt first; the struggle *is* the practice. The first Run downloads a small Python runtime and NumPy (~15 MB); later runs are instant.
+
+<div class="widget" data-widget="code">
+<script type="application/json" class="code-config">
+{"func":"layer_norm","packages":["numpy"],"approx":true,"starter":"import numpy as np\n\ndef layer_norm(x, gamma, beta, eps=1e-5):\n    # normalize over the LAST dim (per token): (x-mean)/sqrt(var+eps), then scale by gamma, shift by beta\n    pass","tests":[{"args":[[[1,2,3,4]],[1,1,1,1],[0,0,0,0]],"expect":[[-1.3416354199689269,-0.447211806656309,0.447211806656309,1.3416354199689269]]},{"args":[[[1,2,3,4],[10,10,10,10]],[1,1,1,1],[0,0,0,0]],"expect":[[-1.3416354199689269,-0.447211806656309,0.447211806656309,1.3416354199689269],[0.0,0.0,0.0,0.0]]},{"args":[[[2,4,6,8]],[2,2,2,2],[1,1,1,1]],"expect":[[-1.6832788897221995,0.10557370342593342,1.8944262965740666,3.6832788897221995]]}],"solution":"import numpy as np\n\ndef layer_norm(x, gamma, beta, eps=1e-5):\n    x, gamma, beta = np.asarray(x, float), np.asarray(gamma, float), np.asarray(beta, float)\n    mu = x.mean(-1, keepdims=True)\n    var = x.var(-1, keepdims=True)\n    return gamma * (x - mu) / np.sqrt(var + eps) + beta"}
+</script>
+</div>
 
 LayerNorm normalizes **per token over the feature dim**, so it's independent of batch size and sequence length — that's why Transformers use it instead of BatchNorm. RMSNorm (LLaMA) drops the mean-centering and $\beta$, keeping only the scale.
+
+## Feed-forward network (NumPy)
+
+The position-wise FFN is $D\to 4D\to D$ with a GELU in between (here the tanh approximation). `feedforward` seeds its weights with `np.random.seed(0)` so the output is deterministic:
+
+<div class="widget" data-widget="code">
+<script type="application/json" class="code-config">
+{"func":"feedforward","packages":["numpy"],"approx":true,"starter":"import numpy as np\n\ndef gelu(x):\n    return 0.5 * x * (1.0 + np.tanh(np.sqrt(2.0 / np.pi) * (x + 0.044715 * x ** 3)))\n\ndef feedforward(x, mult=4):\n    # D -> mult*D -> D, GELU between; seed weights with np.random.seed(0), zero biases\n    pass","tests":[{"args":[[[1,0,2,-1]]],"expect":[[0.040465675581605985,0.08127055857994071,0.08630397145291878,0.008689684748444178]]},{"args":[[[0.5,-0.5,1.0,0.0],[1,1,1,1]]],"expect":[[0.007273512058388274,0.012726852245228204,0.04167160290468261,-0.030555200099704558],[0.011904363992137353,0.043640236183920614,0.02597430169327689,0.02262224203686889]]}],"solution":"import numpy as np\n\ndef gelu(x):\n    return 0.5 * x * (1.0 + np.tanh(np.sqrt(2.0 / np.pi) * (x + 0.044715 * x ** 3)))\n\ndef feedforward(x, mult=4):\n    x = np.asarray(x, dtype=float)\n    d = x.shape[-1]\n    np.random.seed(0)\n    W1 = np.random.randn(d, mult * d) * 0.1\n    b1 = np.zeros(mult * d)\n    W2 = np.random.randn(mult * d, d) * 0.1\n    b2 = np.zeros(d)\n    h = gelu(x @ W1 + b1)\n    return h @ W2 + b2"}
+</script>
+</div>
 
 ## Causal mask
 

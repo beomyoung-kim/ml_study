@@ -133,6 +133,83 @@ if __name__ == "__main__":
 > [!NOTE] 프레임워크 한 줄
 > `F.cross_entropy(logits, targets)`(log-softmax + NLL을 fuse, 확률을 결코 materialize하지 않음), `F.binary_cross_entropy_with_logits`, `F.mse_loss`; focal은 `torchvision.ops.sigmoid_focal_loss`.
 
+## Practice — 직접 구현하고 실행·테스트
+
+> [!TIP] 이 섹션 사용법
+> 아래 각 문제에는 **NumPy가 준비된 라이브 Python 에디터**가 있습니다. 직접 풀이를 작성하고 **▶ Run tests**를 누르면 어떤 케이스가 통과하는지 보여줍니다. 막히면 참고용 **Solution**을 열어볼 수 있지만, 먼저 직접 시도하세요 — 그 씨름이 곧 연습입니다. 첫 Run에서 작은 Python 런타임과 NumPy(~15 MB)를 내려받고, 이후 실행은 즉시입니다.
+
+elementwise activation부터, 그다음 loss들, 마지막으로 이들을 잇는 softmax-CE gradient 순서로 내려가며 풀어보세요.
+
+### 1. Sigmoid <span class="badge badge-easy">Easy</span>
+
+실수 logit을 elementwise로 $(0,1)$ 확률로 매핑합니다.
+
+<div class="widget" data-widget="code">
+<script type="application/json" class="code-config">
+{"func":"sigmoid","packages":["numpy"],"approx":true,"starter":"import numpy as np\n\ndef sigmoid(z):\n    # elementwise 1/(1+e^-z); accept a list or nested list\n    pass","tests":[{"args":[[0.0,2.0,-2.0]],"expect":[0.5,0.8807970779778823,0.11920292202211755]},{"args":[[[0.0,1.0],[-1.0,3.0]]],"expect":[[0.5,0.7310585786300049],[0.2689414213699951,0.9525741268224334]]},{"args":[[0.0]],"expect":[0.5]}],"solution":"import numpy as np\n\ndef sigmoid(z):\n    z = np.asarray(z, dtype=float)\n    return 1.0 / (1.0 + np.exp(-z))"}
+</script>
+</div>
+
+### 2. Stable Softmax <span class="badge badge-easy">Easy</span>
+
+큰 logit이 overflow하지 않도록 지수화 전에 행별 최댓값을 뺍니다.
+
+<div class="widget" data-widget="code">
+<script type="application/json" class="code-config">
+{"func":"softmax","packages":["numpy"],"approx":true,"starter":"import numpy as np\n\ndef softmax(z, axis=-1):\n    # subtract the max along axis for stability, exponentiate, normalize\n    pass","tests":[{"args":[[[1.0,2.0,3.0]]],"expect":[[0.09003057317038046,0.24472847105479764,0.6652409557748218]]},{"args":[[[0.0,0.0]]],"expect":[[0.5,0.5]]},{"args":[[[1000.0,1001.0,1002.0]]],"expect":[[0.09003057317038046,0.24472847105479764,0.6652409557748218]]}],"solution":"import numpy as np\n\ndef softmax(z, axis=-1):\n    z = np.asarray(z, dtype=float)\n    z = z - np.max(z, axis=axis, keepdims=True)\n    e = np.exp(z)\n    return e / e.sum(axis=axis, keepdims=True)"}
+</script>
+</div>
+
+### 3. Softmax Cross-Entropy Loss <span class="badge badge-med">Medium</span>
+
+logit 배치에 대한 정답 클래스의 평균 negative log-likelihood.
+
+<div class="widget" data-widget="code">
+<script type="application/json" class="code-config">
+{"func":"cross_entropy_loss","packages":["numpy"],"approx":true,"starter":"import numpy as np\n\ndef cross_entropy_loss(logits, targets):\n    # logits:(N,C), targets:(N,) int; softmax rows, gather true-class prob, -log, mean\n    pass","tests":[{"args":[[[1.0,2.0,3.0],[1.0,1.0,1.0]],[2,0]],"expect":0.7531091265562451},{"args":[[[0.0,0.0],[0.0,0.0]],[0,1]],"expect":0.6931471805599453},{"args":[[[2.0,1.0,0.0]],[0]],"expect":0.40760596444438046}],"solution":"import numpy as np\n\ndef cross_entropy_loss(logits, targets):\n    logits = np.asarray(logits, dtype=float)\n    targets = np.asarray(targets)\n    N = logits.shape[0]\n    z = logits - logits.max(axis=1, keepdims=True)\n    p = np.exp(z)\n    p /= p.sum(axis=1, keepdims=True)\n    py = p[np.arange(N), targets]\n    return float(-np.log(np.clip(py, 1e-12, 1.0)).mean())"}
+</script>
+</div>
+
+### 4. Softmax-CE Gradient <span class="badge badge-med">Medium</span>
+
+그 유명한 $p - \text{onehot}(y)$를 batch 크기로 mean-reduce한 값.
+
+<div class="widget" data-widget="code">
+<script type="application/json" class="code-config">
+{"func":"softmax_ce_grad","packages":["numpy"],"approx":true,"starter":"import numpy as np\n\ndef softmax_ce_grad(logits, targets):\n    # gradient wrt logits: softmax(logits) minus one-hot(targets), divided by N\n    pass","tests":[{"args":[[[1.0,2.0,3.0],[1.0,1.0,1.0]],[2,0]],"expect":[[0.04501528658519023,0.12236423552739882,-0.1673795221125891],[-0.33333333333333337,0.16666666666666666,0.16666666666666666]]},{"args":[[[0.0,0.0],[0.0,0.0]],[0,1]],"expect":[[-0.25,0.25],[0.25,-0.25]]},{"args":[[[2.0,1.0,0.0]],[0]],"expect":[[-0.3347590442251782,0.24472847105479764,0.09003057317038046]]}],"solution":"import numpy as np\n\ndef softmax_ce_grad(logits, targets):\n    logits = np.asarray(logits, dtype=float)\n    targets = np.asarray(targets)\n    N = logits.shape[0]\n    z = logits - logits.max(axis=1, keepdims=True)\n    p = np.exp(z)\n    p /= p.sum(axis=1, keepdims=True)\n    grad = p.copy()\n    grad[np.arange(N), targets] -= 1.0\n    return grad / N"}
+</script>
+</div>
+
+### 5. Mean Squared Error <span class="badge badge-easy">Easy</span>
+
+평균 제곱 차이의 절반 — $\tfrac12$ 덕분에 gradient가 $\hat y - y$가 됩니다.
+
+<div class="widget" data-widget="code">
+<script type="application/json" class="code-config">
+{"func":"mse","packages":["numpy"],"approx":true,"starter":"import numpy as np\n\ndef mse(pred, y):\n    # 0.5 * mean((pred - y)^2)\n    pass","tests":[{"args":[[1.0,2.0,3.0],[1.0,2.0,3.0]],"expect":0.0},{"args":[[2.0,0.0,2.0],[0.0,0.0,0.0]],"expect":1.3333333333333333},{"args":[[[1.0,2.0],[3.0,4.0]],[[0.0,0.0],[0.0,0.0]]],"expect":3.75}],"solution":"import numpy as np\n\ndef mse(pred, y):\n    pred = np.asarray(pred, dtype=float)\n    y = np.asarray(y, dtype=float)\n    diff = pred - y\n    return float(0.5 * np.mean(diff ** 2))"}
+</script>
+</div>
+
+### 6. BCE With Logits (stable) <span class="badge badge-med">Medium</span>
+
+logit에서 바로 계산하는 수치적으로 안정된 binary cross-entropy.
+
+<div class="widget" data-widget="code">
+<script type="application/json" class="code-config">
+{"func":"bce_with_logits","packages":["numpy"],"approx":true,"starter":"import numpy as np\n\ndef bce_with_logits(z, y):\n    # stable: max(z,0) - z*y + log1p(exp(-|z|)), then mean\n    pass","tests":[{"args":[[0.0,0.0,0.0],[1.0,0.0,1.0]],"expect":0.6931471805599453},{"args":[[10.0,-10.0],[1.0,0.0]],"expect":4.539889921686465e-05},{"args":[[2.0,-1.0,0.5],[1.0,1.0,0.0]],"expect":0.8047555609137674}],"solution":"import numpy as np\n\ndef bce_with_logits(z, y):\n    z = np.asarray(z, dtype=float)\n    y = np.asarray(y, dtype=float)\n    loss = np.maximum(z, 0) - z * y + np.log1p(np.exp(-np.abs(z)))\n    return float(loss.mean())"}
+</script>
+</div>
+
+### 7. Binary Focal Loss <span class="badge badge-med">Medium</span>
+
+$(1-p_t)^\gamma$로 쉬운 예제를 down-weight — logsigmoid로 안정화.
+
+<div class="widget" data-widget="code">
+<script type="application/json" class="code-config">
+{"func":"binary_focal_loss","packages":["numpy"],"approx":true,"starter":"import numpy as np\n\ndef binary_focal_loss(z, y, gamma=2.0, alpha=0.25):\n    # logsigmoid via softplus; p_t, log_pt, alpha_t by class; mean of -a_t*(1-p_t)^gamma*log_pt\n    pass","tests":[{"args":[[2.0,-1.0,0.5],[1.0,0.0,0.0]],"expect":0.10016771149490598},{"args":[[0.0,0.0],[1.0,0.0]],"expect":0.08664339756999316},{"args":[[3.0,-3.0,1.0,-1.0],[1.0,0.0,1.0,0.0],1.0,0.5],"expect":0.02163833526892106}],"solution":"import numpy as np\n\ndef binary_focal_loss(z, y, gamma=2.0, alpha=0.25):\n    z = np.asarray(z, dtype=float).reshape(-1)\n    y = np.asarray(y, dtype=float).reshape(-1)\n    sp = np.logaddexp(0.0, z)\n    log_p, log_1mp = z - sp, -sp\n    p = np.exp(log_p)\n    p_t = np.where(y == 1, p, 1 - p)\n    log_pt = np.where(y == 1, log_p, log_1mp)\n    a_t = np.where(y == 1, alpha, 1 - alpha)\n    return float((-a_t * (1 - p_t) ** gamma * log_pt).mean())"}
+</script>
+</div>
+
 ## 면접관이 지켜보는 흔한 버그
 
 - **`cross_entropy`는 확률이 아니라 logits를 기대** — softmax를 두 번 하지 마세요.

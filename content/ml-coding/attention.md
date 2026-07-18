@@ -22,42 +22,36 @@ Try it live — adjust a query and watch the weights and output move:
 
 <div class="widget" data-widget="attention"></div>
 
+> [!TIP] Live code — implement, run, test
+> The NumPy blocks below are **live editors**. Fill in the body, hit **▶ Run tests**, and watch the cases pass. Stuck? Reveal the reference **Solution** — but attempt first; the struggle *is* the practice. The first Run downloads a small Python runtime and NumPy (~15 MB); later runs are instant.
+
 ## Scaled dot-product attention (NumPy)
 
-```python
-import numpy as np
+First the numerically stable **softmax** over the key axis:
 
+<div class="widget" data-widget="code">
+<script type="application/json" class="code-config">
+{"func":"softmax","packages":["numpy"],"approx":true,"starter":"import numpy as np\n\ndef softmax(x, axis=-1):\n    # subtract the max for stability, exponentiate, then normalize\n    pass","tests":[{"args":[[[1,2,3]]],"expect":[[0.09003057317038046,0.24472847105479764,0.6652409557748218]]},{"args":[[[0,0,0]]],"expect":[[0.3333333333333333,0.3333333333333333,0.3333333333333333]]},{"args":[[[1000,1001,1002]]],"expect":[[0.09003057317038046,0.24472847105479764,0.6652409557748218]]},{"args":[[[-1,0,1],[1,0,-1]]],"expect":[[0.09003057317038046,0.24472847105479764,0.6652409557748218],[0.6652409557748218,0.24472847105479764,0.09003057317038046]]}],"solution":"import numpy as np\n\ndef softmax(x, axis=-1):\n    x = np.asarray(x, dtype=float)\n    x = x - np.max(x, axis=axis, keepdims=True)\n    e = np.exp(x)\n    return e / np.sum(e, axis=axis, keepdims=True)"}
+</script>
+</div>
 
-def softmax(x, axis=-1):
-    x = x - np.max(x, axis=axis, keepdims=True)   # stability: subtract max
-    e = np.exp(x)
-    return e / np.sum(e, axis=axis, keepdims=True)
+Then **scaled dot-product attention** — score, scale, softmax, weight the values (this lab returns the output; the reference also returns the weights):
 
-
-def sdpa(q, k, v, mask=None):
-    """
-    q,k: (..., Tq/Tk, d),  v: (..., Tk, dv)
-    mask: broadcastable to (..., Tq, Tk); bool True=keep, or additive (-inf blocks)
-    returns: out (..., Tq, dv), weights (..., Tq, Tk)
-    """
-    d = q.shape[-1]
-    scores = q @ np.swapaxes(k, -1, -2) / np.sqrt(d)   # (..., Tq, Tk)
-    if mask is not None:
-        scores = np.where(mask, scores, -1e9) if mask.dtype == bool \
-                 else scores + mask
-    w = softmax(scores, axis=-1)
-    return w @ v, w
-```
+<div class="widget" data-widget="code">
+<script type="application/json" class="code-config">
+{"func":"sdpa","packages":["numpy"],"approx":true,"starter":"import numpy as np\n\ndef softmax(x, axis=-1):\n    x = np.asarray(x, dtype=float)\n    x = x - np.max(x, axis=axis, keepdims=True)\n    e = np.exp(x)\n    return e / np.sum(e, axis=axis, keepdims=True)\n\ndef sdpa(q, k, v, mask=None):\n    # scores = QK^T / sqrt(d); softmax over keys; return the weighted sum of V\n    pass","tests":[{"args":[[[1,0],[0,1]],[[1,0],[0,1]],[[1,2],[3,4]]],"expect":[[1.6604769013466862,2.6604769013466862],[2.3395230986533138,3.3395230986533138]]},{"args":[[[2,0,0]],[[2,0,0],[0,2,0],[0,0,2]],[[1,1],[2,2],[3,3]]],"expect":[[1.2485832277662388,1.2485832277662388]]},{"args":[[[1,1],[2,0]],[[1,0],[0,1]],[[10,0],[0,10]]],"expect":[[5.0,5.0],[8.04429682506957,1.9557031749304312]]}],"solution":"import numpy as np\n\ndef softmax(x, axis=-1):\n    x = np.asarray(x, dtype=float)\n    x = x - np.max(x, axis=axis, keepdims=True)\n    e = np.exp(x)\n    return e / np.sum(e, axis=axis, keepdims=True)\n\ndef sdpa(q, k, v, mask=None):\n    q, k, v = np.asarray(q, float), np.asarray(k, float), np.asarray(v, float)\n    d = q.shape[-1]\n    scores = q @ np.swapaxes(k, -1, -2) / np.sqrt(d)\n    if mask is not None:\n        mask = np.asarray(mask)\n        scores = np.where(mask, scores, -1e9) if mask.dtype == bool else scores + mask\n    w = softmax(scores, axis=-1)\n    return w @ v"}
+</script>
+</div>
 
 **Why $\sqrt{d}$:** if $q,k$ have unit-variance entries, $q\cdot k$ has variance $\approx d$, so raw scores grow with dimension and push softmax into saturated, near-one-hot regions with vanishing gradients. Dividing by $\sqrt{d}$ keeps the score variance $\approx 1$. *(verifiable)*
 
 ## Masking
 
-```python
-def causal_mask(T):
-    """Lower-triangular bool: True = allowed to attend. (T,T)."""
-    return np.tril(np.ones((T, T), dtype=bool))
-```
+<div class="widget" data-widget="code">
+<script type="application/json" class="code-config">
+{"func":"causal_mask","packages":["numpy"],"approx":true,"starter":"import numpy as np\n\ndef causal_mask(T):\n    # lower-triangular boolean (T,T): True = allowed to attend (no peeking ahead)\n    pass","tests":[{"args":[2],"expect":[[1,0],[1,1]]},{"args":[3],"expect":[[1,0,0],[1,1,0],[1,1,1]]},{"args":[4],"expect":[[1,0,0,0],[1,1,0,0],[1,1,1,0],[1,1,1,1]]}],"solution":"import numpy as np\n\ndef causal_mask(T):\n    return np.tril(np.ones((T, T), dtype=bool))"}
+</script>
+</div>
 
 - **Causal mask** blocks position $t$ from seeing the future ($>t$) — required for autoregressive decoding.
 - **Key-padding mask** blocks attention to `[PAD]` keys; shape `(B,1,1,Tk)`, broadcasts over heads and queries.
@@ -65,22 +59,13 @@ def causal_mask(T):
 
 ## Multi-head attention
 
-```python
-def mha(x, Wq, Wk, Wv, Wo, num_heads, causal=False):
-    """x:(B,T,D)  W*:(D,D) -> (B,T,D)."""
-    B, T, D = x.shape
-    assert D % num_heads == 0
-    dh = D // num_heads
+Implement `mha`; the harness `run_mha` builds a fixed, seeded `(B,T,D)=(1,3,4)` input with `H=2` heads so the output is deterministic (the helpers `softmax`/`causal_mask`/`sdpa` are provided):
 
-    def split(t):                       # (B,T,D) -> (B,H,T,Dh)
-        return t.reshape(B, T, num_heads, dh).transpose(0, 2, 1, 3)
-
-    q, k, v = split(x @ Wq), split(x @ Wk), split(x @ Wv)
-    mask = causal_mask(T) if causal else None      # (T,T) broadcasts over B,H
-    out, _ = sdpa(q, k, v, mask=mask)              # (B,H,T,Dh)
-    out = out.transpose(0, 2, 1, 3).reshape(B, T, D)   # merge heads
-    return out @ Wo
-```
+<div class="widget" data-widget="code">
+<script type="application/json" class="code-config">
+{"func":"run_mha","packages":["numpy"],"approx":true,"starter":"import numpy as np\n\ndef softmax(x, axis=-1):\n    x = x - np.max(x, axis=axis, keepdims=True)\n    e = np.exp(x)\n    return e / np.sum(e, axis=axis, keepdims=True)\n\ndef causal_mask(T):\n    return np.tril(np.ones((T, T), dtype=bool))\n\ndef sdpa(q, k, v, mask=None):\n    d = q.shape[-1]\n    scores = q @ np.swapaxes(k, -1, -2) / np.sqrt(d)\n    if mask is not None:\n        scores = np.where(mask, scores, -1e9) if mask.dtype == bool else scores + mask\n    return softmax(scores, axis=-1) @ v\n\ndef mha(x, Wq, Wk, Wv, Wo, num_heads, causal=False):\n    # split (B,T,D)->(B,H,T,Dh), run sdpa per head, merge heads, project by Wo\n    pass\n\ndef run_mha(causal):\n    np.random.seed(0)\n    B, T, D, H = 1, 3, 4, 2\n    x = np.random.randn(B, T, D)\n    Ws = [np.random.randn(D, D) * 0.1 for _ in range(4)]\n    return mha(x, *Ws, H, causal)","tests":[{"args":[false],"expect":[[[0.03190098881683708,-0.003883638346883957,0.009816921823006634,0.0008853701048203459],[0.032178757789826054,-0.003954663472188265,0.008879630160056167,0.0011910101137743716],[0.03203148496155561,-0.0038215886062526196,0.009498626868409653,0.0010096474007127018]]]},{"args":[true],"expect":[[[0.059733984570268545,-0.003891324159579386,0.01245601832145022,0.013606293601693605],[0.04292552968524655,-0.008439370891800252,0.018326373103144715,-0.004398635006322705],[0.03203148496155561,-0.0038215886062526196,0.009498626868409653,0.0010096474007127018]]]}],"solution":"import numpy as np\n\ndef softmax(x, axis=-1):\n    x = x - np.max(x, axis=axis, keepdims=True)\n    e = np.exp(x)\n    return e / np.sum(e, axis=axis, keepdims=True)\n\ndef causal_mask(T):\n    return np.tril(np.ones((T, T), dtype=bool))\n\ndef sdpa(q, k, v, mask=None):\n    d = q.shape[-1]\n    scores = q @ np.swapaxes(k, -1, -2) / np.sqrt(d)\n    if mask is not None:\n        scores = np.where(mask, scores, -1e9) if mask.dtype == bool else scores + mask\n    return softmax(scores, axis=-1) @ v\n\ndef mha(x, Wq, Wk, Wv, Wo, num_heads, causal=False):\n    B, T, D = x.shape\n    dh = D // num_heads\n    def split(t):\n        return t.reshape(B, T, num_heads, dh).transpose(0, 2, 1, 3)\n    q, k, v = split(x @ Wq), split(x @ Wk), split(x @ Wv)\n    mask = causal_mask(T) if causal else None\n    out = sdpa(q, k, v, mask=mask)\n    out = out.transpose(0, 2, 1, 3).reshape(B, T, D)\n    return out @ Wo\n\ndef run_mha(causal):\n    np.random.seed(0)\n    B, T, D, H = 1, 3, 4, 2\n    x = np.random.randn(B, T, D)\n    Ws = [np.random.randn(D, D) * 0.1 for _ in range(4)]\n    return mha(x, *Ws, H, causal)"}
+</script>
+</div>
 
 Splitting heads into the batch-like axis lets one `@` compute all heads at once. **Complexity:** $O(T^2 d)$ compute and $O(T^2)$ memory for the score matrix, per head.
 

@@ -41,7 +41,12 @@ heapq.nsmallest(k, data, key=fn)
 > [!WARNING] Size-k heap direction is inverted
 > To keep the **k largest**, use a **min-heap of size k** and pop when it exceeds `k`: the smallest of your winners sits at the root, ready to be evicted. Using a max-heap here is the classic mistake.
 
-## Representative problems
+## Practice — implement, run, test
+
+> [!TIP] How to use this section
+> Several problems below have a **live Python editor**. Write your solution, hit **▶ Run tests**, and see which cases pass. Stuck? Reveal a reference **Solution** — but attempt first; the struggle *is* the practice. The first Run downloads a small Python runtime (~10 MB); later runs are instant. Prefer your own editor? Each lab links out to **LeetCode**.
+
+The stateful stream problems (Kth Largest, Median Finder) and the linked-list merge stay as static references; the two pure-function problems are live labs.
 
 ### 1. Kth Largest in a Stream (Easy)
 Maintain exactly `k` elements; the root is the answer.
@@ -63,35 +68,26 @@ class KthLargest:
 ```
 `add` is `O(log k)`, space `O(k)`.
 
-### 2. Top K Frequent Elements (Medium)
+### 2. Top K Frequent Elements <span class="badge badge-med">Medium</span> · [LeetCode ↗](https://leetcode.com/problems/top-k-frequent-elements/)
 Count, then keep a size-`k` min-heap keyed by frequency.
 
-```python
-from collections import Counter
+<div class="widget" data-widget="code">
+<script type="application/json" class="code-config">
+{"func":"top_k_frequent","starter":"from collections import Counter\nimport heapq\n\ndef top_k_frequent(nums: list[int], k: int) -> list[int]:\n    # count, then keep a size-k min-heap keyed by frequency\n    pass","tests":[{"args":[[1,1,1,2,2,3],2],"expect":[1,2],"unordered":true},{"args":[[1],1],"expect":[1],"unordered":true},{"args":[[4,4,4,5,5,6],2],"expect":[4,5],"unordered":true},{"args":[[7,7,8,8,9],3],"expect":[7,8,9],"unordered":true}],"solution":"from collections import Counter\nimport heapq\n\ndef top_k_frequent(nums: list[int], k: int) -> list[int]:\n    freq = Counter(nums)\n    h = []\n    for num, cnt in freq.items():\n        heapq.heappush(h, (cnt, num))\n        if len(h) > k:\n            heapq.heappop(h)\n    return [num for _, num in h]"}
+</script>
+</div>
 
-def top_k_frequent(nums: list[int], k: int) -> list[int]:
-    freq = Counter(nums)
-    h = []
-    for num, cnt in freq.items():
-        heapq.heappush(h, (cnt, num))
-        if len(h) > k:
-            heapq.heappop(h)
-    return [num for _, num in h]
-```
 `O(n log k)`. **Say the alternative:** bucket sort by frequency is `O(n)` — strictly better when `k` approaches `n`. Naming the trade-off is the signal.
 
-### 3. K Closest Points to Origin (Medium)
+### 3. K Closest Points to Origin <span class="badge badge-med">Medium</span> · [LeetCode ↗](https://leetcode.com/problems/k-closest-points-to-origin/)
 Size-`k` max-heap on squared distance (no `sqrt` needed).
 
-```python
-def k_closest(points: list[list[int]], k: int) -> list[list[int]]:
-    h = []                                  # max-heap via negation
-    for x, y in points:
-        heapq.heappush(h, (-(x*x + y*y), x, y))
-        if len(h) > k:
-            heapq.heappop(h)
-    return [[x, y] for _, x, y in h]
-```
+<div class="widget" data-widget="code">
+<script type="application/json" class="code-config">
+{"func":"k_closest","starter":"import heapq\n\ndef k_closest(points: list[list[int]], k: int) -> list[list[int]]:\n    # size-k max-heap on squared distance (negate); no sqrt needed\n    pass","tests":[{"args":[[[1,3],[-2,2]],1],"expect":[[-2,2]],"unordered":true},{"args":[[[3,3],[5,-1],[-2,4]],2],"expect":[[3,3],[-2,4]],"unordered":true},{"args":[[[1,1],[2,2],[3,3]],1],"expect":[[1,1]],"unordered":true},{"args":[[[0,1],[1,0]],2],"expect":[[0,1],[1,0]],"unordered":true}],"solution":"import heapq\n\ndef k_closest(points: list[list[int]], k: int) -> list[list[int]]:\n    h = []\n    for x, y in points:\n        heapq.heappush(h, (-(x*x + y*y), x, y))\n        if len(h) > k:\n            heapq.heappop(h)\n    return [[x, y] for _, x, y in h]"}
+</script>
+</div>
+
 `O(n log k)` time, `O(k)` space. Quickselect gives `O(n)` average if only the *set* (unordered) is needed.
 
 ### 4. Merge k Sorted Lists (Hard) — merge-k idiom

@@ -21,100 +21,52 @@ $$
 
 With dilation $d$, replace $K$ by the effective kernel $d(K-1)+1$. "Same" padding at stride 1 is $p = (K-1)/2$.
 
-## Naive convolution (correct first)
+## Practice — implement, run, test
 
-```python
-import numpy as np
+> [!TIP] How to use this section
+> Each problem below has a **live Python editor**. Write your solution, hit **▶ Run tests**, and see which cases pass. Stuck? Reveal a reference **Solution** — but attempt first; the struggle *is* the practice. The first Run downloads a small Python runtime plus NumPy (~15 MB); later runs are instant.
 
+Write the obviously-correct nested-loop conv first, then the im2col→GEMM fast path, then the two poolings.
 
-def _pad(x, p):
-    if p == 0:
-        return x
-    return np.pad(x, ((0, 0), (0, 0), (p, p), (p, p)))  # zero-pad H, W only
+### 1. Naive convolution <span class="badge badge-easy">Easy</span>
 
+The five-nested-loop version — correct before fast. Each output pixel is the sum of the elementwise product over its receptive field; add a per-output-channel bias. Remember the output size $\lfloor (H+2p-K)/s \rfloor + 1$.
 
-def conv2d_naive(x, w, b=None, stride=1, padding=0):
-    """x:(N,Cin,H,W)  w:(Cout,Cin,KH,KW)  b:(Cout,) -> (N,Cout,Hout,Wout)."""
-    N, Cin, H, W = x.shape
-    Cout, _, KH, KW = w.shape
-    xp = _pad(x, padding)
-    Ho = (H + 2 * padding - KH) // stride + 1
-    Wo = (W + 2 * padding - KW) // stride + 1
-    out = np.zeros((N, Cout, Ho, Wo), dtype=x.dtype)
-    for n in range(N):
-        for o in range(Cout):
-            for i in range(Ho):
-                for j in range(Wo):
-                    hs, ws = i * stride, j * stride
-                    field = xp[n, :, hs:hs + KH, ws:ws + KW]  # (Cin,KH,KW)
-                    out[n, o, i, j] = np.sum(field * w[o])
-    if b is not None:
-        out += b[None, :, None, None]
-    return out
-```
+<div class="widget" data-widget="code">
+<script type="application/json" class="code-config">
+{"func":"conv2d_naive","packages":["numpy"],"approx":true,"starter":"def conv2d_naive(x, w, b=None, stride=1, padding=0):\n    # x:(N,Cin,H,W)  w:(Cout,Cin,KH,KW)  b:(Cout,) -> (N,Cout,Hout,Wout); five nested loops\n    pass","tests":[{"args":[[[[[1,2,3],[4,5,6],[7,8,9]]]],[[[[1,0],[0,1]]]],null,1,0],"expect":[[[[6.0,8.0],[12.0,14.0]]]]},{"args":[[[[[1,2,3],[4,5,6],[7,8,9]]]],[[[[1,0],[0,1]]]],[1.0],1,0],"expect":[[[[7.0,9.0],[13.0,15.0]]]]},{"args":[[[[[1,2,3],[4,5,6],[7,8,9]]]],[[[[1,1],[1,1]]]],null,1,0],"expect":[[[[12.0,16.0],[24.0,28.0]]]]},{"args":[[[[[1,2,3],[4,5,6],[7,8,9]]]],[[[[1,1],[1,1]]]],null,2,0],"expect":[[[[12.0]]]]}],"solution":"import numpy as np\n\ndef conv2d_naive(x, w, b=None, stride=1, padding=0):\n    x = np.asarray(x, dtype=float)\n    w = np.asarray(w, dtype=float)\n    N, Cin, H, W = x.shape\n    Cout, _, KH, KW = w.shape\n    xp = x if padding == 0 else np.pad(x, ((0, 0), (0, 0), (padding, padding), (padding, padding)))\n    Ho = (H + 2 * padding - KH) // stride + 1\n    Wo = (W + 2 * padding - KW) // stride + 1\n    out = np.zeros((N, Cout, Ho, Wo), dtype=float)\n    for n in range(N):\n        for o in range(Cout):\n            for i in range(Ho):\n                for j in range(Wo):\n                    hs, ws = i * stride, j * stride\n                    field = xp[n, :, hs:hs + KH, ws:ws + KW]\n                    out[n, o, i, j] = np.sum(field * w[o])\n    if b is not None:\n        out += np.asarray(b, dtype=float)[None, :, None, None]\n    return out"}
+</script>
+</div>
 
 Correct but slow: five nested loops, $O(N\,C_\text{out}\,C_\text{in}\,K^2\,H_\text{out}W_\text{out})$.
 
-## im2col → GEMM (the fast path)
+### 2. im2col → GEMM (the fast path) <span class="badge badge-med">Medium</span>
 
-Unroll every receptive field into a column of length $C_\text{in}K_HK_W$; convolution becomes $W_\text{mat} \cdot \text{cols}$.
+Unroll every receptive field into a column of length $C_\text{in}K_HK_W$; convolution becomes $W_\text{mat} \cdot \text{cols}$ — one batched matmul. It must match `conv2d_naive` exactly.
 
-```python
-def im2col(x, KH, KW, stride, padding):
-    """x:(N,C,H,W) -> cols:(N, C*KH*KW, Hout*Wout)."""
-    N, C, H, W = x.shape
-    xp = _pad(x, padding)
-    Ho = (H + 2 * padding - KH) // stride + 1
-    Wo = (W + 2 * padding - KW) // stride + 1
-    cols = np.empty((N, C * KH * KW, Ho * Wo), dtype=x.dtype)
-    p = 0
-    for i in range(Ho):
-        for j in range(Wo):
-            hs, ws = i * stride, j * stride
-            patch = xp[:, :, hs:hs + KH, ws:ws + KW]   # (N,C,KH,KW)
-            cols[:, :, p] = patch.reshape(N, -1)
-            p += 1
-    return cols, Ho, Wo
-
-
-def conv2d_im2col(x, w, b=None, stride=1, padding=0):
-    N = x.shape[0]
-    Cout, _, KH, KW = w.shape
-    cols, Ho, Wo = im2col(x, KH, KW, stride, padding)      # (N, CKK, HW)
-    w_mat = w.reshape(Cout, -1)                            # (Cout, CKK)
-    out = np.einsum("oc,ncp->nop", w_mat, cols)            # (N, Cout, HW)
-    if b is not None:
-        out += b[None, :, None]
-    return out.reshape(N, Cout, Ho, Wo)
-```
+<div class="widget" data-widget="code">
+<script type="application/json" class="code-config">
+{"func":"conv2d_im2col","packages":["numpy"],"approx":true,"starter":"def conv2d_im2col(x, w, b=None, stride=1, padding=0):\n    # unroll receptive fields into columns, then one batched matmul (im2col -> GEMM)\n    pass","tests":[{"args":[[[[[1,2,3],[4,5,6],[7,8,9]]]],[[[[1,0],[0,1]]]],null,1,0],"expect":[[[[6.0,8.0],[12.0,14.0]]]]},{"args":[[[[[1,2,3],[4,5,6],[7,8,9]]]],[[[[1,1],[1,1]]]],[0.5],1,0],"expect":[[[[12.5,16.5],[24.5,28.5]]]]},{"args":[[[[[1,2],[3,4]]]],[[[[1,0],[0,1]]]],null,1,1],"expect":[[[[1.0,2.0,0.0],[3.0,5.0,2.0],[0.0,3.0,4.0]]]]}],"solution":"import numpy as np\n\ndef conv2d_im2col(x, w, b=None, stride=1, padding=0):\n    x = np.asarray(x, dtype=float)\n    w = np.asarray(w, dtype=float)\n    N, C, H, W = x.shape\n    Cout = w.shape[0]\n    KH, KW = w.shape[2], w.shape[3]\n    xp = x if padding == 0 else np.pad(x, ((0, 0), (0, 0), (padding, padding), (padding, padding)))\n    Ho = (H + 2 * padding - KH) // stride + 1\n    Wo = (W + 2 * padding - KW) // stride + 1\n    cols = np.empty((N, C * KH * KW, Ho * Wo), dtype=float)\n    p = 0\n    for i in range(Ho):\n        for j in range(Wo):\n            hs, ws = i * stride, j * stride\n            patch = xp[:, :, hs:hs + KH, ws:ws + KW]\n            cols[:, :, p] = patch.reshape(N, -1)\n            p += 1\n    out = np.einsum(\"oc,ncp->nop\", w.reshape(Cout, -1), cols)\n    if b is not None:\n        out += np.asarray(b, dtype=float)[None, :, None]\n    return out.reshape(N, Cout, Ho, Wo)"}
+</script>
+</div>
 
 The loop now only builds the column matrix; the heavy arithmetic is a single batched matmul — the same reduction cuDNN and every BLAS-backed framework make so it can call a tuned GEMM kernel.
 
-## Pooling
+### 3. Max & average pooling <span class="badge badge-easy">Easy</span>
 
-```python
-def _pool(x, k, stride, padding, reduce_fn):
-    N, C, H, W = x.shape
-    stride = stride or k
-    xp = _pad(x, padding)
-    Ho = (H + 2 * padding - k) // stride + 1
-    Wo = (W + 2 * padding - k) // stride + 1
-    out = np.empty((N, C, Ho, Wo), dtype=x.dtype)
-    for i in range(Ho):
-        for j in range(Wo):
-            hs, ws = i * stride, j * stride
-            win = xp[:, :, hs:hs + k, ws:ws + k].reshape(N, C, -1)
-            out[:, :, i, j] = reduce_fn(win, axis=-1)
-    return out
+Slide a $k\times k$ window (stride defaults to $k$) and reduce each window per channel — `max` for max-pool, `mean` for avg-pool.
 
+<div class="widget" data-widget="code">
+<script type="application/json" class="code-config">
+{"func":"max_pool2d","packages":["numpy"],"approx":true,"starter":"def max_pool2d(x, k=2, stride=None, padding=0):\n    # slide a k x k window (stride defaults to k) and take the max in each channel\n    pass","tests":[{"args":[[[[[1,2,3,4],[5,6,7,8],[9,10,11,12],[13,14,15,16]]]],2,2,0],"expect":[[[[6.0,8.0],[14.0,16.0]]]]},{"args":[[[[[1,2,3],[4,5,6],[7,8,9]]]],2,1,0],"expect":[[[[5.0,6.0],[8.0,9.0]]]]},{"args":[[[[[1,2],[3,4]],[[10,20],[30,40]]]],2,2,0],"expect":[[[[4.0]],[[40.0]]]]}],"solution":"import numpy as np\n\ndef max_pool2d(x, k=2, stride=None, padding=0):\n    x = np.asarray(x, dtype=float)\n    N, C, H, W = x.shape\n    stride = stride or k\n    xp = x if padding == 0 else np.pad(x, ((0, 0), (0, 0), (padding, padding), (padding, padding)))\n    Ho = (H + 2 * padding - k) // stride + 1\n    Wo = (W + 2 * padding - k) // stride + 1\n    out = np.empty((N, C, Ho, Wo), dtype=float)\n    for i in range(Ho):\n        for j in range(Wo):\n            hs, ws = i * stride, j * stride\n            win = xp[:, :, hs:hs + k, ws:ws + k].reshape(N, C, -1)\n            out[:, :, i, j] = win.max(axis=-1)\n    return out"}
+</script>
+</div>
 
-def max_pool2d(x, k=2, stride=None, padding=0):
-    return _pool(x, k, stride, padding, np.max)
-
-
-def avg_pool2d(x, k=2, stride=None, padding=0):
-    return _pool(x, k, stride, padding, np.mean)
-```
+<div class="widget" data-widget="code">
+<script type="application/json" class="code-config">
+{"func":"avg_pool2d","packages":["numpy"],"approx":true,"starter":"def avg_pool2d(x, k=2, stride=None, padding=0):\n    # slide a k x k window (stride defaults to k) and take the mean in each channel\n    pass","tests":[{"args":[[[[[1,2,3,4],[5,6,7,8],[9,10,11,12],[13,14,15,16]]]],2,2,0],"expect":[[[[3.5,5.5],[11.5,13.5]]]]},{"args":[[[[[1,2,3],[4,5,6],[7,8,9]]]],2,1,0],"expect":[[[[3.0,4.0],[6.0,7.0]]]]},{"args":[[[[[2,4],[6,8]]]],2,2,0],"expect":[[[[5.0]]]]}],"solution":"import numpy as np\n\ndef avg_pool2d(x, k=2, stride=None, padding=0):\n    x = np.asarray(x, dtype=float)\n    N, C, H, W = x.shape\n    stride = stride or k\n    xp = x if padding == 0 else np.pad(x, ((0, 0), (0, 0), (padding, padding), (padding, padding)))\n    Ho = (H + 2 * padding - k) // stride + 1\n    Wo = (W + 2 * padding - k) // stride + 1\n    out = np.empty((N, C, Ho, Wo), dtype=float)\n    for i in range(Ho):\n        for j in range(Wo):\n            hs, ws = i * stride, j * stride\n            win = xp[:, :, hs:hs + k, ws:ws + k].reshape(N, C, -1)\n            out[:, :, i, j] = win.mean(axis=-1)\n    return out"}
+</script>
+</div>
 
 ## Sanity check
 

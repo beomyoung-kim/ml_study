@@ -68,115 +68,64 @@ def dfs(graph, node, seen):
 > [!WARNING] Enqueue 시점에 표시
 > BFS에서는 pop할 때가 아니라 **push**할 때 `seen`에 추가합니다. pop할 때 표시하면 같은 노드가 큐에 여러 번 들어와 → 폭발적으로 커지고, 가중치 변형에서는 틀린 답이 나옵니다.
 
-## 대표 문제
+## Practice — 직접 구현하고 실행·테스트
 
-### 1. Number of Islands (Medium) — flood fill
+> [!TIP] 이 섹션 사용법
+> 아래 각 문제에는 **라이브 Python 에디터**가 있습니다. 직접 풀이를 작성하고 **▶ Run tests**를 누르면 어떤 케이스가 통과하는지 보여줍니다. 막히면 참고용 **Solution**을 열어볼 수 있지만, 먼저 직접 시도하세요 — 그 씨름이 곧 연습입니다. 첫 Run에서 작은 Python 런타임(~10 MB)을 내려받고, 이후 실행은 즉시입니다. 본인 에디터가 편하면 각 문제의 **LeetCode** 링크로 이동하세요. 각 lab은 평범한 grid / edge 리스트 / adjacency 리스트를 받습니다 — 따로 만들 graph 객체가 없습니다.
+
+순서대로 진행하세요 — grid flood-fill과 multi-source BFS를 먼저, 그다음 topological sort, cycle 감지, Dijkstra입니다.
+
+### 1. Number of Islands <span class="badge badge-med">Medium</span> · [LeetCode ↗](https://leetcode.com/problems/number-of-islands/)
 방문하지 않은 각 land 셀이 자신의 컴포넌트 전체를 가라앉히는 DFS를 시작합니다.
 
-```python
-def num_islands(grid: list[list[str]]) -> int:
-    rows, cols = len(grid), len(grid[0])
-    def sink(r, c):
-        if not (0 <= r < rows and 0 <= c < cols) or grid[r][c] != "1":
-            return
-        grid[r][c] = "0"                       # mark visited in place
-        for dr, dc in DIRS:
-            sink(r + dr, c + dc)
-    count = 0
-    for r in range(rows):
-        for c in range(cols):
-            if grid[r][c] == "1":
-                count += 1
-                sink(r, c)
-    return count
-```
+<div class="widget" data-widget="code">
+<script type="application/json" class="code-config">
+{"func":"num_islands","starter":"def num_islands(grid):\n    # each unvisited '1' launches a DFS that sinks its whole component\n    pass","tests":[{"args":[[["1","1","1","1","0"],["1","1","0","1","0"],["1","1","0","0","0"],["0","0","0","0","0"]]],"expect":1},{"args":[[["1","1","0","0","0"],["1","1","0","0","0"],["0","0","1","0","0"],["0","0","0","1","1"]]],"expect":3},{"args":[[["1","0","1"]]],"expect":2},{"args":[[["0"]]],"expect":0}],"solution":"def num_islands(grid):\n    DIRS = [(1, 0), (-1, 0), (0, 1), (0, -1)]\n    rows, cols = len(grid), len(grid[0])\n    def sink(r, c):\n        if not (0 <= r < rows and 0 <= c < cols) or grid[r][c] != \"1\":\n            return\n        grid[r][c] = \"0\"\n        for dr, dc in DIRS:\n            sink(r + dr, c + dc)\n    count = 0\n    for r in range(rows):\n        for c in range(cols):\n            if grid[r][c] == \"1\":\n                count += 1\n                sink(r, c)\n    return count"}
+</script>
+</div>
+
 `O(R·C)` 시간. grid를 변형하는 게 금지되면 별도의 `visited` 집합을 유지하세요.
 
-### 2. Rotting Oranges (Medium) — multi-source BFS
+### 2. Rotting Oranges <span class="badge badge-med">Medium</span> · [LeetCode ↗](https://leetcode.com/problems/rotting-oranges/)
 큐를 **모든** 썩은 셀로 시드하고 layer당 1분씩 확장합니다.
 
-```python
-def oranges_rotting(grid: list[list[int]]) -> int:
-    rows, cols = len(grid), len(grid[0])
-    q, fresh = deque(), 0
-    for r in range(rows):
-        for c in range(cols):
-            if grid[r][c] == 2: q.append((r, c))
-            elif grid[r][c] == 1: fresh += 1
-    minutes = 0
-    while q and fresh:
-        for _ in range(len(q)):
-            r, c = q.popleft()
-            for dr, dc in DIRS:
-                nr, nc = r + dr, c + dc
-                if 0 <= nr < rows and 0 <= nc < cols and grid[nr][nc] == 1:
-                    grid[nr][nc] = 2
-                    fresh -= 1
-                    q.append((nr, nc))
-        minutes += 1
-    return minutes if fresh == 0 else -1
-```
+<div class="widget" data-widget="code">
+<script type="application/json" class="code-config">
+{"func":"oranges_rotting","starter":"from collections import deque\n\ndef oranges_rotting(grid):\n    # multi-source BFS: seed the queue with all rotten cells, expand one minute per layer\n    pass","tests":[{"args":[[[2,1,1],[1,1,0],[0,1,1]]],"expect":4},{"args":[[[2,1,1],[0,1,1],[1,0,1]]],"expect":-1},{"args":[[[0,2]]],"expect":0},{"args":[[[1]]],"expect":-1},{"args":[[[2,2],[1,1]]],"expect":1}],"solution":"from collections import deque\n\ndef oranges_rotting(grid):\n    DIRS = [(1, 0), (-1, 0), (0, 1), (0, -1)]\n    rows, cols = len(grid), len(grid[0])\n    q, fresh = deque(), 0\n    for r in range(rows):\n        for c in range(cols):\n            if grid[r][c] == 2:\n                q.append((r, c))\n            elif grid[r][c] == 1:\n                fresh += 1\n    minutes = 0\n    while q and fresh:\n        for _ in range(len(q)):\n            r, c = q.popleft()\n            for dr, dc in DIRS:\n                nr, nc = r + dr, c + dc\n                if 0 <= nr < rows and 0 <= nc < cols and grid[nr][nc] == 1:\n                    grid[nr][nc] = 2\n                    fresh -= 1\n                    q.append((nr, nc))\n        minutes += 1\n    return minutes if fresh == 0 else -1"}
+</script>
+</div>
+
 `O(R·C)`. Multi-source BFS는 "여러 출발점에서 동시에 퍼진다" 패턴입니다 — *walls and gates*, *shortest bridge*도 마찬가지입니다.
 
-### 3. Course Schedule II — topological sort (Medium)
+### 3. Course Schedule II <span class="badge badge-med">Medium</span> · [LeetCode ↗](https://leetcode.com/problems/course-schedule-ii/)
 Kahn's algorithm: in-degree가 0인 노드를 반복적으로 emit합니다. 전부 emit할 수 없다면 사이클이 있는 것입니다.
 
-```python
-def find_order(n: int, prereqs: list[list[int]]) -> list[int]:
-    graph = defaultdict(list)
-    indeg = [0] * n
-    for course, need in prereqs:
-        graph[need].append(course)              # need -> course
-        indeg[course] += 1
-    q = deque(c for c in range(n) if indeg[c] == 0)
-    order = []
-    while q:
-        cur = q.popleft()
-        order.append(cur)
-        for nxt in graph[cur]:
-            indeg[nxt] -= 1
-            if indeg[nxt] == 0:
-                q.append(nxt)
-    return order if len(order) == n else []      # incomplete ⇒ cycle
-```
+<div class="widget" data-widget="code">
+<script type="application/json" class="code-config">
+{"func":"find_order","starter":"from collections import defaultdict, deque\n\ndef find_order(n, prereqs):\n    # Kahn's algorithm: repeatedly emit an in-degree-0 node; incomplete => cycle\n    pass","tests":[{"args":[2,[[1,0]]],"expect":[0,1]},{"args":[4,[[1,0],[2,0],[3,1],[3,2]]],"expect":[0,1,2,3]},{"args":[1,[]],"expect":[0]},{"args":[2,[[0,1],[1,0]]],"expect":[]}],"solution":"from collections import defaultdict, deque\n\ndef find_order(n, prereqs):\n    graph = defaultdict(list)\n    indeg = [0] * n\n    for course, need in prereqs:\n        graph[need].append(course)\n        indeg[course] += 1\n    q = deque(c for c in range(n) if indeg[c] == 0)\n    order = []\n    while q:\n        cur = q.popleft()\n        order.append(cur)\n        for nxt in graph[cur]:\n            indeg[nxt] -= 1\n            if indeg[nxt] == 0:\n                q.append(nxt)\n    return order if len(order) == n else []"}
+</script>
+</div>
+
 `O(V+E)`. `len(order) == n` 체크가 사이클 감지기 *그 자체*입니다. DFS 대안은 3-color 마킹(white/gray/black)을 씁니다; gray 노드로 가는 back-edge가 사이클입니다.
 
-### 4. Directed graph에서의 사이클 감지 (DFS, 3-color)
-```python
-def has_cycle(n, graph):
-    state = [0] * n                 # 0 unvisited, 1 in-stack, 2 done
-    def dfs(u):
-        if state[u] == 1: return True    # back-edge → cycle
-        if state[u] == 2: return False
-        state[u] = 1
-        if any(dfs(v) for v in graph[u]): return True
-        state[u] = 2
-        return False
-    return any(dfs(u) for u in range(n) if state[u] == 0)
-```
+### 4. Cycle Detection in a Directed Graph <span class="badge badge-med">Medium</span> · [LeetCode ↗](https://leetcode.com/problems/course-schedule/)
+3-color DFS: gray(in-stack) 노드로 가는 back-edge가 사이클입니다. adjacency list는 이웃 리스트의 평범한 리스트입니다.
 
-### 5. Network Delay Time — Dijkstra (Medium)
+<div class="widget" data-widget="code">
+<script type="application/json" class="code-config">
+{"func":"has_cycle","starter":"def has_cycle(n, graph):\n    # 3-color DFS: a back-edge to an in-stack (gray) node means a cycle\n    pass","tests":[{"args":[3,[[1],[2],[]]],"expect":false},{"args":[3,[[1],[2],[0]]],"expect":true},{"args":[2,[[],[]]],"expect":false},{"args":[4,[[1],[2],[3],[1]]],"expect":true},{"args":[1,[[]]],"expect":false}],"solution":"def has_cycle(n, graph):\n    state = [0] * n\n    def dfs(u):\n        if state[u] == 1:\n            return True\n        if state[u] == 2:\n            return False\n        state[u] = 1\n        if any(dfs(v) for v in graph[u]):\n            return True\n        state[u] = 2\n        return False\n    return any(dfs(u) for u in range(n) if state[u] == 0)"}
+</script>
+</div>
+
+### 5. Network Delay Time <span class="badge badge-med">Medium</span> · [LeetCode ↗](https://leetcode.com/problems/network-delay-time/)
 source에서 음이 아닌 가중 최단 경로; min-heap은 항상 아직 확정되지 않은 노드 중 가장 가까운 것을 finalize합니다.
 
-```python
-import heapq
+<div class="widget" data-widget="code">
+<script type="application/json" class="code-config">
+{"func":"network_delay_time","starter":"import heapq\nfrom collections import defaultdict\n\ndef network_delay_time(times, n, k):\n    # Dijkstra from k; a min-heap finalizes the closest unsettled node each pop\n    pass","tests":[{"args":[[[2,1,1],[2,3,1],[3,4,1]],4,2],"expect":2},{"args":[[[1,2,1]],2,1],"expect":1},{"args":[[[1,2,1]],2,2],"expect":-1},{"args":[[[1,2,1],[2,3,2],[1,3,4]],3,1],"expect":3}],"solution":"import heapq\nfrom collections import defaultdict\n\ndef network_delay_time(times, n, k):\n    graph = defaultdict(list)\n    for u, v, w in times:\n        graph[u].append((v, w))\n    dist = {}\n    pq = [(0, k)]\n    while pq:\n        d, u = heapq.heappop(pq)\n        if u in dist:\n            continue\n        dist[u] = d\n        for v, w in graph[u]:\n            if v not in dist:\n                heapq.heappush(pq, (d + w, v))\n    return max(dist.values()) if len(dist) == n else -1"}
+</script>
+</div>
 
-def network_delay_time(times, n, k) -> int:
-    graph = defaultdict(list)
-    for u, v, w in times:
-        graph[u].append((v, w))
-    dist = {}
-    pq = [(0, k)]                              # (distance, node)
-    while pq:
-        d, u = heapq.heappop(pq)
-        if u in dist:                          # already finalized
-            continue
-        dist[u] = d
-        for v, w in graph[u]:
-            if v not in dist:
-                heapq.heappush(pq, (d + w, v))
-    return max(dist.values()) if len(dist) == n else -1
-```
 `O(E log V)`. 음의 edge는 Dijkstra를 깨뜨립니다 → **Bellman-Ford** `O(VE)` 사용; all-pairs → **Floyd-Warshall** `O(V³)`.
 
 ## 언급할 변형

@@ -22,42 +22,36 @@ $$
 
 <div class="widget" data-widget="attention"></div>
 
+> [!TIP] 라이브 코드 — 직접 구현하고 실행·테스트
+> 아래 NumPy 블록은 **라이브 에디터**입니다. 본문을 채우고 **▶ Run tests**를 누르면 어떤 케이스가 통과하는지 보여줍니다. 막히면 참고용 **Solution**을 열 수 있지만, 먼저 직접 시도하세요 — 그 씨름이 곧 연습입니다. 첫 Run에서 작은 Python 런타임과 NumPy(~15 MB)를 내려받고, 이후 실행은 즉시입니다.
+
 ## Scaled dot-product attention (NumPy)
 
-```python
-import numpy as np
+먼저 key 축에 대한 수치적으로 안정된 **softmax**:
 
+<div class="widget" data-widget="code">
+<script type="application/json" class="code-config">
+{"func":"softmax","packages":["numpy"],"approx":true,"starter":"import numpy as np\n\ndef softmax(x, axis=-1):\n    # subtract the max for stability, exponentiate, then normalize\n    pass","tests":[{"args":[[[1,2,3]]],"expect":[[0.09003057317038046,0.24472847105479764,0.6652409557748218]]},{"args":[[[0,0,0]]],"expect":[[0.3333333333333333,0.3333333333333333,0.3333333333333333]]},{"args":[[[1000,1001,1002]]],"expect":[[0.09003057317038046,0.24472847105479764,0.6652409557748218]]},{"args":[[[-1,0,1],[1,0,-1]]],"expect":[[0.09003057317038046,0.24472847105479764,0.6652409557748218],[0.6652409557748218,0.24472847105479764,0.09003057317038046]]}],"solution":"import numpy as np\n\ndef softmax(x, axis=-1):\n    x = np.asarray(x, dtype=float)\n    x = x - np.max(x, axis=axis, keepdims=True)\n    e = np.exp(x)\n    return e / np.sum(e, axis=axis, keepdims=True)"}
+</script>
+</div>
 
-def softmax(x, axis=-1):
-    x = x - np.max(x, axis=axis, keepdims=True)   # stability: subtract max
-    e = np.exp(x)
-    return e / np.sum(e, axis=axis, keepdims=True)
+그다음 **scaled dot-product attention** — 점수 계산, 스케일, softmax, value 가중합 (이 lab은 출력을 반환합니다; 참고 구현은 weights도 함께 반환합니다):
 
-
-def sdpa(q, k, v, mask=None):
-    """
-    q,k: (..., Tq/Tk, d),  v: (..., Tk, dv)
-    mask: broadcastable to (..., Tq, Tk); bool True=keep, or additive (-inf blocks)
-    returns: out (..., Tq, dv), weights (..., Tq, Tk)
-    """
-    d = q.shape[-1]
-    scores = q @ np.swapaxes(k, -1, -2) / np.sqrt(d)   # (..., Tq, Tk)
-    if mask is not None:
-        scores = np.where(mask, scores, -1e9) if mask.dtype == bool \
-                 else scores + mask
-    w = softmax(scores, axis=-1)
-    return w @ v, w
-```
+<div class="widget" data-widget="code">
+<script type="application/json" class="code-config">
+{"func":"sdpa","packages":["numpy"],"approx":true,"starter":"import numpy as np\n\ndef softmax(x, axis=-1):\n    x = np.asarray(x, dtype=float)\n    x = x - np.max(x, axis=axis, keepdims=True)\n    e = np.exp(x)\n    return e / np.sum(e, axis=axis, keepdims=True)\n\ndef sdpa(q, k, v, mask=None):\n    # scores = QK^T / sqrt(d); softmax over keys; return the weighted sum of V\n    pass","tests":[{"args":[[[1,0],[0,1]],[[1,0],[0,1]],[[1,2],[3,4]]],"expect":[[1.6604769013466862,2.6604769013466862],[2.3395230986533138,3.3395230986533138]]},{"args":[[[2,0,0]],[[2,0,0],[0,2,0],[0,0,2]],[[1,1],[2,2],[3,3]]],"expect":[[1.2485832277662388,1.2485832277662388]]},{"args":[[[1,1],[2,0]],[[1,0],[0,1]],[[10,0],[0,10]]],"expect":[[5.0,5.0],[8.04429682506957,1.9557031749304312]]}],"solution":"import numpy as np\n\ndef softmax(x, axis=-1):\n    x = np.asarray(x, dtype=float)\n    x = x - np.max(x, axis=axis, keepdims=True)\n    e = np.exp(x)\n    return e / np.sum(e, axis=axis, keepdims=True)\n\ndef sdpa(q, k, v, mask=None):\n    q, k, v = np.asarray(q, float), np.asarray(k, float), np.asarray(v, float)\n    d = q.shape[-1]\n    scores = q @ np.swapaxes(k, -1, -2) / np.sqrt(d)\n    if mask is not None:\n        mask = np.asarray(mask)\n        scores = np.where(mask, scores, -1e9) if mask.dtype == bool else scores + mask\n    w = softmax(scores, axis=-1)\n    return w @ v"}
+</script>
+</div>
 
 **왜 $\sqrt{d}$ 인가:** $q,k$의 원소가 단위 분산을 가지면 $q\cdot k$의 분산은 $\approx d$ 가 되어, raw 점수가 차원에 따라 커지고 softmax를 saturate된 near-one-hot 영역으로 밀어넣어 gradient가 소실됩니다. $\sqrt{d}$로 나누면 점수 분산이 $\approx 1$로 유지됩니다. *(verifiable)*
 
 ## Masking
 
-```python
-def causal_mask(T):
-    """Lower-triangular bool: True = allowed to attend. (T,T)."""
-    return np.tril(np.ones((T, T), dtype=bool))
-```
+<div class="widget" data-widget="code">
+<script type="application/json" class="code-config">
+{"func":"causal_mask","packages":["numpy"],"approx":true,"starter":"import numpy as np\n\ndef causal_mask(T):\n    # lower-triangular boolean (T,T): True = allowed to attend (no peeking ahead)\n    pass","tests":[{"args":[2],"expect":[[1,0],[1,1]]},{"args":[3],"expect":[[1,0,0],[1,1,0],[1,1,1]]},{"args":[4],"expect":[[1,0,0,0],[1,1,0,0],[1,1,1,0],[1,1,1,1]]}],"solution":"import numpy as np\n\ndef causal_mask(T):\n    return np.tril(np.ones((T, T), dtype=bool))"}
+</script>
+</div>
 
 - **Causal mask**는 position $t$가 미래($>t$)를 보지 못하게 막습니다 — autoregressive decoding에 필수입니다.
 - **Key-padding mask**는 `[PAD]` key로의 attention을 막습니다; shape은 `(B,1,1,Tk)`로, head와 query에 대해 broadcast됩니다.
@@ -65,22 +59,13 @@ def causal_mask(T):
 
 ## Multi-head attention
 
-```python
-def mha(x, Wq, Wk, Wv, Wo, num_heads, causal=False):
-    """x:(B,T,D)  W*:(D,D) -> (B,T,D)."""
-    B, T, D = x.shape
-    assert D % num_heads == 0
-    dh = D // num_heads
+`mha`를 구현하세요; 하네스 `run_mha`는 seed 고정된 `(B,T,D)=(1,3,4)` 입력과 `H=2` head를 만들어 출력이 결정적이게 합니다 (헬퍼 `softmax`/`causal_mask`/`sdpa`는 제공됩니다):
 
-    def split(t):                       # (B,T,D) -> (B,H,T,Dh)
-        return t.reshape(B, T, num_heads, dh).transpose(0, 2, 1, 3)
-
-    q, k, v = split(x @ Wq), split(x @ Wk), split(x @ Wv)
-    mask = causal_mask(T) if causal else None      # (T,T) broadcasts over B,H
-    out, _ = sdpa(q, k, v, mask=mask)              # (B,H,T,Dh)
-    out = out.transpose(0, 2, 1, 3).reshape(B, T, D)   # merge heads
-    return out @ Wo
-```
+<div class="widget" data-widget="code">
+<script type="application/json" class="code-config">
+{"func":"run_mha","packages":["numpy"],"approx":true,"starter":"import numpy as np\n\ndef softmax(x, axis=-1):\n    x = x - np.max(x, axis=axis, keepdims=True)\n    e = np.exp(x)\n    return e / np.sum(e, axis=axis, keepdims=True)\n\ndef causal_mask(T):\n    return np.tril(np.ones((T, T), dtype=bool))\n\ndef sdpa(q, k, v, mask=None):\n    d = q.shape[-1]\n    scores = q @ np.swapaxes(k, -1, -2) / np.sqrt(d)\n    if mask is not None:\n        scores = np.where(mask, scores, -1e9) if mask.dtype == bool else scores + mask\n    return softmax(scores, axis=-1) @ v\n\ndef mha(x, Wq, Wk, Wv, Wo, num_heads, causal=False):\n    # split (B,T,D)->(B,H,T,Dh), run sdpa per head, merge heads, project by Wo\n    pass\n\ndef run_mha(causal):\n    np.random.seed(0)\n    B, T, D, H = 1, 3, 4, 2\n    x = np.random.randn(B, T, D)\n    Ws = [np.random.randn(D, D) * 0.1 for _ in range(4)]\n    return mha(x, *Ws, H, causal)","tests":[{"args":[false],"expect":[[[0.03190098881683708,-0.003883638346883957,0.009816921823006634,0.0008853701048203459],[0.032178757789826054,-0.003954663472188265,0.008879630160056167,0.0011910101137743716],[0.03203148496155561,-0.0038215886062526196,0.009498626868409653,0.0010096474007127018]]]},{"args":[true],"expect":[[[0.059733984570268545,-0.003891324159579386,0.01245601832145022,0.013606293601693605],[0.04292552968524655,-0.008439370891800252,0.018326373103144715,-0.004398635006322705],[0.03203148496155561,-0.0038215886062526196,0.009498626868409653,0.0010096474007127018]]]}],"solution":"import numpy as np\n\ndef softmax(x, axis=-1):\n    x = x - np.max(x, axis=axis, keepdims=True)\n    e = np.exp(x)\n    return e / np.sum(e, axis=axis, keepdims=True)\n\ndef causal_mask(T):\n    return np.tril(np.ones((T, T), dtype=bool))\n\ndef sdpa(q, k, v, mask=None):\n    d = q.shape[-1]\n    scores = q @ np.swapaxes(k, -1, -2) / np.sqrt(d)\n    if mask is not None:\n        scores = np.where(mask, scores, -1e9) if mask.dtype == bool else scores + mask\n    return softmax(scores, axis=-1) @ v\n\ndef mha(x, Wq, Wk, Wv, Wo, num_heads, causal=False):\n    B, T, D = x.shape\n    dh = D // num_heads\n    def split(t):\n        return t.reshape(B, T, num_heads, dh).transpose(0, 2, 1, 3)\n    q, k, v = split(x @ Wq), split(x @ Wk), split(x @ Wv)\n    mask = causal_mask(T) if causal else None\n    out = sdpa(q, k, v, mask=mask)\n    out = out.transpose(0, 2, 1, 3).reshape(B, T, D)\n    return out @ Wo\n\ndef run_mha(causal):\n    np.random.seed(0)\n    B, T, D, H = 1, 3, 4, 2\n    x = np.random.randn(B, T, D)\n    Ws = [np.random.randn(D, D) * 0.1 for _ in range(4)]\n    return mha(x, *Ws, H, causal)"}
+</script>
+</div>
 
 head를 batch 같은 축으로 나누면 하나의 `@`로 모든 head를 한 번에 계산할 수 있습니다. **복잡도:** head당 점수 행렬에 대해 $O(T^2 d)$ 연산과 $O(T^2)$ 메모리가 듭니다.
 

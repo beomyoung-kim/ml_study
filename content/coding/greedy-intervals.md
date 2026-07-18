@@ -48,81 +48,59 @@ Greedy is fast (usually one sort + one pass) but only correct when the greedy-ch
 <figcaption>Sorted by end time, greedily keep each interval that starts at or after the last kept end.</figcaption>
 </figure>
 
-## Representative problems
+## Practice — implement, run, test
 
-### 1. Merge Intervals (Medium) — sort by start
-```python
-def merge(intervals: list[list[int]]) -> list[list[int]]:
-    intervals.sort(key=lambda iv: iv[0])
-    out = []
-    for start, end in intervals:
-        if out and start <= out[-1][1]:
-            out[-1][1] = max(out[-1][1], end)     # overlap ⇒ extend
-        else:
-            out.append([start, end])
-    return out
-```
+> [!TIP] How to use this section
+> Each problem below has a **live Python editor**. Write your solution, hit **▶ Run tests**, and see which cases pass. Stuck? Reveal a reference **Solution** — but attempt first; the struggle *is* the practice. The first Run downloads a small Python runtime (~10 MB); later runs are instant. Prefer your own editor? Each problem links out to **LeetCode**.
+
+Work them in order — the sort key is the whole game, so name it (start, end, or length) before you type.
+
+### 1. Merge Intervals <span class="badge badge-med">Medium</span> · [LeetCode ↗](https://leetcode.com/problems/merge-intervals/) — sort by start
+<div class="widget" data-widget="code">
+<script type="application/json" class="code-config">
+{"func": "merge", "starter": "def merge(intervals: list[list[int]]) -> list[list[int]]:\n    # sort by start; extend the last kept interval when they overlap\n    pass", "tests": [{"args": [[[1, 3], [2, 6], [8, 10], [15, 18]]], "expect": [[1, 6], [8, 10], [15, 18]]}, {"args": [[[1, 4], [4, 5]]], "expect": [[1, 5]]}, {"args": [[[1, 4], [2, 3]]], "expect": [[1, 4]]}, {"args": [[[1, 4], [0, 4]]], "expect": [[0, 4]]}], "solution": "def merge(intervals):\n    intervals.sort(key=lambda iv: iv[0])\n    out = []\n    for start, end in intervals:\n        if out and start <= out[-1][1]:\n            out[-1][1] = max(out[-1][1], end)\n        else:\n            out.append([start, end])\n    return out"}
+</script>
+</div>
 `O(N log N)`. Whether touching endpoints (`[1,2],[2,3]`) merge is a `<` vs `<=` decision — confirm the problem's convention out loud.
 
-### 2. Non-overlapping Intervals (Medium) — sort by end, activity selection
+### 2. Non-overlapping Intervals <span class="badge badge-med">Medium</span> · [LeetCode ↗](https://leetcode.com/problems/non-overlapping-intervals/) — sort by end, activity selection
 Minimum removals = `N −` (max non-overlapping kept).
 
-```python
-def erase_overlap(intervals: list[list[int]]) -> int:
-    intervals.sort(key=lambda iv: iv[1])         # earliest finish first
-    kept, prev_end = 0, float("-inf")
-    for start, end in intervals:
-        if start >= prev_end:                    # no overlap with last kept
-            kept += 1
-            prev_end = end
-    return len(intervals) - kept
-```
+<div class="widget" data-widget="code">
+<script type="application/json" class="code-config">
+{"func": "erase_overlap", "starter": "def erase_overlap(intervals: list[list[int]]) -> int:\n    # sort by end (earliest finish first); count how many you can keep\n    pass", "tests": [{"args": [[[1, 2], [2, 3], [3, 4], [1, 3]]], "expect": 1}, {"args": [[[1, 2], [1, 2], [1, 2]]], "expect": 2}, {"args": [[[1, 2], [2, 3]]], "expect": 0}, {"args": [[[1, 100], [11, 22], [1, 11], [2, 12]]], "expect": 2}], "solution": "def erase_overlap(intervals):\n    intervals.sort(key=lambda iv: iv[1])\n    kept, prev_end = 0, float('-inf')\n    for start, end in intervals:\n        if start >= prev_end:\n            kept += 1\n            prev_end = end\n    return len(intervals) - kept"}
+</script>
+</div>
 `O(N log N)`. Sorting by *start* here is the classic wrong turn — it doesn't give the exchange-argument guarantee.
 
-### 3. Minimum Arrows to Burst Balloons (Medium)
+### 3. Minimum Arrows to Burst Balloons <span class="badge badge-med">Medium</span> · [LeetCode ↗](https://leetcode.com/problems/minimum-number-of-arrows-to-burst-balloons/)
 Same earliest-end greedy: one arrow at each interval's end bursts every balloon overlapping it.
 
-```python
-def find_min_arrows(points: list[list[int]]) -> int:
-    points.sort(key=lambda p: p[1])
-    arrows, last = 0, float("-inf")
-    for start, end in points:
-        if start > last:                         # current arrow can't reach
-            arrows += 1
-            last = end                           # new arrow at this end
-    return arrows
-```
+<div class="widget" data-widget="code">
+<script type="application/json" class="code-config">
+{"func": "find_min_arrows", "starter": "def find_min_arrows(points: list[list[int]]) -> int:\n    # sort by end; new arrow whenever the current one can't reach\n    pass", "tests": [{"args": [[[10, 16], [2, 8], [1, 6], [7, 12]]], "expect": 2}, {"args": [[[1, 2], [3, 4], [5, 6], [7, 8]]], "expect": 4}, {"args": [[[1, 2], [2, 3], [3, 4], [4, 5]]], "expect": 2}, {"args": [[[1, 2]]], "expect": 1}], "solution": "def find_min_arrows(points):\n    points.sort(key=lambda p: p[1])\n    arrows, last = 0, float('-inf')\n    for start, end in points:\n        if start > last:\n            arrows += 1\n            last = end\n    return arrows"}
+</script>
+</div>
 `O(N log N)`. Structurally identical to activity selection — recognizing that saves derivation time.
 
-### 4. Meeting Rooms II (Medium) — heap of end-times
+### 4. Meeting Rooms II <span class="badge badge-med">Medium</span> · [LeetCode ↗](https://leetcode.com/problems/meeting-rooms-ii/) — heap of end-times
 Minimum rooms = max simultaneous overlap. A min-heap of end-times tracks rooms in use.
 
-```python
-import heapq
-
-def min_meeting_rooms(intervals: list[list[int]]) -> int:
-    intervals.sort(key=lambda iv: iv[0])         # process by start
-    ends = []                                    # min-heap of end times
-    for start, end in intervals:
-        if ends and ends[0] <= start:            # earliest room freed in time
-            heapq.heappop(ends)
-        heapq.heappush(ends, end)
-    return len(ends)                             # peak concurrency
-```
+<div class="widget" data-widget="code">
+<script type="application/json" class="code-config">
+{"func": "min_meeting_rooms", "starter": "import heapq\n\ndef min_meeting_rooms(intervals: list[list[int]]) -> int:\n    # process by start; a min-heap of end-times tracks rooms in use\n    pass", "tests": [{"args": [[[0, 30], [5, 10], [15, 20]]], "expect": 2}, {"args": [[[7, 10], [2, 4]]], "expect": 1}, {"args": [[[1, 5], [8, 9], [8, 9]]], "expect": 2}, {"args": [[[13, 15], [1, 13]]], "expect": 1}], "solution": "import heapq\n\ndef min_meeting_rooms(intervals):\n    intervals.sort(key=lambda iv: iv[0])\n    ends = []\n    for start, end in intervals:\n        if ends and ends[0] <= start:\n            heapq.heappop(ends)\n        heapq.heappush(ends, end)\n    return len(ends)"}
+</script>
+</div>
 `O(N log N)`. Alternative: sweep-line over sorted start/end events, `+1`/`−1`, track the max — same complexity, no heap. Bridges to [Heaps](#/coding/heap-priority-queue).
 
-### 5. Jump Game (Medium) — greedy reachability
+### 5. Jump Game <span class="badge badge-med">Medium</span> · [LeetCode ↗](https://leetcode.com/problems/jump-game/) — greedy reachability
 Track the farthest index reachable; if the loop index ever exceeds it, you're stuck.
 
-```python
-def can_jump(nums: list[int]) -> bool:
-    farthest = 0
-    for i, jump in enumerate(nums):
-        if i > farthest:
-            return False                         # unreachable gap
-        farthest = max(farthest, i + jump)
-    return True
-```
+<div class="widget" data-widget="code">
+<script type="application/json" class="code-config">
+{"func": "can_jump", "starter": "def can_jump(nums: list[int]) -> bool:\n    # track the farthest reachable index; fail if the loop index passes it\n    pass", "tests": [{"args": [[2, 3, 1, 1, 4]], "expect": true}, {"args": [[3, 2, 1, 0, 4]], "expect": false}, {"args": [[0]], "expect": true}, {"args": [[2, 0, 0]], "expect": true}, {"args": [[1, 0, 1, 0]], "expect": false}], "solution": "def can_jump(nums):\n    farthest = 0\n    for i, jump in enumerate(nums):\n        if i > farthest:\n            return False\n        farthest = max(farthest, i + jump)\n    return True"}
+</script>
+</div>
 `O(N)`, `O(1)` space. The DP formulation is `O(N²)` — leading with the greedy reachability argument is the win. *Jump Game II* (min jumps) extends this to a BFS-like level count, still `O(N)`.
 
 ## When greedy fails — the DP hand-off

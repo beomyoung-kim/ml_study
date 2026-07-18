@@ -64,92 +64,66 @@ def inorder_iterative(root):                 # explicit stack, no recursion limi
 
 Swap the `out.append` position to get pre-order iterative; post-order iterative is easiest as **reversed** `node→right→left`.
 
-## Representative problems
+## Practice — implement, run, test
 
-### 1. Validate BST (Medium)
+> [!TIP] How to use this section
+> Each problem below has a **live Python editor**. Write your solution, hit **▶ Run tests**, and see which cases pass. Stuck? Reveal a reference **Solution** — but attempt first; the struggle *is* the practice. The first Run downloads a small Python runtime (~10 MB); later runs are instant. Prefer your own editor? Each problem links out to **LeetCode**. Each lab feeds the tree in as a **level-order list** (`None` marks a missing child) and builds the `TreeNode` for you.
+
+Work them in order — BST validation and traversal first, then the general-tree LCA and the tree-DP finale.
+
+### 1. Validate BST <span class="badge badge-med">Medium</span> · [LeetCode ↗](https://leetcode.com/problems/validate-binary-search-tree/)
 Each node must fall inside an inherited `(low, high)` window — comparing to the parent alone is the classic bug.
 
-```python
-def is_valid_bst(root) -> bool:
-    def dfs(node, low, high):
-        if not node:
-            return True
-        if not (low < node.val < high):
-            return False
-        return dfs(node.left, low, node.val) and dfs(node.right, node.val, high)
-    return dfs(root, float("-inf"), float("inf"))
-```
+<div class="widget" data-widget="code">
+<script type="application/json" class="code-config">
+{"func":"is_valid_bst","starter":"from collections import deque\n\nclass TreeNode:\n    def __init__(self, val=0, left=None, right=None):\n        self.val, self.left, self.right = val, left, right\n\ndef build_tree(vals):\n    if not vals:\n        return None\n    root = TreeNode(vals[0])\n    q = deque([root])\n    i = 1\n    while q and i < len(vals):\n        node = q.popleft()\n        if i < len(vals) and vals[i] is not None:\n            node.left = TreeNode(vals[i])\n            q.append(node.left)\n        i += 1\n        if i < len(vals) and vals[i] is not None:\n            node.right = TreeNode(vals[i])\n            q.append(node.right)\n        i += 1\n    return root\n\ndef is_valid_bst(vals) -> bool:\n    root = build_tree(vals)\n    # inherit a (low, high) window down the tree; equal values are invalid\n    pass","tests":[{"args":[[2,1,3]],"expect":true},{"args":[[5,1,4,null,null,3,6]],"expect":false},{"args":[[2,2,2]],"expect":false},{"args":[[10,5,15,null,null,6,20]],"expect":false},{"args":[[]],"expect":true},{"args":[[1]],"expect":true}],"solution":"from collections import deque\n\nclass TreeNode:\n    def __init__(self, val=0, left=None, right=None):\n        self.val, self.left, self.right = val, left, right\n\ndef build_tree(vals):\n    if not vals:\n        return None\n    root = TreeNode(vals[0])\n    q = deque([root])\n    i = 1\n    while q and i < len(vals):\n        node = q.popleft()\n        if i < len(vals) and vals[i] is not None:\n            node.left = TreeNode(vals[i])\n            q.append(node.left)\n        i += 1\n        if i < len(vals) and vals[i] is not None:\n            node.right = TreeNode(vals[i])\n            q.append(node.right)\n        i += 1\n    return root\n\ndef is_valid_bst(vals) -> bool:\n    root = build_tree(vals)\n    def dfs(node, low, high):\n        if not node:\n            return True\n        if not (low < node.val < high):\n            return False\n        return dfs(node.left, low, node.val) and dfs(node.right, node.val, high)\n    return dfs(root, float(\"-inf\"), float(\"inf\"))"}
+</script>
+</div>
+
 `O(N)` time, `O(H)` space. Equivalent check: an in-order traversal is strictly increasing.
 
-### 2. Kth Smallest in a BST (Medium)
+### 2. Kth Smallest in a BST <span class="badge badge-med">Medium</span> · [LeetCode ↗](https://leetcode.com/problems/kth-smallest-element-in-a-bst/)
 In-order visits values in sorted order — stop at the k-th.
 
-```python
-def kth_smallest(root, k: int) -> int:
-    stack, cur = [], root
-    while cur or stack:
-        while cur:
-            stack.append(cur)
-            cur = cur.left
-        cur = stack.pop()
-        k -= 1
-        if k == 0:
-            return cur.val
-        cur = cur.right
-```
+<div class="widget" data-widget="code">
+<script type="application/json" class="code-config">
+{"func":"kth_smallest","starter":"from collections import deque\n\nclass TreeNode:\n    def __init__(self, val=0, left=None, right=None):\n        self.val, self.left, self.right = val, left, right\n\ndef build_tree(vals):\n    if not vals:\n        return None\n    root = TreeNode(vals[0])\n    q = deque([root])\n    i = 1\n    while q and i < len(vals):\n        node = q.popleft()\n        if i < len(vals) and vals[i] is not None:\n            node.left = TreeNode(vals[i])\n            q.append(node.left)\n        i += 1\n        if i < len(vals) and vals[i] is not None:\n            node.right = TreeNode(vals[i])\n            q.append(node.right)\n        i += 1\n    return root\n\ndef kth_smallest(vals, k: int) -> int:\n    root = build_tree(vals)\n    # in-order visits values in sorted order; stop at the k-th\n    pass","tests":[{"args":[[3,1,4,null,2],1],"expect":1},{"args":[[5,3,6,2,4,null,null,1],3],"expect":3},{"args":[[1],1],"expect":1},{"args":[[2,1,3],2],"expect":2},{"args":[[2,1,3],3],"expect":3}],"solution":"from collections import deque\n\nclass TreeNode:\n    def __init__(self, val=0, left=None, right=None):\n        self.val, self.left, self.right = val, left, right\n\ndef build_tree(vals):\n    if not vals:\n        return None\n    root = TreeNode(vals[0])\n    q = deque([root])\n    i = 1\n    while q and i < len(vals):\n        node = q.popleft()\n        if i < len(vals) and vals[i] is not None:\n            node.left = TreeNode(vals[i])\n            q.append(node.left)\n        i += 1\n        if i < len(vals) and vals[i] is not None:\n            node.right = TreeNode(vals[i])\n            q.append(node.right)\n        i += 1\n    return root\n\ndef kth_smallest(vals, k: int) -> int:\n    root = build_tree(vals)\n    stack, cur = [], root\n    while cur or stack:\n        while cur:\n            stack.append(cur)\n            cur = cur.left\n        cur = stack.pop()\n        k -= 1\n        if k == 0:\n            return cur.val\n        cur = cur.right"}
+</script>
+</div>
+
 `O(H + k)` time. Follow-up "the BST is modified often" → augment nodes with subtree counts for `O(H)` queries.
 
-### 3. Lowest Common Ancestor — general binary tree (Medium)
-Return the node where the searches for `p` and `q` meet.
+### 3. Lowest Common Ancestor <span class="badge badge-med">Medium</span> · [LeetCode ↗](https://leetcode.com/problems/lowest-common-ancestor-of-a-binary-tree/)
+Return the value of the node where the searches for `p` and `q` meet (values are unique).
 
-```python
-def lca(root, p, q):
-    if root is None or root is p or root is q:
-        return root
-    left = lca(root.left, p, q)
-    right = lca(root.right, p, q)
-    if left and right:      # p, q split across children → root is the LCA
-        return root
-    return left or right    # both on one side (or neither)
-```
+<div class="widget" data-widget="code">
+<script type="application/json" class="code-config">
+{"func":"lca","starter":"from collections import deque\n\nclass TreeNode:\n    def __init__(self, val=0, left=None, right=None):\n        self.val, self.left, self.right = val, left, right\n\ndef build_tree(vals):\n    if not vals:\n        return None\n    root = TreeNode(vals[0])\n    q = deque([root])\n    i = 1\n    while q and i < len(vals):\n        node = q.popleft()\n        if i < len(vals) and vals[i] is not None:\n            node.left = TreeNode(vals[i])\n            q.append(node.left)\n        i += 1\n        if i < len(vals) and vals[i] is not None:\n            node.right = TreeNode(vals[i])\n            q.append(node.right)\n        i += 1\n    return root\n\ndef lca(vals, p, q):\n    root = build_tree(vals)\n    # return the value of the node where the searches for p and q meet\n    pass","tests":[{"args":[[3,5,1,6,2,0,8,null,null,7,4],5,1],"expect":3},{"args":[[3,5,1,6,2,0,8,null,null,7,4],5,4],"expect":5},{"args":[[3,5,1,6,2,0,8,null,null,7,4],6,4],"expect":5},{"args":[[1,2],1,2],"expect":1},{"args":[[2,1,3],1,3],"expect":2}],"solution":"from collections import deque\n\nclass TreeNode:\n    def __init__(self, val=0, left=None, right=None):\n        self.val, self.left, self.right = val, left, right\n\ndef build_tree(vals):\n    if not vals:\n        return None\n    root = TreeNode(vals[0])\n    q = deque([root])\n    i = 1\n    while q and i < len(vals):\n        node = q.popleft()\n        if i < len(vals) and vals[i] is not None:\n            node.left = TreeNode(vals[i])\n            q.append(node.left)\n        i += 1\n        if i < len(vals) and vals[i] is not None:\n            node.right = TreeNode(vals[i])\n            q.append(node.right)\n        i += 1\n    return root\n\ndef lca(vals, p, q):\n    root = build_tree(vals)\n    def dfs(node):\n        if node is None or node.val == p or node.val == q:\n            return node\n        left = dfs(node.left)\n        right = dfs(node.right)\n        if left and right:\n            return node\n        return left or right\n    ans = dfs(root)\n    return ans.val if ans else None"}
+</script>
+</div>
+
 `O(N)`. For a **BST** (LC 235) it's `O(H)`: descend left while both `< node`, right while both `> node`, else you're at the split.
 
-### 4. Level Order Traversal (Medium)
+### 4. Level Order Traversal <span class="badge badge-med">Medium</span> · [LeetCode ↗](https://leetcode.com/problems/binary-tree-level-order-traversal/)
 BFS, snapshotting the queue length so each level stays separate.
 
-```python
-def level_order(root):
-    if not root: return []
-    out, q = [], deque([root])
-    while q:
-        level = []
-        for _ in range(len(q)):           # fix the level boundary
-            node = q.popleft()
-            level.append(node.val)
-            if node.left:  q.append(node.left)
-            if node.right: q.append(node.right)
-        out.append(level)
-    return out
-```
+<div class="widget" data-widget="code">
+<script type="application/json" class="code-config">
+{"func":"level_order","starter":"from collections import deque\n\nclass TreeNode:\n    def __init__(self, val=0, left=None, right=None):\n        self.val, self.left, self.right = val, left, right\n\ndef build_tree(vals):\n    if not vals:\n        return None\n    root = TreeNode(vals[0])\n    q = deque([root])\n    i = 1\n    while q and i < len(vals):\n        node = q.popleft()\n        if i < len(vals) and vals[i] is not None:\n            node.left = TreeNode(vals[i])\n            q.append(node.left)\n        i += 1\n        if i < len(vals) and vals[i] is not None:\n            node.right = TreeNode(vals[i])\n            q.append(node.right)\n        i += 1\n    return root\n\ndef level_order(vals):\n    root = build_tree(vals)\n    # BFS; snapshot len(q) so each level stays separate\n    pass","tests":[{"args":[[3,9,20,null,null,15,7]],"expect":[[3],[9,20],[15,7]]},{"args":[[1]],"expect":[[1]]},{"args":[[]],"expect":[]},{"args":[[1,2,3,4,5]],"expect":[[1],[2,3],[4,5]]}],"solution":"from collections import deque\n\nclass TreeNode:\n    def __init__(self, val=0, left=None, right=None):\n        self.val, self.left, self.right = val, left, right\n\ndef build_tree(vals):\n    if not vals:\n        return None\n    root = TreeNode(vals[0])\n    q = deque([root])\n    i = 1\n    while q and i < len(vals):\n        node = q.popleft()\n        if i < len(vals) and vals[i] is not None:\n            node.left = TreeNode(vals[i])\n            q.append(node.left)\n        i += 1\n        if i < len(vals) and vals[i] is not None:\n            node.right = TreeNode(vals[i])\n            q.append(node.right)\n        i += 1\n    return root\n\ndef level_order(vals):\n    root = build_tree(vals)\n    if not root:\n        return []\n    out, q = [], deque([root])\n    while q:\n        level = []\n        for _ in range(len(q)):\n            node = q.popleft()\n            level.append(node.val)\n            if node.left:\n                q.append(node.left)\n            if node.right:\n                q.append(node.right)\n        out.append(level)\n    return out"}
+</script>
+</div>
+
 `O(N)` time, `O(W)` space (max width). Zigzag, right-side-view, and "average per level" are one-line edits on this.
 
-### 5. Binary Tree Maximum Path Sum (Hard) — tree DP
+### 5. Binary Tree Maximum Path Sum <span class="badge badge-hard">Hard</span> · [LeetCode ↗](https://leetcode.com/problems/binary-tree-maximum-path-sum/)
 Each call returns the best *downward* chain; the global answer may **bend** at a node using both children.
 
-```python
-def max_path_sum(root) -> int:
-    best = float("-inf")
-    def gain(node):
-        nonlocal best
-        if not node:
-            return 0
-        left = max(gain(node.left), 0)         # drop negative branches
-        right = max(gain(node.right), 0)
-        best = max(best, node.val + left + right)   # path bending here
-        return node.val + max(left, right)          # chain to hand upward
-    gain(root)
-    return best
-```
+<div class="widget" data-widget="code">
+<script type="application/json" class="code-config">
+{"func":"max_path_sum","starter":"from collections import deque\n\nclass TreeNode:\n    def __init__(self, val=0, left=None, right=None):\n        self.val, self.left, self.right = val, left, right\n\ndef build_tree(vals):\n    if not vals:\n        return None\n    root = TreeNode(vals[0])\n    q = deque([root])\n    i = 1\n    while q and i < len(vals):\n        node = q.popleft()\n        if i < len(vals) and vals[i] is not None:\n            node.left = TreeNode(vals[i])\n            q.append(node.left)\n        i += 1\n        if i < len(vals) and vals[i] is not None:\n            node.right = TreeNode(vals[i])\n            q.append(node.right)\n        i += 1\n    return root\n\ndef max_path_sum(vals) -> int:\n    root = build_tree(vals)\n    # each call returns the best downward chain; the global answer may bend at a node\n    pass","tests":[{"args":[[1,2,3]],"expect":6},{"args":[[-10,9,20,null,null,15,7]],"expect":42},{"args":[[-3]],"expect":-3},{"args":[[2,-1]],"expect":2},{"args":[[-2,-1]],"expect":-1}],"solution":"from collections import deque\n\nclass TreeNode:\n    def __init__(self, val=0, left=None, right=None):\n        self.val, self.left, self.right = val, left, right\n\ndef build_tree(vals):\n    if not vals:\n        return None\n    root = TreeNode(vals[0])\n    q = deque([root])\n    i = 1\n    while q and i < len(vals):\n        node = q.popleft()\n        if i < len(vals) and vals[i] is not None:\n            node.left = TreeNode(vals[i])\n            q.append(node.left)\n        i += 1\n        if i < len(vals) and vals[i] is not None:\n            node.right = TreeNode(vals[i])\n            q.append(node.right)\n        i += 1\n    return root\n\ndef max_path_sum(vals) -> int:\n    root = build_tree(vals)\n    best = float(\"-inf\")\n    def gain(node):\n        nonlocal best\n        if not node:\n            return 0\n        left = max(gain(node.left), 0)\n        right = max(gain(node.right), 0)\n        best = max(best, node.val + left + right)\n        return node.val + max(left, right)\n    gain(root)\n    return best"}
+</script>
+</div>
+
 `O(N)`. This return-a-chain / update-a-global split is the template for **diameter** (LC 543), **house robber III** (LC 337), and most "path within a tree" DPs.
 
 ## Common tree-DP recipes

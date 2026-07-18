@@ -74,68 +74,51 @@ class UnionFind:
 <figcaption>find 도중의 path compression은 노드를 root로 직접 재연결하므로, 이후의 find는 O(1)이 됩니다.</figcaption>
 </figure>
 
-## 대표 문제
+## Practice — 직접 구현하고 실행·테스트
 
-### 1. Number of Connected Components (Medium)
+> [!TIP] 이 섹션 사용법
+> 아래 각 문제에는 **라이브 Python 에디터**가 있습니다. 직접 풀이를 작성하고 **▶ Run tests**를 누르면 어떤 케이스가 통과하는지 보여줍니다. 막히면 참고용 **Solution**을 열어볼 수 있지만, 먼저 직접 시도하세요 — 그 씨름이 곧 연습입니다. 첫 Run에서 작은 Python 런타임(~10 MB)을 내려받고, 이후 실행은 즉시입니다. 본인 에디터가 편하면 각 문제의 **LeetCode** 링크로 이동하세요.
+
+아래 각 랩은 동일한 `UnionFind` 클래스를 재사용합니다 — 각 starter에 포함되어 있으니, 이를 구동하는 top-level 함수만 구현하면 됩니다.
+
+### 1. Number of Connected Components <span class="badge badge-med">Medium</span> · [LeetCode ↗](https://leetcode.com/problems/number-of-connected-components-in-an-undirected-graph/)
 모든 edge를 union; 답은 `count`입니다. 고립된 노드는 `count = n`으로 초기화하면 처리됩니다.
 
-```python
-def count_components(n: int, edges: list[list[int]]) -> int:
-    uf = UnionFind(n)
-    for u, v in edges:
-        uf.union(u, v)
-    return uf.count
-```
+<div class="widget" data-widget="code">
+<script type="application/json" class="code-config">
+{"func": "count_components", "starter": "class UnionFind:\n    def __init__(self, n):\n        self.parent = list(range(n))\n        self.rank = [0] * n\n        self.count = n\n    def find(self, x):\n        while self.parent[x] != x:\n            self.parent[x] = self.parent[self.parent[x]]\n            x = self.parent[x]\n        return x\n    def union(self, a, b):\n        ra, rb = self.find(a), self.find(b)\n        if ra == rb:\n            return False\n        if self.rank[ra] < self.rank[rb]:\n            ra, rb = rb, ra\n        self.parent[rb] = ra\n        if self.rank[ra] == self.rank[rb]:\n            self.rank[ra] += 1\n        self.count -= 1\n        return True\n    def connected(self, a, b):\n        return self.find(a) == self.find(b)\n\n\ndef count_components(n: int, edges: list[list[int]]) -> int:\n    # union every edge; the answer is uf.count\n    pass", "tests": [{"args": [5, [[0, 1], [1, 2], [3, 4]]], "expect": 2}, {"args": [5, [[0, 1], [1, 2], [2, 3], [3, 4]]], "expect": 1}, {"args": [4, []], "expect": 4}, {"args": [1, []], "expect": 1}], "solution": "class UnionFind:\n    def __init__(self, n):\n        self.parent = list(range(n))\n        self.rank = [0] * n\n        self.count = n\n    def find(self, x):\n        while self.parent[x] != x:\n            self.parent[x] = self.parent[self.parent[x]]\n            x = self.parent[x]\n        return x\n    def union(self, a, b):\n        ra, rb = self.find(a), self.find(b)\n        if ra == rb:\n            return False\n        if self.rank[ra] < self.rank[rb]:\n            ra, rb = rb, ra\n        self.parent[rb] = ra\n        if self.rank[ra] == self.rank[rb]:\n            self.rank[ra] += 1\n        self.count -= 1\n        return True\n    def connected(self, a, b):\n        return self.find(a) == self.find(b)\n\n\ndef count_components(n, edges):\n    uf = UnionFind(n)\n    for u, v in edges:\n        uf.union(u, v)\n    return uf.count"}
+</script>
+</div>
 `O(N + E·α(N))`.
 
-### 2. Redundant Connection (Medium) — undirected 사이클
+### 2. Redundant Connection <span class="badge badge-med">Medium</span> · [LeetCode ↗](https://leetcode.com/problems/redundant-connection/) — undirected 사이클
 tree에 여분의 edge 하나. 양 끝점이 *이미* 연결된 첫 edge가 범인입니다.
 
-```python
-def find_redundant(edges: list[list[int]]) -> list[int]:
-    uf = UnionFind(len(edges) + 1)     # nodes are 1-indexed
-    for u, v in edges:
-        if not uf.union(u, v):
-            return [u, v]              # union returns False ⇒ cycle-closing edge
-    return []
-```
+<div class="widget" data-widget="code">
+<script type="application/json" class="code-config">
+{"func": "find_redundant", "starter": "class UnionFind:\n    def __init__(self, n):\n        self.parent = list(range(n))\n        self.rank = [0] * n\n        self.count = n\n    def find(self, x):\n        while self.parent[x] != x:\n            self.parent[x] = self.parent[self.parent[x]]\n            x = self.parent[x]\n        return x\n    def union(self, a, b):\n        ra, rb = self.find(a), self.find(b)\n        if ra == rb:\n            return False\n        if self.rank[ra] < self.rank[rb]:\n            ra, rb = rb, ra\n        self.parent[rb] = ra\n        if self.rank[ra] == self.rank[rb]:\n            self.rank[ra] += 1\n        self.count -= 1\n        return True\n    def connected(self, a, b):\n        return self.find(a) == self.find(b)\n\n\ndef find_redundant(edges: list[list[int]]) -> list[int]:\n    # nodes are 1-indexed; the first edge that fails to union closes a cycle\n    pass", "tests": [{"args": [[[1, 2], [1, 3], [2, 3]]], "expect": [2, 3]}, {"args": [[[1, 2], [2, 3], [3, 4], [1, 4], [1, 5]]], "expect": [1, 4]}, {"args": [[[1, 2], [2, 3], [1, 3]]], "expect": [1, 3]}], "solution": "class UnionFind:\n    def __init__(self, n):\n        self.parent = list(range(n))\n        self.rank = [0] * n\n        self.count = n\n    def find(self, x):\n        while self.parent[x] != x:\n            self.parent[x] = self.parent[self.parent[x]]\n            x = self.parent[x]\n        return x\n    def union(self, a, b):\n        ra, rb = self.find(a), self.find(b)\n        if ra == rb:\n            return False\n        if self.rank[ra] < self.rank[rb]:\n            ra, rb = rb, ra\n        self.parent[rb] = ra\n        if self.rank[ra] == self.rank[rb]:\n            self.rank[ra] += 1\n        self.count -= 1\n        return True\n    def connected(self, a, b):\n        return self.find(a) == self.find(b)\n\n\ndef find_redundant(edges):\n    uf = UnionFind(len(edges) + 1)\n    for u, v in edges:\n        if not uf.union(u, v):\n            return [u, v]\n    return []"}
+</script>
+</div>
 `O(N·α(N))`. `union`이 `False`를 반환하는 것이 사이클 감지기 *그 자체*입니다 — undirected graph에는 DFS보다 깔끔합니다.
 
-### 3. Accounts Merge (Medium) — 공유 키로 union
+### 3. Accounts Merge <span class="badge badge-med">Medium</span> · [LeetCode ↗](https://leetcode.com/problems/accounts-merge/) — 공유 키로 union
 두 계정이 email을 하나라도 공유하면 같은 사람의 것입니다. `email → 처음 본 index` map을 통해 계정 index를 union합니다.
 
-```python
-from collections import defaultdict
-
-def accounts_merge(accounts: list[list[str]]) -> list[list[str]]:
-    uf = UnionFind(len(accounts))
-    owner = {}                                    # email -> account index
-    for i, acc in enumerate(accounts):
-        for email in acc[1:]:
-            if email in owner:
-                uf.union(i, owner[email])
-            else:
-                owner[email] = i
-    groups = defaultdict(list)
-    for email, i in owner.items():
-        groups[uf.find(i)].append(email)
-    return [[accounts[r][0]] + sorted(emails) for r, emails in groups.items()]
-```
+<div class="widget" data-widget="code">
+<script type="application/json" class="code-config">
+{"func": "accounts_merge", "starter": "class UnionFind:\n    def __init__(self, n):\n        self.parent = list(range(n))\n        self.rank = [0] * n\n        self.count = n\n    def find(self, x):\n        while self.parent[x] != x:\n            self.parent[x] = self.parent[self.parent[x]]\n            x = self.parent[x]\n        return x\n    def union(self, a, b):\n        ra, rb = self.find(a), self.find(b)\n        if ra == rb:\n            return False\n        if self.rank[ra] < self.rank[rb]:\n            ra, rb = rb, ra\n        self.parent[rb] = ra\n        if self.rank[ra] == self.rank[rb]:\n            self.rank[ra] += 1\n        self.count -= 1\n        return True\n    def connected(self, a, b):\n        return self.find(a) == self.find(b)\n\n\nfrom collections import defaultdict\n\ndef accounts_merge(accounts: list[list[str]]) -> list[list[str]]:\n    # union account indices that share any email, then group by root\n    pass", "tests": [{"args": [[["John", "john@a.com", "john@b.com"], ["John", "john@b.com", "john@c.com"], ["Mary", "mary@a.com"]]], "expect": [["John", "john@a.com", "john@b.com", "john@c.com"], ["Mary", "mary@a.com"]], "unordered": true}, {"args": [[["A", "a1@x.com"], ["A", "a2@x.com"]]], "expect": [["A", "a1@x.com"], ["A", "a2@x.com"]], "unordered": true}, {"args": [[["A", "a@x.com", "b@x.com"], ["B", "c@x.com"]]], "expect": [["A", "a@x.com", "b@x.com"], ["B", "c@x.com"]], "unordered": true}], "solution": "class UnionFind:\n    def __init__(self, n):\n        self.parent = list(range(n))\n        self.rank = [0] * n\n        self.count = n\n    def find(self, x):\n        while self.parent[x] != x:\n            self.parent[x] = self.parent[self.parent[x]]\n            x = self.parent[x]\n        return x\n    def union(self, a, b):\n        ra, rb = self.find(a), self.find(b)\n        if ra == rb:\n            return False\n        if self.rank[ra] < self.rank[rb]:\n            ra, rb = rb, ra\n        self.parent[rb] = ra\n        if self.rank[ra] == self.rank[rb]:\n            self.rank[ra] += 1\n        self.count -= 1\n        return True\n    def connected(self, a, b):\n        return self.find(a) == self.find(b)\n\n\nfrom collections import defaultdict\n\ndef accounts_merge(accounts):\n    uf = UnionFind(len(accounts))\n    owner = {}\n    for i, acc in enumerate(accounts):\n        for email in acc[1:]:\n            if email in owner:\n                uf.union(i, owner[email])\n            else:\n                owner[email] = i\n    groups = defaultdict(list)\n    for email, i in owner.items():\n        groups[uf.find(i)].append(email)\n    return [[accounts[r][0]] + sorted(emails) for r, emails in groups.items()]"}
+</script>
+</div>
 email 정렬이 지배하는 `O(N·K log K)`. 주의: *이름*은 병합을 결정하지 않습니다 — 오직 공유 email만이 합니다.
 
-### 4. Graph Valid Tree (Medium)
+### 4. Graph Valid Tree <span class="badge badge-med">Medium</span> · [LeetCode ↗](https://leetcode.com/problems/graph-valid-tree/)
 tree는 정확히 `n-1`개의 edge를 갖고, 완전히 연결되어 있으며, 비순환입니다. Union-Find가 이 세 가지를 값싸게 확인합니다.
 
-```python
-def valid_tree(n: int, edges: list[list[int]]) -> bool:
-    if len(edges) != n - 1:
-        return False                    # too few/many edges ⇒ can't be a tree
-    uf = UnionFind(n)
-    for u, v in edges:
-        if not uf.union(u, v):
-            return False                # cycle
-    return uf.count == 1                 # fully connected
-```
+<div class="widget" data-widget="code">
+<script type="application/json" class="code-config">
+{"func": "valid_tree", "starter": "class UnionFind:\n    def __init__(self, n):\n        self.parent = list(range(n))\n        self.rank = [0] * n\n        self.count = n\n    def find(self, x):\n        while self.parent[x] != x:\n            self.parent[x] = self.parent[self.parent[x]]\n            x = self.parent[x]\n        return x\n    def union(self, a, b):\n        ra, rb = self.find(a), self.find(b)\n        if ra == rb:\n            return False\n        if self.rank[ra] < self.rank[rb]:\n            ra, rb = rb, ra\n        self.parent[rb] = ra\n        if self.rank[ra] == self.rank[rb]:\n            self.rank[ra] += 1\n        self.count -= 1\n        return True\n    def connected(self, a, b):\n        return self.find(a) == self.find(b)\n\n\ndef valid_tree(n: int, edges: list[list[int]]) -> bool:\n    # a tree has exactly n-1 edges, no cycle, and one component\n    pass", "tests": [{"args": [5, [[0, 1], [0, 2], [0, 3], [1, 4]]], "expect": true}, {"args": [5, [[0, 1], [1, 2], [2, 3], [1, 3], [1, 4]]], "expect": false}, {"args": [4, [[0, 1], [2, 3]]], "expect": false}, {"args": [1, []], "expect": true}], "solution": "class UnionFind:\n    def __init__(self, n):\n        self.parent = list(range(n))\n        self.rank = [0] * n\n        self.count = n\n    def find(self, x):\n        while self.parent[x] != x:\n            self.parent[x] = self.parent[self.parent[x]]\n            x = self.parent[x]\n        return x\n    def union(self, a, b):\n        ra, rb = self.find(a), self.find(b)\n        if ra == rb:\n            return False\n        if self.rank[ra] < self.rank[rb]:\n            ra, rb = rb, ra\n        self.parent[rb] = ra\n        if self.rank[ra] == self.rank[rb]:\n            self.rank[ra] += 1\n        self.count -= 1\n        return True\n    def connected(self, a, b):\n        return self.find(a) == self.find(b)\n\n\ndef valid_tree(n, edges):\n    if len(edges) != n - 1:\n        return False\n    uf = UnionFind(n)\n    for u, v in edges:\n        if not uf.union(u, v):\n            return False\n    return uf.count == 1"}
+</script>
+</div>
 `n-1` edge 체크가 있으면 "사이클 없음"이 이미 "연결됨"을 함의하지만, 세 조건을 모두 언급하는 것이 깔끔한 답입니다.
 
 ### 5. Kruskal's MST (Hard) — 대표적인 응용

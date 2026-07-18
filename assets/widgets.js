@@ -216,6 +216,44 @@
   }
   const fmt = (v) => JSON.stringify(v);
 
+  // Runs inside Pyodide: grades cfg.func against cfg.tests, returns a JSON string.
+  // Supports exact compare, order-insensitive lists (unordered), and numeric/array
+  // closeness (approx + tol) via numpy.allclose when numpy is loaded.
+  const HARNESS = [
+    "import json as __json",
+    "def __eq(a, b, approx, tol, unordered):",
+    "    try:",
+    "        if approx:",
+    "            try:",
+    "                import numpy as __np",
+    "                return bool(__np.allclose(__np.array(a, dtype=float), __np.array(b, dtype=float), rtol=tol, atol=tol))",
+    "            except Exception:",
+    "                return abs(a - b) <= tol",
+    "        if unordered:",
+    "            return sorted(map(repr, a)) == sorted(map(repr, b))",
+    "        return bool(a == b)",
+    "    except Exception:",
+    "        return False",
+    "__fn = globals().get(__func_name__)",
+    "__res = []",
+    "if __fn is None:",
+    "    __res.append({'ok': False, 'err': \"No function named '\" + str(__func_name__) + \"' is defined.\"})",
+    "else:",
+    "    for __t in __tests__:",
+    "        __args = list(__t['args']) if ('args' in __t and __t['args'] is not None) else []",
+    "        __call = __func_name__ + '(' + ', '.join(repr(x) for x in __args) + ')'",
+    "        try:",
+    "            __got = __fn(*__args)",
+    "            __ap = __t['approx'] if 'approx' in __t else __approx_default__",
+    "            __tol = __t['tol'] if 'tol' in __t else 1e-6",
+    "            __un = __t['unordered'] if 'unordered' in __t else False",
+    "            __ok = __eq(__got, __t['expect'], __ap, __tol, __un)",
+    "            __res.append({'ok': bool(__ok), 'call': __call, 'got': repr(__got)[:120], 'want': repr(__t['expect'])[:120]})",
+    "        except Exception as __e:",
+    "            __res.append({'ok': False, 'call': __call, 'err': str(__e)[:160]})",
+    "__json.dumps(__res)",
+  ].join("\n");
+
   registry.code = (host) => {
     let cfg;
     try { cfg = JSON.parse(host.querySelector("script.code-config").textContent); }
@@ -258,33 +296,35 @@
     };
     runBtn.onclick = async () => {
       runBtn.disabled = true;
-      out.className = "w-code-out"; out.textContent = "Loading Python… (first run downloads the runtime, ~10 MB — later runs are instant)";
+      out.className = "w-code-out";
+      out.textContent = "Loading Python…" + (cfg.packages && cfg.packages.length ? " (+ " + cfg.packages.join(", ") + ")" : "") + " — the first run downloads the runtime; later runs are instant.";
       let py;
       try { py = await ensurePyodide(); }
       catch (e) { out.className = "w-code-out err"; out.textContent = "⚠ " + e.message; runBtn.disabled = false; return; }
+      if (cfg.packages && cfg.packages.length) {
+        try { await py.loadPackage(cfg.packages); }
+        catch (e) { out.className = "w-code-out err"; out.textContent = "⚠ Could not load " + cfg.packages.join(", ") + " (network?)."; runBtn.disabled = false; return; }
+      }
       try { await py.runPythonAsync(editor.value); }
       catch (e) { out.className = "w-code-out err"; out.textContent = "❌ Your code raised an error:\n" + (e.message || e); runBtn.disabled = false; return; }
-      const fn = py.globals.get(cfg.func);
-      if (!fn) { out.className = "w-code-out err"; out.textContent = "❌ No function named `" + cfg.func + "` was defined."; runBtn.disabled = false; return; }
-      let pass = 0; const fails = [];
-      (cfg.tests || []).forEach((tc) => {
-        const proxies = [];
-        try {
-          const args = (tc.args || []).map((a) => { const p = py.toPy(a); if (p && p.destroy) proxies.push(p); return p; });
-          let r = fn(...args);
-          if (r && r.toJs) r = r.toJs();
-          const ok = jsonEq(r, tc.expect, tc.unordered);
-          if (ok) pass++;
-          else fails.push("  ✗ " + cfg.func + "(" + (tc.args || []).map(fmt).join(", ") + ") → got " + fmt(r) + ", want " + fmt(tc.expect));
-        } catch (e) {
-          fails.push("  ✗ " + cfg.func + "(" + (tc.args || []).map(fmt).join(", ") + ") → error: " + (e.message || e));
-        }
-        proxies.forEach((p) => { try { p.destroy(); } catch (e) {} });
-      });
-      try { if (fn.destroy) fn.destroy(); } catch (e) {}
-      const total = (cfg.tests || []).length;
+      let results;
+      try {
+        py.globals.set("__func_name__", cfg.func);
+        py.globals.set("__approx_default__", !!cfg.approx);
+        const tp = py.toPy(cfg.tests || []);
+        py.globals.set("__tests__", tp);
+        const raw = py.runPython(HARNESS);
+        if (tp.destroy) tp.destroy();
+        results = JSON.parse(raw);
+      } catch (e) { out.className = "w-code-out err"; out.textContent = "❌ Test harness error:\n" + (e.message || e); runBtn.disabled = false; return; }
+      const total = results.length;
+      const pass = results.filter((r) => r.ok).length;
       if (pass === total) { out.className = "w-code-out ok"; out.textContent = "✓ All " + total + " tests passed. Well done."; }
-      else { out.className = "w-code-out err"; out.textContent = pass + "/" + total + " passed\n" + fails.slice(0, 8).join("\n") + (fails.length > 8 ? "\n  … " + (fails.length - 8) + " more" : ""); }
+      else {
+        const fails = results.filter((r) => !r.ok).map((r) => "  ✗ " + (r.call ? r.call + " " : "") + (r.err ? "→ error: " + r.err : "→ got " + r.got + ", want " + r.want));
+        out.className = "w-code-out err";
+        out.textContent = pass + "/" + total + " passed\n" + fails.slice(0, 8).join("\n") + (fails.length > 8 ? "\n  … " + (fails.length - 8) + " more" : "");
+      }
       runBtn.disabled = false;
     };
   };

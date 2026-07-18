@@ -49,56 +49,51 @@ def climb_tab(n: int) -> int:
 > [!NOTE] Interview move
 > Derive the recurrence top-down with `@cache` (fast, hard to get wrong), then, if asked for space, convert to tabulation and roll the table down to one or two rows. Showing both directions is a strong signal.
 
+## Practice — implement, run, test
+
+> [!TIP] How to use this section
+> Several problems below have a **live Python editor**. Write your solution, hit **▶ Run tests**, and see which cases pass. Stuck? Reveal a reference **Solution** — but attempt first; the struggle *is* the practice. The first Run downloads a small Python runtime (~10 MB); later runs are instant. Prefer your own editor? Each problem links out to **LeetCode**.
+
+The labs are grouped by shape below — 1-D rolling-table DPs first, then the 2-D grid family. Work them in order.
+
 ## 1-D DP
 
-### House Robber — `dp[i] = max(dp[i-1], dp[i-2] + nums[i])`
+### House Robber — `dp[i] = max(dp[i-1], dp[i-2] + nums[i])` <span class="badge badge-med">Medium</span> · [LeetCode ↗](https://leetcode.com/problems/house-robber/)
 Rob `i` (skip `i-1`) or skip `i`. Two rolling scalars suffice.
 
-```python
-def rob(nums: list[int]) -> int:
-    skip, take = 0, 0            # best excluding / including previous house
-    for x in nums:
-        skip, take = max(skip, take), skip + x
-    return max(skip, take)
-```
+<div class="widget" data-widget="code">
+<script type="application/json" class="code-config">
+{"func":"rob","starter":"def rob(nums: list[int]) -> int:\n    # rob i (skip i-1) or skip i; two rolling scalars suffice\n    pass","tests":[{"args":[[1,2,3,1]],"expect":4},{"args":[[2,7,9,3,1]],"expect":12},{"args":[[2,1,1,2]],"expect":4},{"args":[[5]],"expect":5},{"args":[[]],"expect":0}],"solution":"def rob(nums: list[int]) -> int:\n    skip, take = 0, 0\n    for x in nums:\n        skip, take = max(skip, take), skip + x\n    return max(skip, take)"}
+</script>
+</div>
+
 `O(N)` time, `O(1)` space. Circular variant (LC 213): run twice, excluding first or last house.
 
-### Coin Change — unbounded knapsack (fewest coins)
+### Coin Change — unbounded knapsack (fewest coins) <span class="badge badge-med">Medium</span> · [LeetCode ↗](https://leetcode.com/problems/coin-change/)
 `dp[a]` = min coins to make amount `a`. Iterate amounts outward.
 
-```python
-def coin_change(coins: list[int], amount: int) -> int:
-    INF = amount + 1
-    dp = [0] + [INF] * amount
-    for a in range(1, amount + 1):
-        for c in coins:
-            if c <= a:
-                dp[a] = min(dp[a], dp[a - c] + 1)
-    return dp[amount] if dp[amount] < INF else -1
-```
+<div class="widget" data-widget="code">
+<script type="application/json" class="code-config">
+{"func":"coin_change","starter":"def coin_change(coins: list[int], amount: int) -> int:\n    # dp[a] = fewest coins to make amount a; iterate amounts outward\n    pass","tests":[{"args":[[1,2,5],11],"expect":3},{"args":[[2],3],"expect":-1},{"args":[[1],0],"expect":0},{"args":[[2,5,10,1],27],"expect":4}],"solution":"def coin_change(coins: list[int], amount: int) -> int:\n    INF = amount + 1\n    dp = [0] + [INF] * amount\n    for a in range(1, amount + 1):\n        for c in coins:\n            if c <= a:\n                dp[a] = min(dp[a], dp[a - c] + 1)\n    return dp[amount] if dp[amount] < INF else -1"}
+</script>
+</div>
+
 `O(amount · |coins|)`. **Loop order matters:** amount-outer/coin-inner counts *combinations* correctly for "number of ways" (LC 518); swapping to coin-outer avoids counting permutations. Say which you're computing.
 
-### Longest Increasing Subsequence — `O(N log N)`
+### Longest Increasing Subsequence — `O(N log N)` <span class="badge badge-med">Medium</span> · [LeetCode ↗](https://leetcode.com/problems/longest-increasing-subsequence/)
 Patience sorting: `tails[k]` = smallest possible tail of an increasing subsequence of length `k+1`.
 
-```python
-import bisect
+<div class="widget" data-widget="code">
+<script type="application/json" class="code-config">
+{"func":"length_of_lis","starter":"import bisect\n\ndef length_of_lis(nums: list[int]) -> int:\n    # patience sorting: tails[k] = smallest tail of an increasing subsequence of length k+1\n    pass","tests":[{"args":[[10,9,2,5,3,7,101,18]],"expect":4},{"args":[[0,1,0,3,2,3]],"expect":4},{"args":[[7,7,7,7,7]],"expect":1},{"args":[[4,10,4,3,8,9]],"expect":3},{"args":[[]],"expect":0}],"solution":"import bisect\n\ndef length_of_lis(nums: list[int]) -> int:\n    tails = []\n    for x in nums:\n        i = bisect.bisect_left(tails, x)\n        if i == len(tails):\n            tails.append(x)\n        else:\n            tails[i] = x\n    return len(tails)"}
+</script>
+</div>
 
-def length_of_lis(nums: list[int]) -> int:
-    tails = []
-    for x in nums:
-        i = bisect.bisect_left(tails, x)     # bisect_right → longest non-decreasing
-        if i == len(tails):
-            tails.append(x)
-        else:
-            tails[i] = x
-    return len(tails)
-```
 The naive DP is `O(N²)` (`dp[i] = 1 + max(dp[j] for j<i if nums[j]<nums[i])`); know both and lead with the fast one.
 
 ## 2-D DP
 
-### Edit Distance (Levenshtein) — the canonical grid DP
+### Edit Distance (Levenshtein) — the canonical grid DP <span class="badge badge-med">Medium</span> · [LeetCode ↗](https://leetcode.com/problems/edit-distance/)
 `dp[i][j]` = edits to turn `word1[:i]` into `word2[:j]`.
 
 <figure>
@@ -123,35 +118,23 @@ The naive DP is `O(N²)` (`dp[i] = 1 + max(dp[j] for j<i if nums[j]<nums[i])`); 
 <figcaption>HORSE → ROS = 3. Each cell is 1 + min(up, left, diag), or diag if the letters match.</figcaption>
 </figure>
 
-```python
-def min_distance(w1: str, w2: str) -> int:
-    m, n = len(w1), len(w2)
-    dp = [[0] * (n + 1) for _ in range(m + 1)]
-    for i in range(m + 1): dp[i][0] = i           # delete all
-    for j in range(n + 1): dp[0][j] = j           # insert all
-    for i in range(1, m + 1):
-        for j in range(1, n + 1):
-            if w1[i-1] == w2[j-1]:
-                dp[i][j] = dp[i-1][j-1]            # free match
-            else:
-                dp[i][j] = 1 + min(dp[i-1][j],     # delete
-                                   dp[i][j-1],     # insert
-                                   dp[i-1][j-1])   # replace
-    return dp[m][n]
-```
+<div class="widget" data-widget="code">
+<script type="application/json" class="code-config">
+{"func":"min_distance","starter":"def min_distance(w1: str, w2: str) -> int:\n    # dp[i][j] = edits to turn w1[:i] into w2[:j]; match is free, else 1 + min(delete, insert, replace)\n    pass","tests":[{"args":["horse","ros"],"expect":3},{"args":["intention","execution"],"expect":5},{"args":["","abc"],"expect":3},{"args":["abc",""],"expect":3},{"args":["abc","abc"],"expect":0}],"solution":"def min_distance(w1: str, w2: str) -> int:\n    m, n = len(w1), len(w2)\n    dp = [[0] * (n + 1) for _ in range(m + 1)]\n    for i in range(m + 1): dp[i][0] = i\n    for j in range(n + 1): dp[0][j] = j\n    for i in range(1, m + 1):\n        for j in range(1, n + 1):\n            if w1[i-1] == w2[j-1]:\n                dp[i][j] = dp[i-1][j-1]\n            else:\n                dp[i][j] = 1 + min(dp[i-1][j], dp[i][j-1], dp[i-1][j-1])\n    return dp[m][n]"}
+</script>
+</div>
+
 `O(mn)` time, reducible to `O(min(m,n))` space (two rows). LCS, min-path-sum, and unique-paths share this grid skeleton.
 
 ### 0/1 Knapsack — the DP everyone should hold in their head
 `dp[w]` = best value at capacity `w`; iterate weights **downward** so each item is used at most once.
 
-```python
-def knapsack(weights, values, cap: int) -> int:
-    dp = [0] * (cap + 1)
-    for wt, val in zip(weights, values):
-        for w in range(cap, wt - 1, -1):     # reverse ⇒ 0/1 (each item once)
-            dp[w] = max(dp[w], dp[w - wt] + val)
-    return dp[cap]
-```
+<div class="widget" data-widget="code">
+<script type="application/json" class="code-config">
+{"func":"knapsack","starter":"def knapsack(weights, values, cap: int) -> int:\n    # dp[w] = best value at capacity w; iterate capacity downward so each item is used at most once\n    pass","tests":[{"args":[[1,3,4,5],[1,4,5,7],7],"expect":9},{"args":[[2,3,4,5],[3,4,5,6],5],"expect":7},{"args":[[1,2,3],[6,10,12],5],"expect":22},{"args":[[4,5],[1,2],3],"expect":0}],"solution":"def knapsack(weights, values, cap: int) -> int:\n    dp = [0] * (cap + 1)\n    for wt, val in zip(weights, values):\n        for w in range(cap, wt - 1, -1):\n            dp[w] = max(dp[w], dp[w - wt] + val)\n    return dp[cap]"}
+</script>
+</div>
+
 Forward iteration would reuse items → that's *unbounded* knapsack (coin change). The loop direction is the entire distinction.
 
 ### Interval DP — `dp[i][j]` over a subrange, split at `k`

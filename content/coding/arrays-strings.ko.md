@@ -16,119 +16,78 @@
 | group by signature (anagrams) | Hash on a canonical key | O(N·K) |
 | "trap water / two walls" | Two-pointer with running maxes | O(N) time, O(1) space |
 
-## Worked examples
+## Practice — 직접 구현하고 실행·테스트
 
-### 1. Best Time to Buy and Sell Stock <span class="badge badge-easy">Easy</span>
+> [!TIP] 이 섹션 사용법
+> 아래 각 문제에는 **라이브 Python 에디터**가 있습니다. 직접 풀이를 작성하고 **▶ Run tests**를 누르면 어떤 케이스가 통과하는지 보여줍니다. 막히면 참고용 **Solution**을 열어볼 수 있지만, 먼저 직접 시도하세요 — 그 씨름이 곧 연습입니다. 첫 Run에서 작은 Python 런타임(~10 MB)을 내려받고, 이후 실행은 즉시입니다. 본인 에디터가 편하면 각 문제의 **LeetCode** 링크로 이동하세요.
+
+### 1. Best Time to Buy and Sell Stock <span class="badge badge-easy">Easy</span> · [LeetCode ↗](https://leetcode.com/problems/best-time-to-buy-and-sell-stock/)
 
 일별 `prices`가 주어지면, 한 번 사고 나중에 한 번 파는 것으로 profit을 최대화하세요; 없으면 0.
 
 **Approach.** brute force는 모든 (buy, sell) 쌍을 확인 → O(N²). 최적화: 왼쪽에서 오른쪽으로 스캔하며 **지금까지 본 최소 price**를 유지하고, best profit을 `price − min_so_far`로 갱신합니다.
 
-```python
-def max_profit(prices: list[int]) -> int:
-    if not prices:
-        return 0
-    min_so_far = prices[0]
-    best = 0
-    for price in prices[1:]:
-        best = max(best, price - min_so_far)   # compute profit BEFORE updating min
-        min_so_far = min(min_so_far, price)
-    return best
-```
+<div class="widget" data-widget="code">
+<script type="application/json" class="code-config">
+{"func":"max_profit","starter":"def max_profit(prices: list[int]) -> int:\n    # single pass; track the min price so far, best = price - min\n    pass","tests":[{"args":[[7,1,5,3,6,4]],"expect":5},{"args":[[7,6,4,3,1]],"expect":0},{"args":[[1,2,3,4,5]],"expect":4},{"args":[[2,4,1]],"expect":2},{"args":[[5]],"expect":0}],"solution":"def max_profit(prices: list[int]) -> int:\n    if not prices:\n        return 0\n    min_so_far = prices[0]\n    best = 0\n    for price in prices[1:]:\n        best = max(best, price - min_so_far)\n        min_so_far = min(min_so_far, price)\n    return best"}
+</script>
+</div>
 
 *O(N) time, O(1) space.* **Pitfall:** min은 profit을 계산한 *뒤에* 갱신하세요, 안 그러면 같은 날 buy/sell을 허용하게 됩니다.
 
-### 2. Product of Array Except Self <span class="badge badge-med">Medium</span>
+### 2. Product of Array Except Self <span class="badge badge-med">Medium</span> · [LeetCode ↗](https://leetcode.com/problems/product-of-array-except-self/)
 
 `out[i] = nums[i]를 제외한 모든 원소의 곱`을 반환하세요, 나눗셈 없이, O(N²)보다 나은 방법으로.
 
 **Approach.** `out[i] = (i 왼쪽 전부의 곱) × (i 오른쪽 전부의 곱)`. 왼쪽에서 오른쪽으로 한 번 pass하여 left product를 채우고, 오른쪽에서 왼쪽으로 한 번 pass하며 right product를 곱해 넣습니다.
 
-```python
-def product_except_self(nums: list[int]) -> list[int]:
-    n = len(nums)
-    out = [1] * n
-    left = 1
-    for i in range(n):
-        out[i] = left
-        left *= nums[i]
-    right = 1
-    for i in range(n - 1, -1, -1):
-        out[i] *= right
-        right *= nums[i]
-    return out
-```
+<div class="widget" data-widget="code">
+<script type="application/json" class="code-config">
+{"func":"product_except_self","starter":"def product_except_self(nums: list[int]) -> list[int]:\n    # prefix pass fills left products; suffix pass multiplies in right products\n    pass","tests":[{"args":[[1,2,3,4]],"expect":[24,12,8,6]},{"args":[[-1,1,0,-3,3]],"expect":[0,0,9,0,0]},{"args":[[2,3]],"expect":[3,2]},{"args":[[0,0]],"expect":[0,0]}],"solution":"def product_except_self(nums: list[int]) -> list[int]:\n    n = len(nums)\n    out = [1] * n\n    left = 1\n    for i in range(n):\n        out[i] = left\n        left *= nums[i]\n    right = 1\n    for i in range(n - 1, -1, -1):\n        out[i] *= right\n        right *= nums[i]\n    return out"}
+</script>
+</div>
 
 *O(N) time, O(1) extra space* (output array 제외). **Pitfall:** 나눗셈 방식(`total // nums[i]`)은 zero가 하나라도 있으면 깨집니다 — prefix/suffix 방법은 zero가 몇 개든 안전하게 처리합니다.
 
-### 3. Rotate Array <span class="badge badge-med">Medium</span>
+### 3. Rotate Array <span class="badge badge-med">Medium</span> · [LeetCode ↗](https://leetcode.com/problems/rotate-array/)
 
 `nums`를 오른쪽으로 `k`만큼 회전하세요, in place로 O(1) extra space.
 
 **Approach.** **triple reversal** 트릭: 전체를 reverse, 앞의 `k`개를 reverse, 나머지를 reverse.
 
-```python
-def rotate(nums: list[int], k: int) -> None:
-    n = len(nums)
-    if n == 0:
-        return
-    k %= n                     # essential: k can exceed n
-    def reverse(lo: int, hi: int) -> None:
-        while lo < hi:
-            nums[lo], nums[hi] = nums[hi], nums[lo]
-            lo, hi = lo + 1, hi - 1
-    reverse(0, n - 1)
-    reverse(0, k - 1)
-    reverse(k, n - 1)
-```
+<div class="widget" data-widget="code">
+<script type="application/json" class="code-config">
+{"func":"rotate","starter":"def rotate(nums: list[int], k: int) -> list[int]:\n    # triple reversal in place (k %= n first); return the rotated list\n    pass","tests":[{"args":[[1,2,3,4,5,6,7],3],"expect":[5,6,7,1,2,3,4]},{"args":[[-1,-100,3,99],2],"expect":[3,99,-1,-100]},{"args":[[1,2],3],"expect":[2,1]},{"args":[[1],0],"expect":[1]}],"solution":"def rotate(nums: list[int], k: int) -> list[int]:\n    n = len(nums)\n    if n == 0:\n        return nums\n    k %= n\n    def reverse(lo: int, hi: int) -> None:\n        while lo < hi:\n            nums[lo], nums[hi] = nums[hi], nums[lo]\n            lo, hi = lo + 1, hi - 1\n    reverse(0, n - 1)\n    reverse(0, k - 1)\n    reverse(k, n - 1)\n    return nums"}
+</script>
+</div>
 
 *O(N) time, O(1) space.* **Pitfall:** `k %= n`을 잊기(`k > n`일 때 index error); 세 reversal 범위를 헷갈리기 — `[1,2,3,4,5], k=2`로 손으로 확인하세요.
 
-### 4. Group Anagrams <span class="badge badge-med">Medium</span>
+### 4. Group Anagrams <span class="badge badge-med">Medium</span> · [LeetCode ↗](https://leetcode.com/problems/group-anagrams/)
 
 서로 anagram인 단어들을 묶으세요.
 
 **Approach.** 두 단어는 canonical signature를 공유할 때에만 anagram입니다. 글자를 sort하면 단어당 O(K log K); **길이 26짜리 count vector**(hashable tuple로)는 O(K). 면접에서는 sort를 먼저 언급하고, 그다음 count vector로 최적화하세요.
 
-```python
-from collections import defaultdict
-
-def group_anagrams(strs: list[str]) -> list[list[str]]:
-    groups: dict[tuple[int, ...], list[str]] = defaultdict(list)
-    for s in strs:
-        count = [0] * 26
-        for ch in s:
-            count[ord(ch) - ord('a')] += 1
-        groups[tuple(count)].append(s)      # tuple is hashable → dict key
-    return list(groups.values())
-```
+<div class="widget" data-widget="code">
+<script type="application/json" class="code-config">
+{"func":"group_anagrams","starter":"from collections import defaultdict\n\ndef group_anagrams(strs: list[str]) -> list[list[str]]:\n    # hash each word by its 26-length count vector (as a tuple)\n    pass","tests":[{"args":[["eat","tea","tan","ate","nat","bat"]],"expect":[["eat","tea","ate"],["tan","nat"],["bat"]],"unordered":true},{"args":[[""]],"expect":[[""]],"unordered":true},{"args":[["a"]],"expect":[["a"]],"unordered":true}],"solution":"from collections import defaultdict\n\ndef group_anagrams(strs: list[str]) -> list[list[str]]:\n    groups = defaultdict(list)\n    for s in strs:\n        count = [0] * 26\n        for ch in s:\n            count[ord(ch) - ord('a')] += 1\n        groups[tuple(count)].append(s)\n    return list(groups.values())"}
+</script>
+</div>
 
 *O(N·K) time* (N 단어, K 평균 길이), *O(N·K) space.* 이건 사실 array의 옷을 입은 [Hashing](#/coding/hashing) 문제입니다.
 
-### 5. Trapping Rain Water <span class="badge badge-hard">Hard</span>
+### 5. Trapping Rain Water <span class="badge badge-hard">Hard</span> · [LeetCode ↗](https://leetcode.com/problems/trapping-rain-water/)
 
 주어진 `height`들의 막대 사이에 갇히는 총 물의 양.
 
 **Approach.** index `i` 위의 물은 `min(max_left, max_right) − height[i]`입니다. brute force는 max를 매번 재계산 → O(N²). Prefix/suffix-max array는 O(N) time, O(N) space. **최적: two pointers**, O(1) space — running max가 더 작은 쪽을 이동하세요, 그 쪽의 물 높이가 그 시점에 완전히 결정되기 때문입니다.
 
-```python
-def trap(height: list[int]) -> int:
-    if not height:
-        return 0
-    left, right = 0, len(height) - 1
-    left_max, right_max = height[left], height[right]
-    water = 0
-    while left < right:
-        if left_max < right_max:
-            left += 1
-            left_max = max(left_max, height[left])
-            water += left_max - height[left]
-        else:
-            right -= 1
-            right_max = max(right_max, height[right])
-            water += right_max - height[right]
-    return water
-```
+<div class="widget" data-widget="code">
+<script type="application/json" class="code-config">
+{"func":"trap","starter":"def trap(height: list[int]) -> int:\n    # two pointers; move the side with the smaller running max\n    pass","tests":[{"args":[[0,1,0,2,1,0,1,3,2,1,2,1]],"expect":6},{"args":[[4,2,0,3,2,5]],"expect":9},{"args":[[]],"expect":0},{"args":[[1,2,3]],"expect":0}],"solution":"def trap(height: list[int]) -> int:\n    if not height:\n        return 0\n    left, right = 0, len(height) - 1\n    left_max, right_max = height[left], height[right]\n    water = 0\n    while left < right:\n        if left_max < right_max:\n            left += 1\n            left_max = max(left_max, height[left])\n            water += left_max - height[left]\n        else:\n            right -= 1\n            right_max = max(right_max, height[right])\n            water += right_max - height[right]\n    return water"}
+</script>
+</div>
 
 *O(N) time, O(1) space.* **Pitfall:** 왜 max가 더 작은 쪽을 확정해도 안전한지 *설명*할 준비를 하세요 — 면접관은 항상 follow-up합니다. prefix/suffix 버전을 먼저 연습하고, 그다음 space 최적인 two-pointer를 하세요.
 

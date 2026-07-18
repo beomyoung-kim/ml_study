@@ -17,106 +17,74 @@
 | Longest consecutive run | set for O(1) neighbor checks | O(N) / O(N) |
 | O(1) get/put with eviction | hash + ordering structure | O(1)/op |
 
-## Worked examples
+## Practice — 직접 구현하고 실행·테스트
 
-### 1. Two Sum <span class="badge badge-easy">Easy</span>
+> [!TIP] 이 섹션 사용법
+> 아래 각 문제에는 **라이브 Python 에디터**가 있습니다. 직접 풀이를 작성하고 **▶ Run tests**를 누르면 어떤 케이스가 통과하는지 보여줍니다. 막히면 참고용 **Solution**을 열어볼 수 있지만, 먼저 직접 시도하세요 — 그 씨름이 곧 연습입니다. 첫 Run에서 작은 Python 런타임(~10 MB)을 내려받고, 이후 실행은 즉시입니다. 본인 에디터가 편하면 각 문제의 **LeetCode** 링크로 이동하세요.
+
+### 1. Two Sum <span class="badge badge-easy">Easy</span> · [LeetCode ↗](https://leetcode.com/problems/two-sum/)
 
 `target`에 합해지는 두 수의 index.
 
-```python
-def two_sum(nums: list[int], target: int) -> list[int]:
-    index_of: dict[int, int] = {}
-    for i, value in enumerate(nums):
-        if target - value in index_of:      # check BEFORE inserting
-            return [index_of[target - value], i]
-        index_of[value] = i
-    return []
-```
+<div class="widget" data-widget="code">
+<script type="application/json" class="code-config">
+{"func":"two_sum","starter":"def two_sum(nums: list[int], target: int) -> list[int]:\n    # store value -> index; look up the complement before inserting\n    pass","tests":[{"args":[[2,7,11,15],9],"expect":[0,1]},{"args":[[3,2,4],6],"expect":[1,2]},{"args":[[3,3],6],"expect":[0,1]},{"args":[[-3,4,3,90],0],"expect":[0,2]}],"solution":"def two_sum(nums: list[int], target: int) -> list[int]:\n    index_of = {}\n    for i, value in enumerate(nums):\n        if target - value in index_of:\n            return [index_of[target - value], i]\n        index_of[value] = i\n    return []"}
+</script>
+</div>
 
 *O(N) time, O(N) space.* **Pitfall:** complement 확인 *뒤에* insert하세요, 안 그러면 한 원소를 자기 자신과 짝지을 수 있습니다. (array가 sorted라면 O(1)-space [two-pointer](#/coding/two-pointers-sliding-window) 버전을 선호하세요.)
 
-### 2. Contains Duplicate <span class="badge badge-easy">Easy</span>
+### 2. Contains Duplicate <span class="badge badge-easy">Easy</span> · [LeetCode ↗](https://leetcode.com/problems/contains-duplicate/)
 
 값이 하나라도 반복되면 `True`를 반환하세요.
 
-```python
-def contains_duplicate(nums: list[int]) -> bool:
-    seen: set[int] = set()
-    for x in nums:
-        if x in seen:
-            return True
-        seen.add(x)
-    return False
-```
+<div class="widget" data-widget="code">
+<script type="application/json" class="code-config">
+{"func":"contains_duplicate","starter":"def contains_duplicate(nums: list[int]) -> bool:\n    # track seen values in a set; True on the first repeat\n    pass","tests":[{"args":[[1,2,3,1]],"expect":true},{"args":[[1,2,3,4]],"expect":false},{"args":[[1,1,1,3,3,4,3,2,4,2]],"expect":true},{"args":[[]],"expect":false}],"solution":"def contains_duplicate(nums: list[int]) -> bool:\n    seen = set()\n    for x in nums:\n        if x in seen:\n            return True\n        seen.add(x)\n    return False"}
+</script>
+</div>
 
 *O(N) time, O(N) space.* Sorting + 인접 비교는 O(N log N)에 O(1) extra이지만 순서를 파괴합니다 — 둘 다와 trade-off를 언급하세요.
 
-### 3. Subarray Sum Equals K <span class="badge badge-med">Medium</span>
+### 3. Subarray Sum Equals K <span class="badge badge-med">Medium</span> · [LeetCode ↗](https://leetcode.com/problems/subarray-sum-equals-k/)
 
 `k`에 합해지는 contiguous subarray의 개수를 세세요(값은 음수일 수 있음).
 
 **Approach.** prefix sum `S`에서, subarray `(i, j]`가 `k`에 합해지는 건 `S[j] − S[i] = k`, 즉 `S[i] = S[j] − k`일 때뿐입니다. 스캔하며, `running − k`와 같은 이전 prefix sum이 몇 개였는지 세세요.
 
-```python
-from collections import defaultdict
-
-def subarray_sum(nums: list[int], k: int) -> int:
-    count: dict[int, int] = defaultdict(int)
-    count[0] = 1                 # empty prefix, so a prefix itself can equal k
-    running = answer = 0
-    for x in nums:
-        running += x
-        answer += count[running - k]
-        count[running] += 1
-    return answer
-```
+<div class="widget" data-widget="code">
+<script type="application/json" class="code-config">
+{"func":"subarray_sum","starter":"from collections import defaultdict\n\ndef subarray_sum(nums: list[int], k: int) -> int:\n    # prefix sum + hash; count earlier prefixes equal to running - k\n    pass","tests":[{"args":[[1,1,1],2],"expect":2},{"args":[[1,2,3],3],"expect":2},{"args":[[1,-1,0],0],"expect":3},{"args":[[3,4,7,2,-3,1,4,2],7],"expect":4}],"solution":"from collections import defaultdict\n\ndef subarray_sum(nums: list[int], k: int) -> int:\n    count = defaultdict(int)\n    count[0] = 1\n    running = answer = 0\n    for x in nums:\n        running += x\n        answer += count[running - k]\n        count[running] += 1\n    return answer"}
+</script>
+</div>
 
 *O(N) time, O(N) space.* **Pitfall:** `count[0] = 1` seed — 이게 없으면 index 0에서 시작하는 subarray를 놓칩니다. 여기서는 음수가 monotonicity를 깨므로 sliding window를 쓸 수 없습니다; hashing이 필수입니다.
 
-### 4. Top K Frequent Elements <span class="badge badge-med">Medium</span>
+### 4. Top K Frequent Elements <span class="badge badge-med">Medium</span> · [LeetCode ↗](https://leetcode.com/problems/top-k-frequent-elements/)
 
 가장 빈도 높은 `k`개의 값(순서 무관).
 
 **Approach.** `Counter`로 세고, 그다음 **frequency로 bucket sort**하여 O(N). size-k [heap](#/coding/heap-priority-queue)이 O(N log k) 대안입니다 — streaming에 친화적인 옵션으로 언급하세요.
 
-```python
-from collections import Counter
-
-def top_k_frequent(nums: list[int], k: int) -> list[int]:
-    freq = Counter(nums)
-    buckets: list[list[int]] = [[] for _ in range(len(nums) + 1)]
-    for val, c in freq.items():
-        buckets[c].append(val)                 # index by frequency
-    out: list[int] = []
-    for c in range(len(buckets) - 1, 0, -1):   # high frequency first
-        for val in buckets[c]:
-            out.append(val)
-            if len(out) == k:
-                return out
-    return out
-```
+<div class="widget" data-widget="code">
+<script type="application/json" class="code-config">
+{"func":"top_k_frequent","starter":"from collections import Counter\n\ndef top_k_frequent(nums: list[int], k: int) -> list[int]:\n    # count, then bucket-sort by frequency; collect the top k\n    pass","tests":[{"args":[[1,1,1,2,2,3],2],"expect":[1,2],"unordered":true},{"args":[[1],1],"expect":[1],"unordered":true},{"args":[[4,1,-1,2,-1,2,3],2],"expect":[-1,2],"unordered":true}],"solution":"from collections import Counter\n\ndef top_k_frequent(nums: list[int], k: int) -> list[int]:\n    freq = Counter(nums)\n    buckets = [[] for _ in range(len(nums) + 1)]\n    for val, c in freq.items():\n        buckets[c].append(val)\n    out = []\n    for c in range(len(buckets) - 1, 0, -1):\n        for val in buckets[c]:\n            out.append(val)\n            if len(out) == k:\n                return out\n    return out"}
+</script>
+</div>
 
 *O(N) time, O(N) space.* **Pitfall:** `sorted(freq, key=freq.get)`은 쉬운 O(N log N) 답입니다 — 막히면 쓰되, bucket/heap 개선을 자진해서 제시하세요.
 
-### 5. Longest Consecutive Sequence <span class="badge badge-med">Medium</span>
+### 5. Longest Consecutive Sequence <span class="badge badge-med">Medium</span> · [LeetCode ↗](https://leetcode.com/problems/longest-consecutive-sequence/)
 
 연속 정수의 가장 긴 run의 길이를, O(N)로, unsorted에서.
 
 **Approach.** 모든 걸 set에 넣고, 왼쪽 이웃이 없는(`num − 1`이 부재) 값에서만 세기 시작하여, 각 run을 정확히 한 번만 걷게 합니다.
 
-```python
-def longest_consecutive(nums: list[int]) -> int:
-    num_set = set(nums)
-    best = 0
-    for num in num_set:
-        if num - 1 in num_set:
-            continue                 # not a run start
-        length, cur = 1, num
-        while cur + 1 in num_set:
-            cur, length = cur + 1, length + 1
-        best = max(best, length)
-    return best
-```
+<div class="widget" data-widget="code">
+<script type="application/json" class="code-config">
+{"func":"longest_consecutive","starter":"def longest_consecutive(nums: list[int]) -> int:\n    # put all in a set; only count runs from a value with no left neighbor\n    pass","tests":[{"args":[[100,4,200,1,3,2]],"expect":4},{"args":[[0,3,7,2,5,8,4,6,0,1]],"expect":9},{"args":[[]],"expect":0},{"args":[[1,2,0,1]],"expect":3}],"solution":"def longest_consecutive(nums: list[int]) -> int:\n    num_set = set(nums)\n    best = 0\n    for num in num_set:\n        if num - 1 in num_set:\n            continue\n        length, cur = 1, num\n        while cur + 1 in num_set:\n            cur, length = cur + 1, length + 1\n        best = max(best, length)\n    return best"}
+</script>
+</div>
 
 *O(N) time, O(N) space.* **Pitfall:** *모든* 원소에서 inner `while`을 돌리면 O(N²)입니다; "start-only" guard가 이것을 선형으로 유지하는 핵심입니다.
 

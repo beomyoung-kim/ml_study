@@ -15,52 +15,46 @@ $$
 
 Intersection 사각형은 corner $\big(\max(x_1^A,x_1^B),\,\max(y_1^A,y_1^B)\big)$와 $\big(\min(x_2^A,x_2^B),\,\min(y_2^A,y_2^B)\big)$를 갖습니다; 어느 한 변이라도 음수면 box가 겹치지 않으므로 $0$으로 clamp 합니다.
 
-## 직접 구현 — broadcasting으로 pairwise IoU
+## Practice — 직접 구현하고 실행·테스트
 
-```python
-import numpy as np
+> [!TIP] 이 섹션 사용법
+> 아래 각 문제에는 **라이브 Python 에디터**가 있습니다. 직접 풀이를 작성하고 **▶ Run tests**를 누르면 어떤 케이스가 통과하는지 보여줍니다. 막히면 참고용 **Solution**을 열어볼 수 있지만, 먼저 직접 시도하세요 — 그 씨름이 곧 연습입니다. 첫 Run에서 작은 Python 런타임과 NumPy(~15 MB)를 내려받고, 이후 실행은 즉시입니다.
 
+순서대로 만드세요: area 먼저(degenerate box를 방어합니다), 그다음 broadcast된 IoU grid, 그 위에 얹히는 greedy 루프.
 
-def box_area(boxes: np.ndarray) -> np.ndarray:
-    """boxes: (N, 4) xyxy -> (N,). max(0, .) guards degenerate boxes."""
-    return np.maximum(0.0, boxes[:, 2] - boxes[:, 0]) * \
-           np.maximum(0.0, boxes[:, 3] - boxes[:, 1])
+### 1. Box area <span class="badge badge-easy">Easy</span>
 
+각 `[x1, y1, x2, y2]` box의 area, 음의 변 길이를 0으로 clamp하여 degenerate box는 `0`이 되게 합니다.
 
-def iou_matrix(a: np.ndarray, b: np.ndarray) -> np.ndarray:
-    """Pairwise IoU. a: (N,4), b: (M,4) -> (N,M)."""
-    lt = np.maximum(a[:, None, :2], b[None, :, :2])   # (N,M,2) top-left
-    rb = np.minimum(a[:, None, 2:], b[None, :, 2:])   # (N,M,2) bottom-right
-    wh = np.maximum(0.0, rb - lt)                     # clamp: no overlap -> 0
-    inter = wh[..., 0] * wh[..., 1]                   # (N,M)
+<div class="widget" data-widget="code">
+<script type="application/json" class="code-config">
+{"func":"box_area","packages":["numpy"],"approx":true,"starter":"def box_area(boxes):\n    # (N,4) xyxy boxes -> (N,) areas; clamp negative side lengths to 0\n    pass","tests":[{"args":[[[0,0,10,10],[1,1,4,5],[5,5,2,2]]],"expect":[100.0,12.0,0.0]},{"args":[[[0,0,2,3],[0,0,0,9]]],"expect":[6.0,0.0]},{"args":[[[2,2,5,7]]],"expect":[15.0]}],"solution":"import numpy as np\n\ndef box_area(boxes):\n    boxes = np.asarray(boxes, dtype=float)\n    return np.maximum(0.0, boxes[:, 2] - boxes[:, 0]) * np.maximum(0.0, boxes[:, 3] - boxes[:, 1])"}
+</script>
+</div>
 
-    area_a = box_area(a)[:, None]                     # (N,1)
-    area_b = box_area(b)[None, :]                     # (1,M)
-    union = area_a + area_b - inter
-    return inter / np.maximum(union, 1e-8)            # guard div-by-zero
-```
+*O(N), 완전 vectorized.* **Pitfall:** `+1` 없음 — 이건 연속 `xyxy` 좌표이지 VOC integer pixel이 아닙니다.
+
+### 2. Pairwise IoU by broadcasting <span class="badge badge-med">Medium</span>
+
+전체 $(N,M)$ IoU grid: top-left들의 `max`와 bottom-right들의 `min`을 broadcast하고, clamp한 다음, union으로 나눕니다.
+
+<div class="widget" data-widget="code">
+<script type="application/json" class="code-config">
+{"func":"iou_matrix","packages":["numpy"],"approx":true,"starter":"def iou_matrix(a, b):\n    # a:(N,4), b:(M,4) -> (N,M); broadcast max of top-lefts, min of bottom-rights, clamp\n    pass","tests":[{"args":[[[0,0,10,10]],[[0,0,10,10]]],"expect":[[1.0]]},{"args":[[[0,0,10,10]],[[1,1,11,11]]],"expect":[[0.680672268907563]]},{"args":[[[0,0,10,10],[20,20,30,30]],[[0,0,10,10],[5,5,15,15]]],"expect":[[1.0,0.14285714285714285],[0.0,0.0]]},{"args":[[[0,0,2,2]],[[10,10,12,12]]],"expect":[[0.0]]}],"solution":"import numpy as np\n\ndef iou_matrix(a, b):\n    a = np.asarray(a, dtype=float)\n    b = np.asarray(b, dtype=float)\n    def area(x):\n        return np.maximum(0.0, x[:, 2] - x[:, 0]) * np.maximum(0.0, x[:, 3] - x[:, 1])\n    lt = np.maximum(a[:, None, :2], b[None, :, :2])\n    rb = np.minimum(a[:, None, 2:], b[None, :, 2:])\n    wh = np.maximum(0.0, rb - lt)\n    inter = wh[..., 0] * wh[..., 1]\n    union = area(a)[:, None] + area(b)[None, :] - inter\n    return inter / np.maximum(union, 1e-8)"}
+</script>
+</div>
 
 `[:, None]` / `[None, :]` axis 삽입이 전부입니다: $(N,1,\cdot)$과 $(1,M,\cdot)$ tensor를 정렬해서 broadcasting이 루프 없이 완전한 $(N,M)$ grid를 만들게 합니다. **Complexity:** time과 memory 모두 $O(NM)$.
 
-## Greedy NMS
+### 3. Greedy NMS <span class="badge badge-med">Medium</span>
 
-```python
-def nms(boxes: np.ndarray, scores: np.ndarray, iou_thr: float = 0.5) -> list[int]:
-    """Greedy NMS. Returns kept indices in decreasing-score order."""
-    if boxes.size == 0:
-        return []
-    order = scores.argsort()[::-1]          # descending: argsort is ascending!
-    keep = []
-    while order.size > 0:
-        i = int(order[0])
-        keep.append(i)
-        if order.size == 1:
-            break
-        # IoU of the winner against every remaining candidate
-        ious = iou_matrix(boxes[i][None], boxes[order[1:]])[0]  # (rest,)
-        order = order[1:][ious <= iou_thr]  # drop the suppressed
-    return keep
-```
+score로 정렬하고, 최고 box를 keep한 다음, 그것과의 IoU가 threshold를 넘는 생존자를 전부 drop, 반복합니다. keep된 index를 감소하는 score 순으로 반환합니다.
+
+<div class="widget" data-widget="code">
+<script type="application/json" class="code-config">
+{"func":"nms","packages":["numpy"],"starter":"def nms(boxes, scores, iou_thr=0.5):\n    # greedy: keep the top score, drop boxes with IoU > thr, repeat; return kept indices\n    pass","tests":[{"args":[[[0,0,10,10],[1,1,11,11],[20,20,30,30],[0,0,10,10]],[0.9,0.8,0.7,0.95],0.5],"expect":[3,2]},{"args":[[[0,0,10,10],[1,1,11,11]],[0.9,0.8],0.5],"expect":[0]},{"args":[[[0,0,10,10],[1,1,11,11]],[0.9,0.8],0.95],"expect":[0,1]},{"args":[[[0,0,10,10],[100,100,110,110]],[0.5,0.9],0.5],"expect":[1,0]},{"args":[[],[],0.5],"expect":[]}],"solution":"import numpy as np\n\ndef nms(boxes, scores, iou_thr=0.5):\n    boxes = np.asarray(boxes, dtype=float)\n    scores = np.asarray(scores, dtype=float)\n    def iou_m(a, b):\n        lt = np.maximum(a[:, None, :2], b[None, :, :2])\n        rb = np.minimum(a[:, None, 2:], b[None, :, 2:])\n        wh = np.maximum(0.0, rb - lt)\n        inter = wh[..., 0] * wh[..., 1]\n        area = lambda x: np.maximum(0.0, x[:, 2] - x[:, 0]) * np.maximum(0.0, x[:, 3] - x[:, 1])\n        union = area(a)[:, None] + area(b)[None, :] - inter\n        return inter / np.maximum(union, 1e-8)\n    if boxes.size == 0:\n        return []\n    order = scores.argsort()[::-1]\n    keep = []\n    while order.size > 0:\n        i = int(order[0])\n        keep.append(i)\n        if order.size == 1:\n            break\n        ious = iou_m(boxes[i][None], boxes[order[1:]])[0]\n        order = order[1:][ious <= iou_thr]\n    return keep"}
+</script>
+</div>
 
 루프는 **본질적으로 순차적**입니다 — keep된 각 box가 어떤 후보가 살아남을지를 바꾸니까요 — 하지만 각 스텝은 vectorized되어 있습니다. **Complexity:** 최악의 경우 $O(N^2)$; 각 iteration은 생존자에 대한 broadcast된 IoU 하나입니다.
 

@@ -18,6 +18,17 @@
 
 ---
 
+## 2026-07-18 — 코드 랩 전체 확장 (coding + ML-coding)
+
+**Added**
+- 인터랙티브 **코드 랩**이 이제 **모든 coding 패턴 챕터와 모든 ML-coding 챕터**를 커버합니다 — 총 **168개의 실행 가능한 랩**(영어 + 한국어). 각 랩은 starter 코드, 숨겨진 참고 **Solution**, 브라우저에서 즉시 채점되는 테스트 케이스를 갖습니다. coding 랩은 LeetCode로 연결되고, ML-coding 랩은 **NumPy**를 로드해 `numpy.allclose`로 채점합니다.
+
+**Changed**
+- 코드 랩 위젯 업그레이드: 채점을 Pyodide 내부의 Python 하네스로 옮기고(exact / 순서 무관 / 수치 근사), 패키지(numpy)를 지연 로드할 수 있게 했습니다. class 기반·training loop·plot 스니펫은 의도적으로 정적 참고 코드로 유지했습니다.
+- 모든 참고 solution이 자체 테스트를 통과하는지(168/168) 배포 전에 검증했습니다.
+
+---
+
 ## 2026-07-18 — 인터랙티브 코드 랩 (파일럿)
 
 **Added**

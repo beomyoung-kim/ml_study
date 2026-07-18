@@ -74,111 +74,64 @@ def lower_bound(lo: int, hi: int, pred) -> int:
 > [!WARNING] 버그는 단 두 가지
 > **무한 루프:** `while lo < hi`에서 `lo = mid` (`mid + 1`이 아니라)로 하면 `hi = lo + 1`일 때 절대 전진하지 않습니다. 규칙: `mid`를 *유지하는* 쪽이 그쪽으로 줄어드는 쪽(`hi = mid`)이어야 하고, 다른 쪽은 하나를 더합니다(`lo = mid + 1`). **Off-by-one 경계:** predicate에서 `<` vs `<=`를 결정해 lower bound와 upper bound를 고르고, 원소가 두 개인 경우를 손으로 직접 테스트하세요.
 
-## 대표 문제
+## Practice — 직접 구현하고 실행·테스트
 
-### 1. Search Insert Position — lower bound (Easy)
+> [!TIP] 이 섹션 사용법
+> 아래 각 문제에는 **라이브 Python 에디터**가 있습니다. 직접 풀이를 작성하고 **▶ Run tests**를 누르면 어떤 케이스가 통과하는지 보여줍니다. 막히면 참고용 **Solution**을 열어볼 수 있지만, 먼저 직접 시도하세요 — 그 씨름이 곧 연습입니다. 첫 Run에서 작은 Python 런타임(~10 MB)을 내려받고, 이후 실행은 즉시입니다. 본인 에디터가 편하면 각 문제의 **LeetCode** 링크로 이동하세요.
+
+순서대로 진행하세요 — 배열 탐색을 먼저, 그다음 답에 대한 binary search, 마지막으로 Hard 파티션 문제입니다.
+
+### 1. Search Insert Position <span class="badge badge-easy">Easy</span> · [LeetCode ↗](https://leetcode.com/problems/search-insert-position/)
 `target`이 들어갈 인덱스를 반환합니다. 이건 `pred = nums[mid] >= target`인 `lower_bound` *그 자체*입니다.
 
-```python
-def search_insert(nums: list[int], target: int) -> int:
-    lo, hi = 0, len(nums)                 # hi = len, not len-1
-    while lo < hi:
-        mid = lo + (hi - lo) // 2
-        if nums[mid] < target:
-            lo = mid + 1
-        else:
-            hi = mid
-    return lo
-```
+<div class="widget" data-widget="code">
+<script type="application/json" class="code-config">
+{"func":"search_insert","starter":"def search_insert(nums: list[int], target: int) -> int:\n    # lower_bound: hi starts at len(nums); pred is nums[mid] >= target\n    pass","tests":[{"args":[[1,3,5,6],5],"expect":2},{"args":[[1,3,5,6],2],"expect":1},{"args":[[1,3,5,6],7],"expect":4},{"args":[[1,3,5,6],0],"expect":0},{"args":[[1],0],"expect":0}],"solution":"def search_insert(nums: list[int], target: int) -> int:\n    lo, hi = 0, len(nums)\n    while lo < hi:\n        mid = lo + (hi - lo) // 2\n        if nums[mid] < target:\n            lo = mid + 1\n        else:\n            hi = mid\n    return lo"}
+</script>
+</div>
+
 `O(log N)` 시간, `O(1)` 공간. `<`를 `<=`로 바꾸면 **upper bound**가 됩니다 — 이 한 쌍이 `bisect_left`/`bisect_right`를 커버합니다.
 
-### 2. Search in Rotated Sorted Array (Medium)
+### 2. Search in Rotated Sorted Array <span class="badge badge-med">Medium</span> · [LeetCode ↗](https://leetcode.com/problems/search-in-rotated-sorted-array/)
 중복 없음. 각 단계에서 한쪽 절반은 정렬되어 있으니, `target`이 그 안에 있는지 판단합니다.
 
-```python
-def search_rotated(nums: list[int], target: int) -> int:
-    lo, hi = 0, len(nums) - 1
-    while lo <= hi:
-        mid = lo + (hi - lo) // 2
-        if nums[mid] == target:
-            return mid
-        if nums[lo] <= nums[mid]:                 # left half sorted
-            if nums[lo] <= target < nums[mid]:
-                hi = mid - 1
-            else:
-                lo = mid + 1
-        else:                                      # right half sorted
-            if nums[mid] < target <= nums[hi]:
-                lo = mid + 1
-            else:
-                hi = mid - 1
-    return -1
-```
+<div class="widget" data-widget="code">
+<script type="application/json" class="code-config">
+{"func":"search_rotated","starter":"def search_rotated(nums: list[int], target: int) -> int:\n    # one half is always sorted; decide whether target lies inside it\n    pass","tests":[{"args":[[4,5,6,7,0,1,2],0],"expect":4},{"args":[[4,5,6,7,0,1,2],3],"expect":-1},{"args":[[4,5,6,7,0,1,2],7],"expect":3},{"args":[[5,1,3],5],"expect":0},{"args":[[1],0],"expect":-1}],"solution":"def search_rotated(nums: list[int], target: int) -> int:\n    lo, hi = 0, len(nums) - 1\n    while lo <= hi:\n        mid = lo + (hi - lo) // 2\n        if nums[mid] == target:\n            return mid\n        if nums[lo] <= nums[mid]:\n            if nums[lo] <= target < nums[mid]:\n                hi = mid - 1\n            else:\n                lo = mid + 1\n        else:\n            if nums[mid] < target <= nums[hi]:\n                lo = mid + 1\n            else:\n                hi = mid - 1\n    return -1"}
+</script>
+</div>
+
 `O(log N)`. 중복이 있으면 (LC 81) `nums[lo] == nums[mid]` 동점 때문에 linear한 `lo += 1` 스텝이 강제되어 최악의 경우 `O(N)`으로 나빠집니다 — 이 점을 소리 내어 말하세요.
 
-### 3. Koko Eating Bananas — 답에 대한 binary search (Medium)
+### 3. Koko Eating Bananas <span class="badge badge-med">Medium</span> · [LeetCode ↗](https://leetcode.com/problems/koko-eating-bananas/)
 `piles`를 `h`시간 안에 다 먹기 위한 최소 먹는 속도 `k`. "속도 `k`로 다 먹을 수 있다"는 predicate는 `k`에 대해 monotonic합니다.
 
-```python
-import math
+<div class="widget" data-widget="code">
+<script type="application/json" class="code-config">
+{"func":"min_eating_speed","starter":"import math\n\ndef min_eating_speed(piles: list[int], h: int) -> int:\n    # binary-search k in [1, max(piles)]; feasible if sum(ceil(p/k)) <= h\n    pass","tests":[{"args":[[3,6,7,11],8],"expect":4},{"args":[[30,11,23,4,20],5],"expect":30},{"args":[[30,11,23,4,20],6],"expect":23},{"args":[[1,1,1,999999999],10],"expect":142857143}],"solution":"import math\n\ndef min_eating_speed(piles: list[int], h: int) -> int:\n    def can_finish(speed: int) -> bool:\n        return sum(math.ceil(p / speed) for p in piles) <= h\n    lo, hi = 1, max(piles)\n    while lo < hi:\n        mid = lo + (hi - lo) // 2\n        if can_finish(mid):\n            hi = mid\n        else:\n            lo = mid + 1\n    return lo"}
+</script>
+</div>
 
-def min_eating_speed(piles: list[int], h: int) -> int:
-    def can_finish(speed: int) -> bool:
-        return sum(math.ceil(p / speed) for p in piles) <= h
-
-    lo, hi = 1, max(piles)
-    while lo < hi:
-        mid = lo + (hi - lo) // 2
-        if can_finish(mid):
-            hi = mid
-        else:
-            lo = mid + 1
-    return lo
-```
 `M = max(piles)`일 때 `O(N log M)`. 같은 뼈대가 *Capacity to Ship Packages* (LC 1011), *Split Array Largest Sum* (LC 410), *Minimize Max Distance*를 풉니다 — `can_finish`만 바뀔 뿐입니다.
 
-### 4. Find Peak Element (Medium)
+### 4. Find Peak Element <span class="badge badge-med">Medium</span> · [LeetCode ↗](https://leetcode.com/problems/find-peak-element/)
 양쪽 이웃보다 큰 임의의 인덱스를, `O(log N)`에. 오르막으로 걸어 올라가면 됩니다: 더 큰 이웃 쪽에는 항상 peak이 있습니다 (범위 밖은 `-∞`로 취급).
 
-```python
-def find_peak_element(nums: list[int]) -> int:
-    lo, hi = 0, len(nums) - 1
-    while lo < hi:
-        mid = lo + (hi - lo) // 2
-        if nums[mid] < nums[mid + 1]:
-            lo = mid + 1        # peak strictly to the right
-        else:
-            hi = mid            # mid could be the peak
-    return lo
-```
+<div class="widget" data-widget="code">
+<script type="application/json" class="code-config">
+{"func":"find_peak_element","starter":"def find_peak_element(nums: list[int]) -> int:\n    # climb toward the larger neighbor; out-of-bounds counts as -inf\n    pass","tests":[{"args":[[1,2,3,1]],"expect":2},{"args":[[1,2,1,3,5,6,4]],"expect":5},{"args":[[1]],"expect":0},{"args":[[1,2]],"expect":1},{"args":[[2,1]],"expect":0}],"solution":"def find_peak_element(nums: list[int]) -> int:\n    lo, hi = 0, len(nums) - 1\n    while lo < hi:\n        mid = lo + (hi - lo) // 2\n        if nums[mid] < nums[mid + 1]:\n            lo = mid + 1\n        else:\n            hi = mid\n    return lo"}
+</script>
+</div>
 
-### 5. Median of Two Sorted Arrays (Hard)
+### 5. Median of Two Sorted Arrays <span class="badge badge-hard">Hard</span> · [LeetCode ↗](https://leetcode.com/problems/median-of-two-sorted-arrays/)
 `left_max ≤ right_min`이 되도록 *더 짧은* 배열의 분할을 binary search합니다.
 
-```python
-def find_median_sorted_arrays(a: list[int], b: list[int]) -> float:
-    if len(a) > len(b):
-        a, b = b, a
-    m, n = len(a), len(b)
-    half = (m + n + 1) // 2
-    lo, hi = 0, m
-    while lo <= hi:
-        i = (lo + hi) // 2               # take i from a, j from b
-        j = half - i
-        l1 = a[i - 1] if i > 0 else float("-inf")
-        r1 = a[i]     if i < m else float("inf")
-        l2 = b[j - 1] if j > 0 else float("-inf")
-        r2 = b[j]     if j < n else float("inf")
-        if l1 <= r2 and l2 <= r1:
-            if (m + n) % 2:
-                return float(max(l1, l2))
-            return (max(l1, l2) + min(r1, r2)) / 2
-        if l1 > r2:
-            hi = i - 1
-        else:
-            lo = i + 1
-    raise ValueError("inputs not sorted")
-```
+<div class="widget" data-widget="code">
+<script type="application/json" class="code-config">
+{"func":"find_median_sorted_arrays","starter":"def find_median_sorted_arrays(a: list[int], b: list[int]) -> float:\n    # binary-search the partition of the shorter array so left_max <= right_min\n    pass","tests":[{"args":[[1,3],[2]],"expect":2.0},{"args":[[1,2],[3,4]],"expect":2.5},{"args":[[],[1]],"expect":1.0},{"args":[[1,2],[]],"expect":1.5},{"args":[[1,2,3,4,5],[6,7,8]],"expect":4.5}],"solution":"def find_median_sorted_arrays(a: list[int], b: list[int]) -> float:\n    if len(a) > len(b):\n        a, b = b, a\n    m, n = len(a), len(b)\n    half = (m + n + 1) // 2\n    lo, hi = 0, m\n    while lo <= hi:\n        i = (lo + hi) // 2\n        j = half - i\n        l1 = a[i - 1] if i > 0 else float(\"-inf\")\n        r1 = a[i] if i < m else float(\"inf\")\n        l2 = b[j - 1] if j > 0 else float(\"-inf\")\n        r2 = b[j] if j < n else float(\"inf\")\n        if l1 <= r2 and l2 <= r1:\n            if (m + n) % 2:\n                return float(max(l1, l2))\n            return (max(l1, l2) + min(r1, r2)) / 2\n        if l1 > r2:\n            hi = i - 1\n        else:\n            lo = i + 1\n    raise ValueError(\"inputs not sorted\")"}
+</script>
+</div>
+
 `O(log(min(m, n)))`. `±inf` sentinel이 모든 경계 특수 케이스 처리를 없애줍니다 — 이 트릭이 사실상 전부입니다.
 
 ## 묻기 전에 먼저 언급해야 할 변형

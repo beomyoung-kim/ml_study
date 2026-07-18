@@ -5,71 +5,61 @@
 
 mIoU(semantic segmentation)와 AP/mAP(detection)를 구현합니다. 이는 지표를 논문 속 숫자로서가 아니라 *정의 그대로* 안다는 것을 증명합니다 — ablation을 발표할 때의 신뢰도 차이입니다. Box IoU는 [IoU & NMS](#/ml-coding/nms-iou)에서 정의되고, 개념적 설명은 [Evaluation Metrics](#/foundations/evaluation-metrics)에 있습니다.
 
-## Part 1 — confusion matrix를 통한 mIoU
+## Practice — 직접 구현하고 실행·테스트
+
+> [!TIP] 이 섹션 사용법
+> 아래 각 문제에는 NumPy가 미리 로드된 **라이브 Python 에디터**가 있습니다. 직접 풀이를 작성하고 **▶ Run tests**를 누르면 어떤 케이스가 통과하는지 보여줍니다. 막히면 참고용 **Solution**을 열어볼 수 있지만, 먼저 직접 시도하세요 — 그 씨름이 곧 연습입니다. 첫 Run에서 작은 Python 런타임과 NumPy(~15 MB)를 내려받고, 이후 실행은 즉시입니다. 밑바닥부터 구현하는 지표들이라 입력은 작고 결정적이며, `numpy.allclose`로 비교합니다.
+
+순서대로 진행하세요 — segmentation 지표(Part 1)를 먼저, 그다음 detection AP 기계(Part 2)를 만듭니다.
+
+### Part 1 — confusion matrix를 통한 mIoU
 
 클래스별로 $\text{IoU}_c = \dfrac{\text{TP}_c}{\text{TP}_c + \text{FP}_c + \text{FN}_c}$이고, mIoU는 클래스에 대한 평균입니다. 우아한 트릭: 모든 (gt, pred) 픽셀 쌍을 하나의 정수로 인코딩하고 `bincount`로 한 방에 $C\times C$ 행렬로 만드는 것입니다.
 
-```python
-import numpy as np
+먼저 confusion matrix — 모든 `(gt, pred)` 픽셀 쌍을 `gt*C + pred`로 인코딩하고 `bincount`로 $C\times C$ 표(행 = gt, 열 = pred)에 누적하되, `ignore_index` 픽셀은 제외합니다.
 
+<div class="widget" data-widget="code">
+<script type="application/json" class="code-config">
+{"func":"confusion_matrix","packages":["numpy"],"approx":true,"starter":"import numpy as np\n\ndef confusion_matrix(pred, target, num_classes, ignore_index=255):\n    # flatten both, drop ignore_index pixels, then bincount(gt*C + pred) -> (C,C)\n    pass","tests":[{"args":[[[0,0,1],[1,1,1]],[[0,1,1],[1,1,0]],2,-1],"expect":[[1,1],[1,3]]},{"args":[[[0,1],[1,0]],[[0,255],[1,255]],2,255],"expect":[[1,0],[0,1]]},{"args":[[[0,0],[1,2]],[[0,1],[1,2]],3],"expect":[[1,0,0],[1,1,0],[0,0,1]]}],"solution":"import numpy as np\n\ndef confusion_matrix(pred, target, num_classes, ignore_index=255):\n    pred = np.asarray(pred); target = np.asarray(target)\n    pred, target = pred.reshape(-1), target.reshape(-1)\n    keep = target != ignore_index\n    pred, target = pred[keep], target[keep]\n    cm = np.bincount(target * num_classes + pred, minlength=num_classes ** 2).reshape(num_classes, -1)\n    return cm.astype(np.float64)"}
+</script>
+</div>
 
-def confusion_matrix(pred, target, num_classes, ignore_index=255):
-    """pred,target: int label maps. Rows=gt, cols=pred. -> (C,C)."""
-    pred, target = pred.reshape(-1), target.reshape(-1)
-    keep = target != ignore_index                  # drop void/unlabeled pixels
-    pred, target = pred[keep], target[keep]
-    # each pair (g,p) -> unique index g*C + p; count all at once
-    cm = np.bincount(target * num_classes + pred,
-                     minlength=num_classes ** 2).reshape(num_classes, -1)
-    return cm.astype(np.float64)
+그다음 mIoU: confusion matrix로부터 클래스별 $\text{TP}=\text{diag}$, $\text{FP}=\text{열 합}-\text{TP}$, $\text{FN}=\text{행 합}-\text{TP}$를 구하고, 등장한 클래스에 대해 $\text{TP}/(\text{TP}+\text{FP}+\text{FN})$를 평균 냅니다.
 
-
-def mean_iou(pred, target, num_classes, ignore_index=255):
-    cm = confusion_matrix(pred, target, num_classes, ignore_index)
-    tp = np.diag(cm)
-    fp = cm.sum(0) - tp                            # predicted c, gt not c
-    fn = cm.sum(1) - tp                            # gt c, predicted not c
-    denom = tp + fp + fn
-    iou = np.where(denom > 0, tp / np.maximum(denom, 1e-8), np.nan)
-    return float(np.nanmean(iou))                  # ignore classes absent everywhere
-```
+<div class="widget" data-widget="code">
+<script type="application/json" class="code-config">
+{"func":"mean_iou","packages":["numpy"],"approx":true,"starter":"import numpy as np\n\ndef mean_iou(pred, target, num_classes, ignore_index=255):\n    # build the confusion matrix, then per-class TP/(TP+FP+FN); mean over present classes\n    pass","tests":[{"args":[[[0,0,1],[1,1,1]],[[0,1,1],[1,1,0]],2,-1],"expect":0.4666666666666667},{"args":[[[0,1],[1,0]],[[0,1],[1,0]],2,-1],"expect":1.0},{"args":[[[0,0]],[[0,0]],2,-1],"expect":1.0}],"solution":"import numpy as np\n\ndef confusion_matrix(pred, target, num_classes, ignore_index=255):\n    pred = np.asarray(pred); target = np.asarray(target)\n    pred, target = pred.reshape(-1), target.reshape(-1)\n    keep = target != ignore_index\n    pred, target = pred[keep], target[keep]\n    return np.bincount(target * num_classes + pred, minlength=num_classes ** 2).reshape(num_classes, -1).astype(np.float64)\n\ndef mean_iou(pred, target, num_classes, ignore_index=255):\n    cm = confusion_matrix(pred, target, num_classes, ignore_index)\n    tp = np.diag(cm)\n    fp = cm.sum(0) - tp\n    fn = cm.sum(1) - tp\n    denom = tp + fp + fn\n    iou = np.where(denom > 0, tp / np.maximum(denom, 1e-8), np.nan)\n    return float(np.nanmean(iou))"}
+</script>
+</div>
 
 **왜 confusion matrix인가:** 이미지에 걸쳐 additive하므로, 전체 validation set에 대해 `cm`을 누적하고 마지막에 IoU를 한 번만 계산합니다. `bincount`는 모든 $HW$ 픽셀을 벡터화합니다 — 클래스별 loop가 없습니다. **복잡도:** 이미지당 $O(HW)$.
 
 > [!WARNING] 이미지별 IoU를 평균 내지 마세요
 > mIoU는 각 이미지의 IoU를 평균 내는 게 아니라 **데이터셋 전체로 집계된** TP/FP/FN으로 계산합니다. 이미지별 평균은 특정 클래스가 픽셀을 적게 차지하는 이미지에 과도한 가중치를 주며, 이것이 전형적인 보고 수치 불일치의 원인입니다.
 
-## Part 2 — AP / mAP
+### Part 2 — AP / mAP
 
 AP는 한 클래스에 대한 precision–recall 곡선 아래 넓이입니다. Detection은 confidence로 순위를 매기고, 각각은 아직 매칭되지 않은 ground-truth box에 IoU $\ge$ threshold로 매칭되면 **true positive**, 아니면 **false positive**입니다.
 
-```python
-def box_iou(box, boxes):
-    """box:(4,)  boxes:(N,4) xyxy -> (N,)."""
-    if boxes.size == 0:
-        return np.zeros(0)
-    lt = np.maximum(box[:2], boxes[:, :2])
-    rb = np.minimum(box[2:], boxes[:, 2:])
-    wh = np.maximum(0.0, rb - lt)
-    inter = wh[:, 0] * wh[:, 1]
-    a1 = np.prod(np.maximum(0.0, box[2:] - box[:2]))
-    a2 = np.prod(np.maximum(0.0, boxes[:, 2:] - boxes[:, :2]), axis=1)
-    return inter / np.maximum(a1 + a2 - inter, 1e-8)
+먼저 box IoU — xyxy 포맷의 box 하나를 `N`개 box와 비교해 `N`개의 overlap을 반환합니다.
 
+<div class="widget" data-widget="code">
+<script type="application/json" class="code-config">
+{"func":"box_iou","packages":["numpy"],"approx":true,"starter":"import numpy as np\n\ndef box_iou(box, boxes):\n    # box:(4,) vs boxes:(N,4) xyxy -> (N,); intersection area over union area\n    pass","tests":[{"args":[[0,0,10,10],[[0,0,10,10]]],"expect":[1.0]},{"args":[[0,0,10,10],[[0,0,10,10],[5,5,15,15]]],"expect":[1.0,0.14285714285714285]},{"args":[[0,0,10,10],[[20,20,30,30]]],"expect":[0.0]},{"args":[[0,0,10,10],[]],"expect":[]}],"solution":"import numpy as np\n\ndef box_iou(box, boxes):\n    box = np.asarray(box, float); boxes = np.asarray(boxes, float)\n    if boxes.size == 0:\n        return np.zeros(0)\n    lt = np.maximum(box[:2], boxes[:, :2])\n    rb = np.minimum(box[2:], boxes[:, 2:])\n    wh = np.maximum(0.0, rb - lt)\n    inter = wh[:, 0] * wh[:, 1]\n    a1 = np.prod(np.maximum(0.0, box[2:] - box[:2]))\n    a2 = np.prod(np.maximum(0.0, boxes[:, 2:] - boxes[:, :2]), axis=1)\n    return inter / np.maximum(a1 + a2 - inter, 1e-8)"}
+</script>
+</div>
 
-def average_precision(recall, precision):
-    """VOC 2010+ all-point interpolation: area under the PR envelope."""
-    mrec = np.concatenate(([0.0], recall, [1.0]))
-    mpre = np.concatenate(([0.0], precision, [0.0]))
-    for i in range(mpre.size - 1, 0, -1):           # make precision monotonic
-        mpre[i - 1] = max(mpre[i - 1], mpre[i])     #   (envelope from the right)
-    i = np.where(mrec[1:] != mrec[:-1])[0]          # recall steps
-    return float(np.sum((mrec[i + 1] - mrec[i]) * mpre[i + 1]))
-```
+그다음 VOC all-point AP: PR 곡선을 pad하고, precision을 오른쪽에서부터 단조로 만든 뒤(envelope), 각 recall step에서 넓이를 합산합니다.
+
+<div class="widget" data-widget="code">
+<script type="application/json" class="code-config">
+{"func":"average_precision","packages":["numpy"],"approx":true,"starter":"import numpy as np\n\ndef average_precision(recall, precision):\n    # VOC all-point: pad the curve, make precision monotonic from the right, sum step areas\n    pass","tests":[{"args":[[0.5,1.0],[1.0,1.0]],"expect":1.0},{"args":[[1.0],[1.0]],"expect":1.0},{"args":[[0.5,1.0],[1.0,0.5]],"expect":0.75},{"args":[[0.33,0.66,1.0],[1.0,0.5,0.6]],"expect":0.732}],"solution":"import numpy as np\n\ndef average_precision(recall, precision):\n    mrec = np.concatenate(([0.0], recall, [1.0]))\n    mpre = np.concatenate(([0.0], precision, [0.0]))\n    for i in range(mpre.size - 1, 0, -1):\n        mpre[i - 1] = max(mpre[i - 1], mpre[i])\n    i = np.where(mrec[1:] != mrec[:-1])[0]\n    return float(np.sum((mrec[i + 1] - mrec[i]) * mpre[i + 1]))"}
+</script>
+</div>
 
 precision envelope(recall이 커질 때 precision을 단조 비증가하게 만드는 것)는 "출렁임"을 제거하여, AP가 각 recall 수준에서 달성 가능한 최선의 precision을 측정하게 합니다.
 
-### 이미지별 greedy 매칭 후 적분
+#### 이미지별 greedy 매칭 후 적분
 
 ```python
 def mean_average_precision(preds, gts, num_classes, iou_thr=0.5):

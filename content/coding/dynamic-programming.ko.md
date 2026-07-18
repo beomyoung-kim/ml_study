@@ -49,56 +49,51 @@ def climb_tab(n: int) -> int:
 > [!NOTE] 면접 무브
 > recurrence를 `@cache`로 top-down으로 도출하고(빠르고 틀리기 어려움), 공간을 물어보면 tabulation으로 변환해 테이블을 한두 행으로 굴려 내립니다. 두 방향을 모두 보여주는 것이 강한 신호입니다.
 
+## Practice — 직접 구현하고 실행·테스트
+
+> [!TIP] 이 섹션 사용법
+> 아래 여러 문제에는 **라이브 Python 에디터**가 있습니다. 직접 풀이를 작성하고 **▶ Run tests**를 누르면 어떤 케이스가 통과하는지 보여줍니다. 막히면 참고용 **Solution**을 열어볼 수 있지만, 먼저 직접 시도하세요 — 그 씨름이 곧 연습입니다. 첫 Run에서 작은 Python 런타임(~10 MB)을 내려받고, 이후 실행은 즉시입니다. 본인 에디터가 편하면 각 문제의 **LeetCode** 링크로 이동하세요.
+
+아래 lab은 형태별로 묶여 있습니다 — 1-D rolling-table DP 먼저, 그다음 2-D grid 계열. 순서대로 진행하세요.
+
 ## 1-D DP
 
-### House Robber — `dp[i] = max(dp[i-1], dp[i-2] + nums[i])`
+### House Robber — `dp[i] = max(dp[i-1], dp[i-2] + nums[i])` <span class="badge badge-med">Medium</span> · [LeetCode ↗](https://leetcode.com/problems/house-robber/)
 `i`를 털거나(`i-1`은 건너뜀) `i`를 건너뜁니다. rolling scalar 두 개면 충분합니다.
 
-```python
-def rob(nums: list[int]) -> int:
-    skip, take = 0, 0            # best excluding / including previous house
-    for x in nums:
-        skip, take = max(skip, take), skip + x
-    return max(skip, take)
-```
+<div class="widget" data-widget="code">
+<script type="application/json" class="code-config">
+{"func":"rob","starter":"def rob(nums: list[int]) -> int:\n    # rob i (skip i-1) or skip i; two rolling scalars suffice\n    pass","tests":[{"args":[[1,2,3,1]],"expect":4},{"args":[[2,7,9,3,1]],"expect":12},{"args":[[2,1,1,2]],"expect":4},{"args":[[5]],"expect":5},{"args":[[]],"expect":0}],"solution":"def rob(nums: list[int]) -> int:\n    skip, take = 0, 0\n    for x in nums:\n        skip, take = max(skip, take), skip + x\n    return max(skip, take)"}
+</script>
+</div>
+
 `O(N)` 시간, `O(1)` 공간. 원형 변형(LC 213): 첫 집 혹은 마지막 집을 제외하고 두 번 실행.
 
-### Coin Change — unbounded knapsack (최소 동전 수)
+### Coin Change — unbounded knapsack (최소 동전 수) <span class="badge badge-med">Medium</span> · [LeetCode ↗](https://leetcode.com/problems/coin-change/)
 `dp[a]` = 금액 `a`를 만드는 최소 동전 수. 금액을 바깥으로 반복합니다.
 
-```python
-def coin_change(coins: list[int], amount: int) -> int:
-    INF = amount + 1
-    dp = [0] + [INF] * amount
-    for a in range(1, amount + 1):
-        for c in coins:
-            if c <= a:
-                dp[a] = min(dp[a], dp[a - c] + 1)
-    return dp[amount] if dp[amount] < INF else -1
-```
+<div class="widget" data-widget="code">
+<script type="application/json" class="code-config">
+{"func":"coin_change","starter":"def coin_change(coins: list[int], amount: int) -> int:\n    # dp[a] = fewest coins to make amount a; iterate amounts outward\n    pass","tests":[{"args":[[1,2,5],11],"expect":3},{"args":[[2],3],"expect":-1},{"args":[[1],0],"expect":0},{"args":[[2,5,10,1],27],"expect":4}],"solution":"def coin_change(coins: list[int], amount: int) -> int:\n    INF = amount + 1\n    dp = [0] + [INF] * amount\n    for a in range(1, amount + 1):\n        for c in coins:\n            if c <= a:\n                dp[a] = min(dp[a], dp[a - c] + 1)\n    return dp[amount] if dp[amount] < INF else -1"}
+</script>
+</div>
+
 `O(amount · |coins|)`. **루프 순서가 중요합니다:** amount-바깥/coin-안쪽은 "경우의 수"(LC 518)에 대해 *조합*을 올바르게 셉니다; coin-바깥으로 바꾸면 순열을 세는 것을 피합니다. 무엇을 계산하는지 말하세요.
 
-### Longest Increasing Subsequence — `O(N log N)`
+### Longest Increasing Subsequence — `O(N log N)` <span class="badge badge-med">Medium</span> · [LeetCode ↗](https://leetcode.com/problems/longest-increasing-subsequence/)
 Patience sorting: `tails[k]` = 길이 `k+1`인 증가 subsequence의 가능한 가장 작은 tail.
 
-```python
-import bisect
+<div class="widget" data-widget="code">
+<script type="application/json" class="code-config">
+{"func":"length_of_lis","starter":"import bisect\n\ndef length_of_lis(nums: list[int]) -> int:\n    # patience sorting: tails[k] = smallest tail of an increasing subsequence of length k+1\n    pass","tests":[{"args":[[10,9,2,5,3,7,101,18]],"expect":4},{"args":[[0,1,0,3,2,3]],"expect":4},{"args":[[7,7,7,7,7]],"expect":1},{"args":[[4,10,4,3,8,9]],"expect":3},{"args":[[]],"expect":0}],"solution":"import bisect\n\ndef length_of_lis(nums: list[int]) -> int:\n    tails = []\n    for x in nums:\n        i = bisect.bisect_left(tails, x)\n        if i == len(tails):\n            tails.append(x)\n        else:\n            tails[i] = x\n    return len(tails)"}
+</script>
+</div>
 
-def length_of_lis(nums: list[int]) -> int:
-    tails = []
-    for x in nums:
-        i = bisect.bisect_left(tails, x)     # bisect_right → longest non-decreasing
-        if i == len(tails):
-            tails.append(x)
-        else:
-            tails[i] = x
-    return len(tails)
-```
 naive DP는 `O(N²)`입니다 (`dp[i] = 1 + max(dp[j] for j<i if nums[j]<nums[i])`); 둘 다 알되 빠른 것을 먼저 제시하세요.
 
 ## 2-D DP
 
-### Edit Distance (Levenshtein) — 정석적인 grid DP
+### Edit Distance (Levenshtein) — 정석적인 grid DP <span class="badge badge-med">Medium</span> · [LeetCode ↗](https://leetcode.com/problems/edit-distance/)
 `dp[i][j]` = `word1[:i]`을 `word2[:j]`로 바꾸는 데 필요한 편집 수.
 
 <figure>
@@ -123,35 +118,23 @@ naive DP는 `O(N²)`입니다 (`dp[i] = 1 + max(dp[j] for j<i if nums[j]<nums[i]
 <figcaption>HORSE → ROS = 3. 각 셀은 1 + min(up, left, diag), 글자가 일치하면 diag.</figcaption>
 </figure>
 
-```python
-def min_distance(w1: str, w2: str) -> int:
-    m, n = len(w1), len(w2)
-    dp = [[0] * (n + 1) for _ in range(m + 1)]
-    for i in range(m + 1): dp[i][0] = i           # delete all
-    for j in range(n + 1): dp[0][j] = j           # insert all
-    for i in range(1, m + 1):
-        for j in range(1, n + 1):
-            if w1[i-1] == w2[j-1]:
-                dp[i][j] = dp[i-1][j-1]            # free match
-            else:
-                dp[i][j] = 1 + min(dp[i-1][j],     # delete
-                                   dp[i][j-1],     # insert
-                                   dp[i-1][j-1])   # replace
-    return dp[m][n]
-```
+<div class="widget" data-widget="code">
+<script type="application/json" class="code-config">
+{"func":"min_distance","starter":"def min_distance(w1: str, w2: str) -> int:\n    # dp[i][j] = edits to turn w1[:i] into w2[:j]; match is free, else 1 + min(delete, insert, replace)\n    pass","tests":[{"args":["horse","ros"],"expect":3},{"args":["intention","execution"],"expect":5},{"args":["","abc"],"expect":3},{"args":["abc",""],"expect":3},{"args":["abc","abc"],"expect":0}],"solution":"def min_distance(w1: str, w2: str) -> int:\n    m, n = len(w1), len(w2)\n    dp = [[0] * (n + 1) for _ in range(m + 1)]\n    for i in range(m + 1): dp[i][0] = i\n    for j in range(n + 1): dp[0][j] = j\n    for i in range(1, m + 1):\n        for j in range(1, n + 1):\n            if w1[i-1] == w2[j-1]:\n                dp[i][j] = dp[i-1][j-1]\n            else:\n                dp[i][j] = 1 + min(dp[i-1][j], dp[i][j-1], dp[i-1][j-1])\n    return dp[m][n]"}
+</script>
+</div>
+
 `O(mn)` 시간, `O(min(m,n))` 공간으로 축소 가능(두 행). LCS, min-path-sum, unique-paths가 이 grid 뼈대를 공유합니다.
 
 ### 0/1 Knapsack — 누구나 머릿속에 담고 있어야 할 DP
 `dp[w]` = 용량 `w`에서의 최선 가치; 각 아이템이 최대 한 번만 쓰이도록 weight를 **아래로** 반복합니다.
 
-```python
-def knapsack(weights, values, cap: int) -> int:
-    dp = [0] * (cap + 1)
-    for wt, val in zip(weights, values):
-        for w in range(cap, wt - 1, -1):     # reverse ⇒ 0/1 (each item once)
-            dp[w] = max(dp[w], dp[w - wt] + val)
-    return dp[cap]
-```
+<div class="widget" data-widget="code">
+<script type="application/json" class="code-config">
+{"func":"knapsack","starter":"def knapsack(weights, values, cap: int) -> int:\n    # dp[w] = best value at capacity w; iterate capacity downward so each item is used at most once\n    pass","tests":[{"args":[[1,3,4,5],[1,4,5,7],7],"expect":9},{"args":[[2,3,4,5],[3,4,5,6],5],"expect":7},{"args":[[1,2,3],[6,10,12],5],"expect":22},{"args":[[4,5],[1,2],3],"expect":0}],"solution":"def knapsack(weights, values, cap: int) -> int:\n    dp = [0] * (cap + 1)\n    for wt, val in zip(weights, values):\n        for w in range(cap, wt - 1, -1):\n            dp[w] = max(dp[w], dp[w - wt] + val)\n    return dp[cap]"}
+</script>
+</div>
+
 정방향 반복은 아이템을 재사용합니다 → 그건 *unbounded* knapsack(coin change)입니다. 루프 방향이 유일한 차이입니다.
 
 ### Interval DP — `dp[i][j]`를 subrange에 대해, `k`에서 분할

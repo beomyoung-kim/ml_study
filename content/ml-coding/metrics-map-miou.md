@@ -5,71 +5,61 @@
 
 Implement mIoU (semantic segmentation) and AP/mAP (detection). This proves you know the metrics *by definition*, not just as numbers in a paper — the credibility difference when you present ablations. Box IoU is defined in [IoU & NMS](#/ml-coding/nms-iou); the conceptual treatment is in [Evaluation Metrics](#/foundations/evaluation-metrics).
 
-## Part 1 — mIoU via a confusion matrix
+## Practice — implement, run, test
+
+> [!TIP] How to use this section
+> Each problem below has a **live Python editor** with NumPy preloaded. Write your solution, hit **▶ Run tests**, and see which cases pass. Stuck? Reveal a reference **Solution** — but attempt first; the struggle *is* the practice. The first Run downloads a small Python runtime + NumPy (~15 MB); later runs are instant. These are from-scratch metric implementations — small deterministic inputs, `numpy.allclose` comparison.
+
+Work them in order — build the segmentation metric first (Part 1), then the detection AP machinery (Part 2).
+
+### Part 1 — mIoU via a confusion matrix
 
 Per class, $\text{IoU}_c = \dfrac{\text{TP}_c}{\text{TP}_c + \text{FP}_c + \text{FN}_c}$, and mIoU is the mean over classes. The elegant trick: encode every (gt, pred) pixel pair as a single integer and `bincount` it into a $C\times C$ matrix in one shot.
 
-```python
-import numpy as np
+First the confusion matrix — encode every `(gt, pred)` pixel pair as `gt*C + pred` and `bincount` it into a $C\times C$ table (rows = gt, cols = pred), dropping `ignore_index` pixels.
 
+<div class="widget" data-widget="code">
+<script type="application/json" class="code-config">
+{"func":"confusion_matrix","packages":["numpy"],"approx":true,"starter":"import numpy as np\n\ndef confusion_matrix(pred, target, num_classes, ignore_index=255):\n    # flatten both, drop ignore_index pixels, then bincount(gt*C + pred) -> (C,C)\n    pass","tests":[{"args":[[[0,0,1],[1,1,1]],[[0,1,1],[1,1,0]],2,-1],"expect":[[1,1],[1,3]]},{"args":[[[0,1],[1,0]],[[0,255],[1,255]],2,255],"expect":[[1,0],[0,1]]},{"args":[[[0,0],[1,2]],[[0,1],[1,2]],3],"expect":[[1,0,0],[1,1,0],[0,0,1]]}],"solution":"import numpy as np\n\ndef confusion_matrix(pred, target, num_classes, ignore_index=255):\n    pred = np.asarray(pred); target = np.asarray(target)\n    pred, target = pred.reshape(-1), target.reshape(-1)\n    keep = target != ignore_index\n    pred, target = pred[keep], target[keep]\n    cm = np.bincount(target * num_classes + pred, minlength=num_classes ** 2).reshape(num_classes, -1)\n    return cm.astype(np.float64)"}
+</script>
+</div>
 
-def confusion_matrix(pred, target, num_classes, ignore_index=255):
-    """pred,target: int label maps. Rows=gt, cols=pred. -> (C,C)."""
-    pred, target = pred.reshape(-1), target.reshape(-1)
-    keep = target != ignore_index                  # drop void/unlabeled pixels
-    pred, target = pred[keep], target[keep]
-    # each pair (g,p) -> unique index g*C + p; count all at once
-    cm = np.bincount(target * num_classes + pred,
-                     minlength=num_classes ** 2).reshape(num_classes, -1)
-    return cm.astype(np.float64)
+Then mIoU: from the confusion matrix, per class $\text{TP}=\text{diag}$, $\text{FP}=\text{col sum}-\text{TP}$, $\text{FN}=\text{row sum}-\text{TP}$, and average $\text{TP}/(\text{TP}+\text{FP}+\text{FN})$ over classes that appear.
 
-
-def mean_iou(pred, target, num_classes, ignore_index=255):
-    cm = confusion_matrix(pred, target, num_classes, ignore_index)
-    tp = np.diag(cm)
-    fp = cm.sum(0) - tp                            # predicted c, gt not c
-    fn = cm.sum(1) - tp                            # gt c, predicted not c
-    denom = tp + fp + fn
-    iou = np.where(denom > 0, tp / np.maximum(denom, 1e-8), np.nan)
-    return float(np.nanmean(iou))                  # ignore classes absent everywhere
-```
+<div class="widget" data-widget="code">
+<script type="application/json" class="code-config">
+{"func":"mean_iou","packages":["numpy"],"approx":true,"starter":"import numpy as np\n\ndef mean_iou(pred, target, num_classes, ignore_index=255):\n    # build the confusion matrix, then per-class TP/(TP+FP+FN); mean over present classes\n    pass","tests":[{"args":[[[0,0,1],[1,1,1]],[[0,1,1],[1,1,0]],2,-1],"expect":0.4666666666666667},{"args":[[[0,1],[1,0]],[[0,1],[1,0]],2,-1],"expect":1.0},{"args":[[[0,0]],[[0,0]],2,-1],"expect":1.0}],"solution":"import numpy as np\n\ndef confusion_matrix(pred, target, num_classes, ignore_index=255):\n    pred = np.asarray(pred); target = np.asarray(target)\n    pred, target = pred.reshape(-1), target.reshape(-1)\n    keep = target != ignore_index\n    pred, target = pred[keep], target[keep]\n    return np.bincount(target * num_classes + pred, minlength=num_classes ** 2).reshape(num_classes, -1).astype(np.float64)\n\ndef mean_iou(pred, target, num_classes, ignore_index=255):\n    cm = confusion_matrix(pred, target, num_classes, ignore_index)\n    tp = np.diag(cm)\n    fp = cm.sum(0) - tp\n    fn = cm.sum(1) - tp\n    denom = tp + fp + fn\n    iou = np.where(denom > 0, tp / np.maximum(denom, 1e-8), np.nan)\n    return float(np.nanmean(iou))"}
+</script>
+</div>
 
 **Why a confusion matrix:** it's additive across images, so you accumulate `cm` over the whole validation set and compute IoU once at the end. `bincount` vectorizes all $HW$ pixels — no per-class loop. **Complexity:** $O(HW)$ per image.
 
 > [!WARNING] Don't average per-image IoU
 > mIoU is computed from **dataset-aggregated** TP/FP/FN, not by averaging each image's IoU. Per-image averaging over-weights images where a class occupies few pixels and is the classic reported-number mismatch.
 
-## Part 2 — AP / mAP
+### Part 2 — AP / mAP
 
 AP is the area under the precision–recall curve for one class. Detections are ranked by confidence; each is a **true positive** if it matches an unmatched ground-truth box with IoU $\ge$ threshold, else a **false positive**.
 
-```python
-def box_iou(box, boxes):
-    """box:(4,)  boxes:(N,4) xyxy -> (N,)."""
-    if boxes.size == 0:
-        return np.zeros(0)
-    lt = np.maximum(box[:2], boxes[:, :2])
-    rb = np.minimum(box[2:], boxes[:, 2:])
-    wh = np.maximum(0.0, rb - lt)
-    inter = wh[:, 0] * wh[:, 1]
-    a1 = np.prod(np.maximum(0.0, box[2:] - box[:2]))
-    a2 = np.prod(np.maximum(0.0, boxes[:, 2:] - boxes[:, :2]), axis=1)
-    return inter / np.maximum(a1 + a2 - inter, 1e-8)
+Start with box IoU — one box against `N` boxes in xyxy format, returning the `N` overlaps.
 
+<div class="widget" data-widget="code">
+<script type="application/json" class="code-config">
+{"func":"box_iou","packages":["numpy"],"approx":true,"starter":"import numpy as np\n\ndef box_iou(box, boxes):\n    # box:(4,) vs boxes:(N,4) xyxy -> (N,); intersection area over union area\n    pass","tests":[{"args":[[0,0,10,10],[[0,0,10,10]]],"expect":[1.0]},{"args":[[0,0,10,10],[[0,0,10,10],[5,5,15,15]]],"expect":[1.0,0.14285714285714285]},{"args":[[0,0,10,10],[[20,20,30,30]]],"expect":[0.0]},{"args":[[0,0,10,10],[]],"expect":[]}],"solution":"import numpy as np\n\ndef box_iou(box, boxes):\n    box = np.asarray(box, float); boxes = np.asarray(boxes, float)\n    if boxes.size == 0:\n        return np.zeros(0)\n    lt = np.maximum(box[:2], boxes[:, :2])\n    rb = np.minimum(box[2:], boxes[:, 2:])\n    wh = np.maximum(0.0, rb - lt)\n    inter = wh[:, 0] * wh[:, 1]\n    a1 = np.prod(np.maximum(0.0, box[2:] - box[:2]))\n    a2 = np.prod(np.maximum(0.0, boxes[:, 2:] - boxes[:, :2]), axis=1)\n    return inter / np.maximum(a1 + a2 - inter, 1e-8)"}
+</script>
+</div>
 
-def average_precision(recall, precision):
-    """VOC 2010+ all-point interpolation: area under the PR envelope."""
-    mrec = np.concatenate(([0.0], recall, [1.0]))
-    mpre = np.concatenate(([0.0], precision, [0.0]))
-    for i in range(mpre.size - 1, 0, -1):           # make precision monotonic
-        mpre[i - 1] = max(mpre[i - 1], mpre[i])     #   (envelope from the right)
-    i = np.where(mrec[1:] != mrec[:-1])[0]          # recall steps
-    return float(np.sum((mrec[i + 1] - mrec[i]) * mpre[i + 1]))
-```
+Then the VOC all-point AP: pad the PR curve, make precision monotonic from the right (the envelope), and sum the areas at each recall step.
+
+<div class="widget" data-widget="code">
+<script type="application/json" class="code-config">
+{"func":"average_precision","packages":["numpy"],"approx":true,"starter":"import numpy as np\n\ndef average_precision(recall, precision):\n    # VOC all-point: pad the curve, make precision monotonic from the right, sum step areas\n    pass","tests":[{"args":[[0.5,1.0],[1.0,1.0]],"expect":1.0},{"args":[[1.0],[1.0]],"expect":1.0},{"args":[[0.5,1.0],[1.0,0.5]],"expect":0.75},{"args":[[0.33,0.66,1.0],[1.0,0.5,0.6]],"expect":0.732}],"solution":"import numpy as np\n\ndef average_precision(recall, precision):\n    mrec = np.concatenate(([0.0], recall, [1.0]))\n    mpre = np.concatenate(([0.0], precision, [0.0]))\n    for i in range(mpre.size - 1, 0, -1):\n        mpre[i - 1] = max(mpre[i - 1], mpre[i])\n    i = np.where(mrec[1:] != mrec[:-1])[0]\n    return float(np.sum((mrec[i + 1] - mrec[i]) * mpre[i + 1]))"}
+</script>
+</div>
 
 The precision envelope (making precision monotonically non-increasing as recall grows) removes the "wiggles" so AP measures the best achievable precision at each recall level.
 
-### Per-image greedy matching, then integrate
+#### Per-image greedy matching, then integrate
 
 ```python
 def mean_average_precision(preds, gts, num_classes, iou_thr=0.5):

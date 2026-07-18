@@ -68,115 +68,64 @@ def dfs(graph, node, seen):
 > [!WARNING] Mark-on-enqueue
 > In BFS, add to `seen` when you **push**, not when you pop. Marking on pop lets the same node enter the queue many times → blow-up and, on weighted variants, wrong answers.
 
-## Representative problems
+## Practice — implement, run, test
 
-### 1. Number of Islands (Medium) — flood fill
+> [!TIP] How to use this section
+> Each problem below has a **live Python editor**. Write your solution, hit **▶ Run tests**, and see which cases pass. Stuck? Reveal a reference **Solution** — but attempt first; the struggle *is* the practice. The first Run downloads a small Python runtime (~10 MB); later runs are instant. Prefer your own editor? Each problem links out to **LeetCode**. Each lab takes a plain grid / edge list / adjacency list — no graph object to build.
+
+Work them in order — grid flood-fill and multi-source BFS first, then topological sort, cycle detection, and Dijkstra.
+
+### 1. Number of Islands <span class="badge badge-med">Medium</span> · [LeetCode ↗](https://leetcode.com/problems/number-of-islands/)
 Each unvisited land cell launches a DFS that sinks its whole component.
 
-```python
-def num_islands(grid: list[list[str]]) -> int:
-    rows, cols = len(grid), len(grid[0])
-    def sink(r, c):
-        if not (0 <= r < rows and 0 <= c < cols) or grid[r][c] != "1":
-            return
-        grid[r][c] = "0"                       # mark visited in place
-        for dr, dc in DIRS:
-            sink(r + dr, c + dc)
-    count = 0
-    for r in range(rows):
-        for c in range(cols):
-            if grid[r][c] == "1":
-                count += 1
-                sink(r, c)
-    return count
-```
+<div class="widget" data-widget="code">
+<script type="application/json" class="code-config">
+{"func":"num_islands","starter":"def num_islands(grid):\n    # each unvisited '1' launches a DFS that sinks its whole component\n    pass","tests":[{"args":[[["1","1","1","1","0"],["1","1","0","1","0"],["1","1","0","0","0"],["0","0","0","0","0"]]],"expect":1},{"args":[[["1","1","0","0","0"],["1","1","0","0","0"],["0","0","1","0","0"],["0","0","0","1","1"]]],"expect":3},{"args":[[["1","0","1"]]],"expect":2},{"args":[[["0"]]],"expect":0}],"solution":"def num_islands(grid):\n    DIRS = [(1, 0), (-1, 0), (0, 1), (0, -1)]\n    rows, cols = len(grid), len(grid[0])\n    def sink(r, c):\n        if not (0 <= r < rows and 0 <= c < cols) or grid[r][c] != \"1\":\n            return\n        grid[r][c] = \"0\"\n        for dr, dc in DIRS:\n            sink(r + dr, c + dc)\n    count = 0\n    for r in range(rows):\n        for c in range(cols):\n            if grid[r][c] == \"1\":\n                count += 1\n                sink(r, c)\n    return count"}
+</script>
+</div>
+
 `O(R·C)` time. If mutating the grid is disallowed, keep a separate `visited` set.
 
-### 2. Rotting Oranges (Medium) — multi-source BFS
+### 2. Rotting Oranges <span class="badge badge-med">Medium</span> · [LeetCode ↗](https://leetcode.com/problems/rotting-oranges/)
 Seed the queue with **all** rotten cells and expand one minute per layer.
 
-```python
-def oranges_rotting(grid: list[list[int]]) -> int:
-    rows, cols = len(grid), len(grid[0])
-    q, fresh = deque(), 0
-    for r in range(rows):
-        for c in range(cols):
-            if grid[r][c] == 2: q.append((r, c))
-            elif grid[r][c] == 1: fresh += 1
-    minutes = 0
-    while q and fresh:
-        for _ in range(len(q)):
-            r, c = q.popleft()
-            for dr, dc in DIRS:
-                nr, nc = r + dr, c + dc
-                if 0 <= nr < rows and 0 <= nc < cols and grid[nr][nc] == 1:
-                    grid[nr][nc] = 2
-                    fresh -= 1
-                    q.append((nr, nc))
-        minutes += 1
-    return minutes if fresh == 0 else -1
-```
+<div class="widget" data-widget="code">
+<script type="application/json" class="code-config">
+{"func":"oranges_rotting","starter":"from collections import deque\n\ndef oranges_rotting(grid):\n    # multi-source BFS: seed the queue with all rotten cells, expand one minute per layer\n    pass","tests":[{"args":[[[2,1,1],[1,1,0],[0,1,1]]],"expect":4},{"args":[[[2,1,1],[0,1,1],[1,0,1]]],"expect":-1},{"args":[[[0,2]]],"expect":0},{"args":[[[1]]],"expect":-1},{"args":[[[2,2],[1,1]]],"expect":1}],"solution":"from collections import deque\n\ndef oranges_rotting(grid):\n    DIRS = [(1, 0), (-1, 0), (0, 1), (0, -1)]\n    rows, cols = len(grid), len(grid[0])\n    q, fresh = deque(), 0\n    for r in range(rows):\n        for c in range(cols):\n            if grid[r][c] == 2:\n                q.append((r, c))\n            elif grid[r][c] == 1:\n                fresh += 1\n    minutes = 0\n    while q and fresh:\n        for _ in range(len(q)):\n            r, c = q.popleft()\n            for dr, dc in DIRS:\n                nr, nc = r + dr, c + dc\n                if 0 <= nr < rows and 0 <= nc < cols and grid[nr][nc] == 1:\n                    grid[nr][nc] = 2\n                    fresh -= 1\n                    q.append((nr, nc))\n        minutes += 1\n    return minutes if fresh == 0 else -1"}
+</script>
+</div>
+
 `O(R·C)`. Multi-source BFS is the "spread simultaneously from many origins" pattern — also *walls and gates*, *shortest bridge*.
 
-### 3. Course Schedule II — topological sort (Medium)
+### 3. Course Schedule II <span class="badge badge-med">Medium</span> · [LeetCode ↗](https://leetcode.com/problems/course-schedule-ii/)
 Kahn's algorithm: repeatedly emit an in-degree-0 node. If you can't emit them all, there's a cycle.
 
-```python
-def find_order(n: int, prereqs: list[list[int]]) -> list[int]:
-    graph = defaultdict(list)
-    indeg = [0] * n
-    for course, need in prereqs:
-        graph[need].append(course)              # need -> course
-        indeg[course] += 1
-    q = deque(c for c in range(n) if indeg[c] == 0)
-    order = []
-    while q:
-        cur = q.popleft()
-        order.append(cur)
-        for nxt in graph[cur]:
-            indeg[nxt] -= 1
-            if indeg[nxt] == 0:
-                q.append(nxt)
-    return order if len(order) == n else []      # incomplete ⇒ cycle
-```
+<div class="widget" data-widget="code">
+<script type="application/json" class="code-config">
+{"func":"find_order","starter":"from collections import defaultdict, deque\n\ndef find_order(n, prereqs):\n    # Kahn's algorithm: repeatedly emit an in-degree-0 node; incomplete => cycle\n    pass","tests":[{"args":[2,[[1,0]]],"expect":[0,1]},{"args":[4,[[1,0],[2,0],[3,1],[3,2]]],"expect":[0,1,2,3]},{"args":[1,[]],"expect":[0]},{"args":[2,[[0,1],[1,0]]],"expect":[]}],"solution":"from collections import defaultdict, deque\n\ndef find_order(n, prereqs):\n    graph = defaultdict(list)\n    indeg = [0] * n\n    for course, need in prereqs:\n        graph[need].append(course)\n        indeg[course] += 1\n    q = deque(c for c in range(n) if indeg[c] == 0)\n    order = []\n    while q:\n        cur = q.popleft()\n        order.append(cur)\n        for nxt in graph[cur]:\n            indeg[nxt] -= 1\n            if indeg[nxt] == 0:\n                q.append(nxt)\n    return order if len(order) == n else []"}
+</script>
+</div>
+
 `O(V+E)`. The `len(order) == n` check *is* the cycle detector. The DFS alternative uses 3-color marking (white/gray/black); a back-edge to a gray node is a cycle.
 
-### 4. Cycle detection in a directed graph (DFS, 3-color)
-```python
-def has_cycle(n, graph):
-    state = [0] * n                 # 0 unvisited, 1 in-stack, 2 done
-    def dfs(u):
-        if state[u] == 1: return True    # back-edge → cycle
-        if state[u] == 2: return False
-        state[u] = 1
-        if any(dfs(v) for v in graph[u]): return True
-        state[u] = 2
-        return False
-    return any(dfs(u) for u in range(n) if state[u] == 0)
-```
+### 4. Cycle Detection in a Directed Graph <span class="badge badge-med">Medium</span> · [LeetCode ↗](https://leetcode.com/problems/course-schedule/)
+3-color DFS: a back-edge to a gray (in-stack) node means a cycle. The adjacency list is a plain list of neighbor lists.
 
-### 5. Network Delay Time — Dijkstra (Medium)
+<div class="widget" data-widget="code">
+<script type="application/json" class="code-config">
+{"func":"has_cycle","starter":"def has_cycle(n, graph):\n    # 3-color DFS: a back-edge to an in-stack (gray) node means a cycle\n    pass","tests":[{"args":[3,[[1],[2],[]]],"expect":false},{"args":[3,[[1],[2],[0]]],"expect":true},{"args":[2,[[],[]]],"expect":false},{"args":[4,[[1],[2],[3],[1]]],"expect":true},{"args":[1,[[]]],"expect":false}],"solution":"def has_cycle(n, graph):\n    state = [0] * n\n    def dfs(u):\n        if state[u] == 1:\n            return True\n        if state[u] == 2:\n            return False\n        state[u] = 1\n        if any(dfs(v) for v in graph[u]):\n            return True\n        state[u] = 2\n        return False\n    return any(dfs(u) for u in range(n) if state[u] == 0)"}
+</script>
+</div>
+
+### 5. Network Delay Time <span class="badge badge-med">Medium</span> · [LeetCode ↗](https://leetcode.com/problems/network-delay-time/)
 Non-negative weighted shortest paths from a source; a min-heap always finalizes the closest unsettled node.
 
-```python
-import heapq
+<div class="widget" data-widget="code">
+<script type="application/json" class="code-config">
+{"func":"network_delay_time","starter":"import heapq\nfrom collections import defaultdict\n\ndef network_delay_time(times, n, k):\n    # Dijkstra from k; a min-heap finalizes the closest unsettled node each pop\n    pass","tests":[{"args":[[[2,1,1],[2,3,1],[3,4,1]],4,2],"expect":2},{"args":[[[1,2,1]],2,1],"expect":1},{"args":[[[1,2,1]],2,2],"expect":-1},{"args":[[[1,2,1],[2,3,2],[1,3,4]],3,1],"expect":3}],"solution":"import heapq\nfrom collections import defaultdict\n\ndef network_delay_time(times, n, k):\n    graph = defaultdict(list)\n    for u, v, w in times:\n        graph[u].append((v, w))\n    dist = {}\n    pq = [(0, k)]\n    while pq:\n        d, u = heapq.heappop(pq)\n        if u in dist:\n            continue\n        dist[u] = d\n        for v, w in graph[u]:\n            if v not in dist:\n                heapq.heappush(pq, (d + w, v))\n    return max(dist.values()) if len(dist) == n else -1"}
+</script>
+</div>
 
-def network_delay_time(times, n, k) -> int:
-    graph = defaultdict(list)
-    for u, v, w in times:
-        graph[u].append((v, w))
-    dist = {}
-    pq = [(0, k)]                              # (distance, node)
-    while pq:
-        d, u = heapq.heappop(pq)
-        if u in dist:                          # already finalized
-            continue
-        dist[u] = d
-        for v, w in graph[u]:
-            if v not in dist:
-                heapq.heappush(pq, (d + w, v))
-    return max(dist.values()) if len(dist) == n else -1
-```
 `O(E log V)`. Negative edges break Dijkstra → use **Bellman-Ford** `O(VE)`; all-pairs → **Floyd-Warshall** `O(V³)`.
 
 ## Variations to name

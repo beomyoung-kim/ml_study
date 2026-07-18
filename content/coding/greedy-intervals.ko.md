@@ -48,81 +48,59 @@ Greedy는 빠르지만(보통 정렬 한 번 + 순회 한 번) greedy-choice 속
 <figcaption>end time으로 정렬한 뒤, 마지막으로 유지한 end 이후에 시작하는 각 interval을 greedy하게 유지합니다.</figcaption>
 </figure>
 
-## 대표 문제
+## Practice — 직접 구현하고 실행·테스트
 
-### 1. Merge Intervals (Medium) — start로 정렬
-```python
-def merge(intervals: list[list[int]]) -> list[list[int]]:
-    intervals.sort(key=lambda iv: iv[0])
-    out = []
-    for start, end in intervals:
-        if out and start <= out[-1][1]:
-            out[-1][1] = max(out[-1][1], end)     # overlap ⇒ extend
-        else:
-            out.append([start, end])
-    return out
-```
+> [!TIP] 이 섹션 사용법
+> 아래 각 문제에는 **라이브 Python 에디터**가 있습니다. 직접 풀이를 작성하고 **▶ Run tests**를 누르면 어떤 케이스가 통과하는지 보여줍니다. 막히면 참고용 **Solution**을 열어볼 수 있지만, 먼저 직접 시도하세요 — 그 씨름이 곧 연습입니다. 첫 Run에서 작은 Python 런타임(~10 MB)을 내려받고, 이후 실행은 즉시입니다. 본인 에디터가 편하면 각 문제의 **LeetCode** 링크로 이동하세요.
+
+순서대로 풀어보세요 — 정렬 키가 승부의 전부이니, 코드를 치기 전에 무엇으로 정렬할지 먼저 정하세요.
+
+### 1. Merge Intervals <span class="badge badge-med">Medium</span> · [LeetCode ↗](https://leetcode.com/problems/merge-intervals/) — start로 정렬
+<div class="widget" data-widget="code">
+<script type="application/json" class="code-config">
+{"func": "merge", "starter": "def merge(intervals: list[list[int]]) -> list[list[int]]:\n    # sort by start; extend the last kept interval when they overlap\n    pass", "tests": [{"args": [[[1, 3], [2, 6], [8, 10], [15, 18]]], "expect": [[1, 6], [8, 10], [15, 18]]}, {"args": [[[1, 4], [4, 5]]], "expect": [[1, 5]]}, {"args": [[[1, 4], [2, 3]]], "expect": [[1, 4]]}, {"args": [[[1, 4], [0, 4]]], "expect": [[0, 4]]}], "solution": "def merge(intervals):\n    intervals.sort(key=lambda iv: iv[0])\n    out = []\n    for start, end in intervals:\n        if out and start <= out[-1][1]:\n            out[-1][1] = max(out[-1][1], end)\n        else:\n            out.append([start, end])\n    return out"}
+</script>
+</div>
 `O(N log N)`. 맞닿은 끝점(`[1,2],[2,3]`)이 병합되는지는 `<` vs `<=` 결정입니다 — 문제의 관례를 소리 내어 확인하세요.
 
-### 2. Non-overlapping Intervals (Medium) — end로 정렬, activity selection
+### 2. Non-overlapping Intervals <span class="badge badge-med">Medium</span> · [LeetCode ↗](https://leetcode.com/problems/non-overlapping-intervals/) — end로 정렬, activity selection
 최소 제거 수 = `N −` (유지한 최대 non-overlapping).
 
-```python
-def erase_overlap(intervals: list[list[int]]) -> int:
-    intervals.sort(key=lambda iv: iv[1])         # earliest finish first
-    kept, prev_end = 0, float("-inf")
-    for start, end in intervals:
-        if start >= prev_end:                    # no overlap with last kept
-            kept += 1
-            prev_end = end
-    return len(intervals) - kept
-```
+<div class="widget" data-widget="code">
+<script type="application/json" class="code-config">
+{"func": "erase_overlap", "starter": "def erase_overlap(intervals: list[list[int]]) -> int:\n    # sort by end (earliest finish first); count how many you can keep\n    pass", "tests": [{"args": [[[1, 2], [2, 3], [3, 4], [1, 3]]], "expect": 1}, {"args": [[[1, 2], [1, 2], [1, 2]]], "expect": 2}, {"args": [[[1, 2], [2, 3]]], "expect": 0}, {"args": [[[1, 100], [11, 22], [1, 11], [2, 12]]], "expect": 2}], "solution": "def erase_overlap(intervals):\n    intervals.sort(key=lambda iv: iv[1])\n    kept, prev_end = 0, float('-inf')\n    for start, end in intervals:\n        if start >= prev_end:\n            kept += 1\n            prev_end = end\n    return len(intervals) - kept"}
+</script>
+</div>
 `O(N log N)`. 여기서 *start*로 정렬하는 것이 고전적인 오답입니다 — exchange-argument 보장을 주지 못합니다.
 
-### 3. Minimum Arrows to Burst Balloons (Medium)
+### 3. Minimum Arrows to Burst Balloons <span class="badge badge-med">Medium</span> · [LeetCode ↗](https://leetcode.com/problems/minimum-number-of-arrows-to-burst-balloons/)
 같은 earliest-end greedy: 각 interval의 end에 놓인 화살 하나가 그와 겹치는 모든 풍선을 터뜨립니다.
 
-```python
-def find_min_arrows(points: list[list[int]]) -> int:
-    points.sort(key=lambda p: p[1])
-    arrows, last = 0, float("-inf")
-    for start, end in points:
-        if start > last:                         # current arrow can't reach
-            arrows += 1
-            last = end                           # new arrow at this end
-    return arrows
-```
+<div class="widget" data-widget="code">
+<script type="application/json" class="code-config">
+{"func": "find_min_arrows", "starter": "def find_min_arrows(points: list[list[int]]) -> int:\n    # sort by end; new arrow whenever the current one can't reach\n    pass", "tests": [{"args": [[[10, 16], [2, 8], [1, 6], [7, 12]]], "expect": 2}, {"args": [[[1, 2], [3, 4], [5, 6], [7, 8]]], "expect": 4}, {"args": [[[1, 2], [2, 3], [3, 4], [4, 5]]], "expect": 2}, {"args": [[[1, 2]]], "expect": 1}], "solution": "def find_min_arrows(points):\n    points.sort(key=lambda p: p[1])\n    arrows, last = 0, float('-inf')\n    for start, end in points:\n        if start > last:\n            arrows += 1\n            last = end\n    return arrows"}
+</script>
+</div>
 `O(N log N)`. 구조적으로 activity selection과 동일합니다 — 이를 알아채면 유도 시간을 아낍니다.
 
-### 4. Meeting Rooms II (Medium) — end-time의 heap
+### 4. Meeting Rooms II <span class="badge badge-med">Medium</span> · [LeetCode ↗](https://leetcode.com/problems/meeting-rooms-ii/) — end-time의 heap
 최소 방 수 = 최대 동시 overlap. end-time의 min-heap이 사용 중인 방을 추적합니다.
 
-```python
-import heapq
-
-def min_meeting_rooms(intervals: list[list[int]]) -> int:
-    intervals.sort(key=lambda iv: iv[0])         # process by start
-    ends = []                                    # min-heap of end times
-    for start, end in intervals:
-        if ends and ends[0] <= start:            # earliest room freed in time
-            heapq.heappop(ends)
-        heapq.heappush(ends, end)
-    return len(ends)                             # peak concurrency
-```
+<div class="widget" data-widget="code">
+<script type="application/json" class="code-config">
+{"func": "min_meeting_rooms", "starter": "import heapq\n\ndef min_meeting_rooms(intervals: list[list[int]]) -> int:\n    # process by start; a min-heap of end-times tracks rooms in use\n    pass", "tests": [{"args": [[[0, 30], [5, 10], [15, 20]]], "expect": 2}, {"args": [[[7, 10], [2, 4]]], "expect": 1}, {"args": [[[1, 5], [8, 9], [8, 9]]], "expect": 2}, {"args": [[[13, 15], [1, 13]]], "expect": 1}], "solution": "import heapq\n\ndef min_meeting_rooms(intervals):\n    intervals.sort(key=lambda iv: iv[0])\n    ends = []\n    for start, end in intervals:\n        if ends and ends[0] <= start:\n            heapq.heappop(ends)\n        heapq.heappush(ends, end)\n    return len(ends)"}
+</script>
+</div>
 `O(N log N)`. 대안: 정렬된 start/end 이벤트에 대한 sweep-line, `+1`/`−1`, 최대값 추적 — 같은 복잡도, heap 없음. [Heaps](#/coding/heap-priority-queue)로 연결됩니다.
 
-### 5. Jump Game (Medium) — greedy 도달 가능성
+### 5. Jump Game <span class="badge badge-med">Medium</span> · [LeetCode ↗](https://leetcode.com/problems/jump-game/) — greedy 도달 가능성
 도달 가능한 가장 먼 인덱스를 추적; 루프 인덱스가 그것을 넘어서면 막힌 것입니다.
 
-```python
-def can_jump(nums: list[int]) -> bool:
-    farthest = 0
-    for i, jump in enumerate(nums):
-        if i > farthest:
-            return False                         # unreachable gap
-        farthest = max(farthest, i + jump)
-    return True
-```
+<div class="widget" data-widget="code">
+<script type="application/json" class="code-config">
+{"func": "can_jump", "starter": "def can_jump(nums: list[int]) -> bool:\n    # track the farthest reachable index; fail if the loop index passes it\n    pass", "tests": [{"args": [[2, 3, 1, 1, 4]], "expect": true}, {"args": [[3, 2, 1, 0, 4]], "expect": false}, {"args": [[0]], "expect": true}, {"args": [[2, 0, 0]], "expect": true}, {"args": [[1, 0, 1, 0]], "expect": false}], "solution": "def can_jump(nums):\n    farthest = 0\n    for i, jump in enumerate(nums):\n        if i > farthest:\n            return False\n        farthest = max(farthest, i + jump)\n    return True"}
+</script>
+</div>
 `O(N)`, `O(1)` 공간. DP 정식화는 `O(N²)`입니다 — greedy 도달 가능성 논증을 먼저 제시하는 것이 승부수입니다. *Jump Game II*(최소 점프)는 이를 BFS류 레벨 카운트로 확장하며, 여전히 `O(N)`입니다.
 
 ## Greedy가 실패할 때 — DP로의 인계

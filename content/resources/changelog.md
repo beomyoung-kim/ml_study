@@ -18,6 +18,17 @@
 
 ---
 
+## 2026-07-18 — Code lab rollout (all coding + ML-coding)
+
+**Added**
+- The interactive **code lab** now covers **every coding pattern chapter and every ML-coding chapter** — **168 runnable labs** total (English + Korean), each with starter code, a hidden reference **Solution**, and test cases graded live in the browser. Coding labs link out to LeetCode; ML-coding labs load **NumPy** and grade with `numpy.allclose`.
+
+**Changed**
+- Code-lab widget upgraded: grading moved into an in-Pyodide Python harness (exact / order-insensitive / numeric-closeness) that can lazy-load packages (numpy). Class-based, training-loop, and plotting snippets were intentionally kept as static reference code.
+- Every reference solution is verified to pass its own tests (168/168) before shipping.
+
+---
+
 ## 2026-07-18 — Interactive code lab (pilot)
 
 **Added**

@@ -19,23 +19,20 @@
 > [!NOTE] queue로는 `list`가 아니라 `deque`를 쓰세요
 > `list.pop(0)`은 O(N)입니다. `collections.deque`는 O(1) `append`/`appendleft`/`pop`/`popleft`를 줍니다. 순수 stack이라면 `append`/`pop`(둘 다 끝에서 O(1))을 쓰는 `list`가 관용적입니다.
 
-## Worked examples
+## Practice — 직접 구현하고 실행·테스트
 
-### 1. Valid Parentheses <span class="badge badge-easy">Easy</span>
+> [!TIP] 이 섹션 사용법
+> 아래 각 문제에는 **라이브 Python 에디터**가 있습니다. 직접 풀이를 작성하고 **▶ Run tests**를 누르면 어떤 케이스가 통과하는지 보여줍니다. 막히면 참고용 **Solution**을 열어볼 수 있지만, 먼저 직접 시도하세요 — 그 씨름이 곧 연습입니다. 첫 Run에서 작은 Python 런타임(~10 MB)을 내려받고, 이후 실행은 즉시입니다. 본인 에디터가 편하면 각 문제의 **LeetCode** 링크로 이동하세요. (아래 두 개의 class-design 문제는 정적 참고용으로 남겨둡니다.)
+
+### 1. Valid Parentheses <span class="badge badge-easy">Easy</span> · [LeetCode ↗](https://leetcode.com/problems/valid-parentheses/)
 
 `()[]{}` 문자열이 올바르게 matched되고 nested되었나요?
 
-```python
-def is_valid(s: str) -> bool:
-    match = {")": "(", "]": "[", "}": "{"}
-    stack: list[str] = []
-    for ch in s:
-        if ch in "([{":
-            stack.append(ch)
-        elif not stack or stack.pop() != match[ch]:
-            return False
-    return not stack                 # leftover openers → invalid
-```
+<div class="widget" data-widget="code">
+<script type="application/json" class="code-config">
+{"func":"is_valid","starter":"def is_valid(s: str) -> bool:\n    # push openers; on a closer, the popped top must be its match\n    pass","tests":[{"args":["()"],"expect":true},{"args":["()[]{}"],"expect":true},{"args":["(]"],"expect":false},{"args":["([)]"],"expect":false},{"args":["{[]}"],"expect":true}],"solution":"def is_valid(s: str) -> bool:\n    match = {\")\": \"(\", \"]\": \"[\", \"}\": \"{\"}\n    stack = []\n    for ch in s:\n        if ch in \"([{\":\n            stack.append(ch)\n        elif not stack or stack.pop() != match[ch]:\n            return False\n    return not stack"}
+</script>
+</div>
 
 *O(N) time, O(N) space.* **Pitfall:** 두 edge case — 빈 stack에서의 closer, 그리고 끝에 남은 opener(`return not stack`).
 
@@ -69,43 +66,29 @@ class MyQueue:
 
 *op당 amortized O(1), O(N) space.* **Pitfall:** *`out_s`가 비었을 때만* 옮기세요; 각 원소는 최대 한 번 이동하므로 amortized bound가 나옵니다.
 
-### 3. Daily Temperatures <span class="badge badge-med">Medium</span>
+### 3. Daily Temperatures <span class="badge badge-med">Medium</span> · [LeetCode ↗](https://leetcode.com/problems/daily-temperatures/)
 
 각 날에 대해, 더 따뜻한 온도까지 며칠이 걸리나요(없으면 0).
 
 **Approach.** **monotonic decreasing stack of indices**: 오늘이 top을 넘어서면, 그 날의 답이 해결됩니다.
 
-```python
-def daily_temperatures(temps: list[int]) -> list[int]:
-    ans = [0] * len(temps)
-    stack: list[int] = []               # indices, temps decreasing
-    for i, t in enumerate(temps):
-        while stack and temps[stack[-1]] < t:
-            j = stack.pop()
-            ans[j] = i - j
-        stack.append(i)
-    return ans
-```
+<div class="widget" data-widget="code">
+<script type="application/json" class="code-config">
+{"func":"daily_temperatures","starter":"def daily_temperatures(temps: list[int]) -> list[int]:\n    # monotonic decreasing stack of indices; resolve a day when today beats the top\n    pass","tests":[{"args":[[73,74,75,71,69,72,76,73]],"expect":[1,1,4,2,1,1,0,0]},{"args":[[30,40,50,60]],"expect":[1,1,1,0]},{"args":[[30,60,90]],"expect":[1,1,0]},{"args":[[90,80,70]],"expect":[0,0,0]}],"solution":"def daily_temperatures(temps: list[int]) -> list[int]:\n    ans = [0] * len(temps)\n    stack = []\n    for i, t in enumerate(temps):\n        while stack and temps[stack[-1]] < t:\n            j = stack.pop()\n            ans[j] = i - j\n        stack.append(i)\n    return ans"}
+</script>
+</div>
 
 *O(N) time, O(N) space* (각 index는 한 번 push/pop). **Pitfall:** value가 아니라 **index**를 저장하세요 — 거리가 필요합니다.
 
-### 4. Evaluate Reverse Polish Notation <span class="badge badge-med">Medium</span>
+### 4. Evaluate Reverse Polish Notation <span class="badge badge-med">Medium</span> · [LeetCode ↗](https://leetcode.com/problems/evaluate-reverse-polish-notation/)
 
 postfix 식을 평가하세요.
 
-```python
-def eval_rpn(tokens: list[str]) -> int:
-    stack: list[int] = []
-    ops = {"+": lambda a, b: a + b, "-": lambda a, b: a - b,
-           "*": lambda a, b: a * b, "/": lambda a, b: int(a / b)}
-    for tok in tokens:
-        if tok in ops:
-            b, a = stack.pop(), stack.pop()      # order matters!
-            stack.append(ops[tok](a, b))
-        else:
-            stack.append(int(tok))
-    return stack[0]
-```
+<div class="widget" data-widget="code">
+<script type="application/json" class="code-config">
+{"func":"eval_rpn","starter":"def eval_rpn(tokens: list[str]) -> int:\n    # stack of operands; on an operator pop b then a, push a op b\n    pass","tests":[{"args":[["2","1","+","3","*"]],"expect":9},{"args":[["4","13","5","/","+"]],"expect":6},{"args":[["10","6","9","3","+","-11","*","/","*","17","+","5","+"]],"expect":22},{"args":[["3","-4","+"]],"expect":-1}],"solution":"def eval_rpn(tokens: list[str]) -> int:\n    stack = []\n    ops = {\"+\": lambda a, b: a + b, \"-\": lambda a, b: a - b,\n           \"*\": lambda a, b: a * b, \"/\": lambda a, b: int(a / b)}\n    for tok in tokens:\n        if tok in ops:\n            b, a = stack.pop(), stack.pop()\n            stack.append(ops[tok](a, b))\n        else:\n            stack.append(int(tok))\n    return stack[0]"}
+</script>
+</div>
 
 *O(N) time, O(N) space.* **Pitfall:** operand 순서 — `b`를 pop한 뒤 `a`를 pop하고, `a op b`를 계산하세요. `int(a / b)`(0 방향으로 truncate)를 쓰세요; `a // b`는 floor라 음수에서 틀립니다.
 
@@ -129,46 +112,27 @@ class MinStack:
 
 *op당 O(1), O(N) space.* **Pitfall:** 단일 `min` 변수는 `pop` 후 복원할 수 없습니다; running min을 *각 원소와 함께* 저장하세요.
 
-### 6. Sliding Window Maximum <span class="badge badge-hard">Hard</span>
+### 6. Sliding Window Maximum <span class="badge badge-hard">Hard</span> · [LeetCode ↗](https://leetcode.com/problems/sliding-window-maximum/)
 
 size `k`인 모든 window의 최댓값 — heap이 아니라 **monotonic deque**.
 
-```python
-from collections import deque
-
-def max_sliding_window(nums: list[int], k: int) -> list[int]:
-    dq: deque[int] = deque()          # indices, values decreasing
-    out: list[int] = []
-    for i, x in enumerate(nums):
-        while dq and nums[dq[-1]] <= x:
-            dq.pop()                  # x dominates smaller tail values
-        dq.append(i)
-        if dq[0] <= i - k:            # front fell out of the window
-            dq.popleft()
-        if i >= k - 1:
-            out.append(nums[dq[0]])   # front is the window max
-    return out
-```
+<div class="widget" data-widget="code">
+<script type="application/json" class="code-config">
+{"func":"max_sliding_window","starter":"from collections import deque\n\ndef max_sliding_window(nums: list[int], k: int) -> list[int]:\n    # monotonic deque of indices (values decreasing); front is the window max\n    pass","tests":[{"args":[[1,3,-1,-3,5,3,6,7],3],"expect":[3,3,5,5,6,7]},{"args":[[1],1],"expect":[1]},{"args":[[1,-1],1],"expect":[1,-1]},{"args":[[9,11],2],"expect":[11]}],"solution":"from collections import deque\n\ndef max_sliding_window(nums: list[int], k: int) -> list[int]:\n    dq = deque()\n    out = []\n    for i, x in enumerate(nums):\n        while dq and nums[dq[-1]] <= x:\n            dq.pop()\n        dq.append(i)\n        if dq[0] <= i - k:\n            dq.popleft()\n        if i >= k - 1:\n            out.append(nums[dq[0]])\n    return out"}
+</script>
+</div>
 
 *O(N) time, O(k) space.* heap은 O(N log k)를 주지만, deque는 각 index가 한 번 들어오고 한 번 나가므로 O(N)입니다. **Pitfall:** 낡은 front를 index로 evict하고, 들어오는 value보다 `≤`인 동안 tail을 pop하세요.
 
-### 7. Largest Rectangle in Histogram <span class="badge badge-hard">Hard</span>
+### 7. Largest Rectangle in Histogram <span class="badge badge-hard">Hard</span> · [LeetCode ↗](https://leetcode.com/problems/largest-rectangle-in-histogram/)
 
 histogram 아래의 가장 큰 axis-aligned rectangle.
 
-```python
-def largest_rectangle_area(heights: list[int]) -> int:
-    heights = [0] + heights + [0]      # sentinels flush the stack cleanly
-    stack = [0]                        # indices, heights increasing
-    best = 0
-    for i in range(1, len(heights)):
-        while heights[stack[-1]] > heights[i]:
-            h = heights[stack.pop()]
-            width = i - stack[-1] - 1
-            best = max(best, h * width)
-        stack.append(i)
-    return best
-```
+<div class="widget" data-widget="code">
+<script type="application/json" class="code-config">
+{"func":"largest_rectangle_area","starter":"def largest_rectangle_area(heights: list[int]) -> int:\n    # monotonic increasing stack with sentinels; width = i - stack[-1] - 1\n    pass","tests":[{"args":[[2,1,5,6,2,3]],"expect":10},{"args":[[2,4]],"expect":4},{"args":[[2,1,2]],"expect":3},{"args":[[6,2,5,4,5,1,6]],"expect":12}],"solution":"def largest_rectangle_area(heights: list[int]) -> int:\n    heights = [0] + heights + [0]\n    stack = [0]\n    best = 0\n    for i in range(1, len(heights)):\n        while heights[stack[-1]] > heights[i]:\n            h = heights[stack.pop()]\n            width = i - stack[-1] - 1\n            best = max(best, h * width)\n        stack.append(i)\n    return best"}
+</script>
+</div>
 
 *O(N) time, O(N) space.* **Pitfall:** width는 `i − stack[-1] − 1`(새 left boundary와 `i` 사이의 span)이지, `i − popped_index`가 *아닙니다*. sentinel이 양 끝의 특수 처리를 피하게 해줍니다.
 

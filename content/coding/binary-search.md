@@ -74,111 +74,64 @@ def lower_bound(lo: int, hi: int, pred) -> int:
 > [!WARNING] The only two bugs
 > **Infinite loop:** `while lo < hi` with `lo = mid` (not `mid + 1`) never advances when `hi = lo + 1`. Rule: whichever side *keeps* `mid` must be the one that shrinks toward it (`hi = mid`); the other adds one (`lo = mid + 1`). **Off-by-one boundary:** decide `<` vs `<=` in the predicate to pick lower vs upper bound, and test the two-element case by hand.
 
-## Representative problems
+## Practice — implement, run, test
 
-### 1. Search Insert Position — lower bound (Easy)
+> [!TIP] How to use this section
+> Each problem below has a **live Python editor**. Write your solution, hit **▶ Run tests**, and see which cases pass. Stuck? Reveal a reference **Solution** — but attempt first; the struggle *is* the practice. The first Run downloads a small Python runtime (~10 MB); later runs are instant. Prefer your own editor? Each problem links out to **LeetCode**.
+
+Work them in order — the plain-array searches first, then binary-search-on-the-answer, then the Hard partition problem.
+
+### 1. Search Insert Position <span class="badge badge-easy">Easy</span> · [LeetCode ↗](https://leetcode.com/problems/search-insert-position/)
 Return the index where `target` belongs. This *is* `lower_bound` with `pred = nums[mid] >= target`.
 
-```python
-def search_insert(nums: list[int], target: int) -> int:
-    lo, hi = 0, len(nums)                 # hi = len, not len-1
-    while lo < hi:
-        mid = lo + (hi - lo) // 2
-        if nums[mid] < target:
-            lo = mid + 1
-        else:
-            hi = mid
-    return lo
-```
+<div class="widget" data-widget="code">
+<script type="application/json" class="code-config">
+{"func":"search_insert","starter":"def search_insert(nums: list[int], target: int) -> int:\n    # lower_bound: hi starts at len(nums); pred is nums[mid] >= target\n    pass","tests":[{"args":[[1,3,5,6],5],"expect":2},{"args":[[1,3,5,6],2],"expect":1},{"args":[[1,3,5,6],7],"expect":4},{"args":[[1,3,5,6],0],"expect":0},{"args":[[1],0],"expect":0}],"solution":"def search_insert(nums: list[int], target: int) -> int:\n    lo, hi = 0, len(nums)\n    while lo < hi:\n        mid = lo + (hi - lo) // 2\n        if nums[mid] < target:\n            lo = mid + 1\n        else:\n            hi = mid\n    return lo"}
+</script>
+</div>
+
 `O(log N)` time, `O(1)` space. Switching `<` to `<=` gives the **upper bound** — that pair covers `bisect_left`/`bisect_right`.
 
-### 2. Search in Rotated Sorted Array (Medium)
+### 2. Search in Rotated Sorted Array <span class="badge badge-med">Medium</span> · [LeetCode ↗](https://leetcode.com/problems/search-in-rotated-sorted-array/)
 No duplicates. At each step, one half is sorted; decide whether `target` lies inside it.
 
-```python
-def search_rotated(nums: list[int], target: int) -> int:
-    lo, hi = 0, len(nums) - 1
-    while lo <= hi:
-        mid = lo + (hi - lo) // 2
-        if nums[mid] == target:
-            return mid
-        if nums[lo] <= nums[mid]:                 # left half sorted
-            if nums[lo] <= target < nums[mid]:
-                hi = mid - 1
-            else:
-                lo = mid + 1
-        else:                                      # right half sorted
-            if nums[mid] < target <= nums[hi]:
-                lo = mid + 1
-            else:
-                hi = mid - 1
-    return -1
-```
+<div class="widget" data-widget="code">
+<script type="application/json" class="code-config">
+{"func":"search_rotated","starter":"def search_rotated(nums: list[int], target: int) -> int:\n    # one half is always sorted; decide whether target lies inside it\n    pass","tests":[{"args":[[4,5,6,7,0,1,2],0],"expect":4},{"args":[[4,5,6,7,0,1,2],3],"expect":-1},{"args":[[4,5,6,7,0,1,2],7],"expect":3},{"args":[[5,1,3],5],"expect":0},{"args":[[1],0],"expect":-1}],"solution":"def search_rotated(nums: list[int], target: int) -> int:\n    lo, hi = 0, len(nums) - 1\n    while lo <= hi:\n        mid = lo + (hi - lo) // 2\n        if nums[mid] == target:\n            return mid\n        if nums[lo] <= nums[mid]:\n            if nums[lo] <= target < nums[mid]:\n                hi = mid - 1\n            else:\n                lo = mid + 1\n        else:\n            if nums[mid] < target <= nums[hi]:\n                lo = mid + 1\n            else:\n                hi = mid - 1\n    return -1"}
+</script>
+</div>
+
 `O(log N)`. With duplicates (LC 81) the `nums[lo] == nums[mid]` tie forces a linear `lo += 1` step, degrading to `O(N)` worst case — say this out loud.
 
-### 3. Koko Eating Bananas — binary search on the answer (Medium)
+### 3. Koko Eating Bananas <span class="badge badge-med">Medium</span> · [LeetCode ↗](https://leetcode.com/problems/koko-eating-bananas/)
 Minimum eating speed `k` to finish `piles` within `h` hours. The predicate "can finish at speed `k`" is monotonic in `k`.
 
-```python
-import math
+<div class="widget" data-widget="code">
+<script type="application/json" class="code-config">
+{"func":"min_eating_speed","starter":"import math\n\ndef min_eating_speed(piles: list[int], h: int) -> int:\n    # binary-search k in [1, max(piles)]; feasible if sum(ceil(p/k)) <= h\n    pass","tests":[{"args":[[3,6,7,11],8],"expect":4},{"args":[[30,11,23,4,20],5],"expect":30},{"args":[[30,11,23,4,20],6],"expect":23},{"args":[[1,1,1,999999999],10],"expect":142857143}],"solution":"import math\n\ndef min_eating_speed(piles: list[int], h: int) -> int:\n    def can_finish(speed: int) -> bool:\n        return sum(math.ceil(p / speed) for p in piles) <= h\n    lo, hi = 1, max(piles)\n    while lo < hi:\n        mid = lo + (hi - lo) // 2\n        if can_finish(mid):\n            hi = mid\n        else:\n            lo = mid + 1\n    return lo"}
+</script>
+</div>
 
-def min_eating_speed(piles: list[int], h: int) -> int:
-    def can_finish(speed: int) -> bool:
-        return sum(math.ceil(p / speed) for p in piles) <= h
-
-    lo, hi = 1, max(piles)
-    while lo < hi:
-        mid = lo + (hi - lo) // 2
-        if can_finish(mid):
-            hi = mid
-        else:
-            lo = mid + 1
-    return lo
-```
 `O(N log M)` where `M = max(piles)`. Same skeleton solves *Capacity to Ship Packages* (LC 1011), *Split Array Largest Sum* (LC 410), *Minimize Max Distance* — only `can_finish` changes.
 
-### 4. Find Peak Element (Medium)
+### 4. Find Peak Element <span class="badge badge-med">Medium</span> · [LeetCode ↗](https://leetcode.com/problems/find-peak-element/)
 Any index larger than both neighbors, in `O(log N)`. Walk uphill: the larger neighbor's side always contains a peak (treat out-of-bounds as `-∞`).
 
-```python
-def find_peak_element(nums: list[int]) -> int:
-    lo, hi = 0, len(nums) - 1
-    while lo < hi:
-        mid = lo + (hi - lo) // 2
-        if nums[mid] < nums[mid + 1]:
-            lo = mid + 1        # peak strictly to the right
-        else:
-            hi = mid            # mid could be the peak
-    return lo
-```
+<div class="widget" data-widget="code">
+<script type="application/json" class="code-config">
+{"func":"find_peak_element","starter":"def find_peak_element(nums: list[int]) -> int:\n    # climb toward the larger neighbor; out-of-bounds counts as -inf\n    pass","tests":[{"args":[[1,2,3,1]],"expect":2},{"args":[[1,2,1,3,5,6,4]],"expect":5},{"args":[[1]],"expect":0},{"args":[[1,2]],"expect":1},{"args":[[2,1]],"expect":0}],"solution":"def find_peak_element(nums: list[int]) -> int:\n    lo, hi = 0, len(nums) - 1\n    while lo < hi:\n        mid = lo + (hi - lo) // 2\n        if nums[mid] < nums[mid + 1]:\n            lo = mid + 1\n        else:\n            hi = mid\n    return lo"}
+</script>
+</div>
 
-### 5. Median of Two Sorted Arrays (Hard)
+### 5. Median of Two Sorted Arrays <span class="badge badge-hard">Hard</span> · [LeetCode ↗](https://leetcode.com/problems/median-of-two-sorted-arrays/)
 Binary-search the partition of the *shorter* array so that `left_max ≤ right_min`.
 
-```python
-def find_median_sorted_arrays(a: list[int], b: list[int]) -> float:
-    if len(a) > len(b):
-        a, b = b, a
-    m, n = len(a), len(b)
-    half = (m + n + 1) // 2
-    lo, hi = 0, m
-    while lo <= hi:
-        i = (lo + hi) // 2               # take i from a, j from b
-        j = half - i
-        l1 = a[i - 1] if i > 0 else float("-inf")
-        r1 = a[i]     if i < m else float("inf")
-        l2 = b[j - 1] if j > 0 else float("-inf")
-        r2 = b[j]     if j < n else float("inf")
-        if l1 <= r2 and l2 <= r1:
-            if (m + n) % 2:
-                return float(max(l1, l2))
-            return (max(l1, l2) + min(r1, r2)) / 2
-        if l1 > r2:
-            hi = i - 1
-        else:
-            lo = i + 1
-    raise ValueError("inputs not sorted")
-```
+<div class="widget" data-widget="code">
+<script type="application/json" class="code-config">
+{"func":"find_median_sorted_arrays","starter":"def find_median_sorted_arrays(a: list[int], b: list[int]) -> float:\n    # binary-search the partition of the shorter array so left_max <= right_min\n    pass","tests":[{"args":[[1,3],[2]],"expect":2.0},{"args":[[1,2],[3,4]],"expect":2.5},{"args":[[],[1]],"expect":1.0},{"args":[[1,2],[]],"expect":1.5},{"args":[[1,2,3,4,5],[6,7,8]],"expect":4.5}],"solution":"def find_median_sorted_arrays(a: list[int], b: list[int]) -> float:\n    if len(a) > len(b):\n        a, b = b, a\n    m, n = len(a), len(b)\n    half = (m + n + 1) // 2\n    lo, hi = 0, m\n    while lo <= hi:\n        i = (lo + hi) // 2\n        j = half - i\n        l1 = a[i - 1] if i > 0 else float(\"-inf\")\n        r1 = a[i] if i < m else float(\"inf\")\n        l2 = b[j - 1] if j > 0 else float(\"-inf\")\n        r2 = b[j] if j < n else float(\"inf\")\n        if l1 <= r2 and l2 <= r1:\n            if (m + n) % 2:\n                return float(max(l1, l2))\n            return (max(l1, l2) + min(r1, r2)) / 2\n        if l1 > r2:\n            hi = i - 1\n        else:\n            lo = i + 1\n    raise ValueError(\"inputs not sorted\")"}
+</script>
+</div>
+
 `O(log(min(m, n)))`. The `±inf` sentinels remove all boundary special-casing — that trick is the whole trick.
 
 ## Variations you should name unprompted

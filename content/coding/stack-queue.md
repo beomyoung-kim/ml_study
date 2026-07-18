@@ -19,23 +19,20 @@ The high-value idea here is the **monotonic stack/deque**: by keeping the stack 
 > [!NOTE] Use `deque`, never `list`, as a queue
 > `list.pop(0)` is O(N). `collections.deque` gives O(1) `append`/`appendleft`/`pop`/`popleft`. For a plain stack, a `list` with `append`/`pop` (both O(1) at the end) is idiomatic.
 
-## Worked examples
+## Practice — implement, run, test
 
-### 1. Valid Parentheses <span class="badge badge-easy">Easy</span>
+> [!TIP] How to use this section
+> Each problem below has a **live Python editor**. Write your solution, hit **▶ Run tests**, and see which cases pass. Stuck? Reveal a reference **Solution** — but attempt first; the struggle *is* the practice. The first Run downloads a small Python runtime (~10 MB); later runs are instant. Prefer your own editor? Each problem links out to **LeetCode**. (The two class-design problems below stay as static references.)
+
+### 1. Valid Parentheses <span class="badge badge-easy">Easy</span> · [LeetCode ↗](https://leetcode.com/problems/valid-parentheses/)
 
 Is a string of `()[]{}` correctly matched and nested?
 
-```python
-def is_valid(s: str) -> bool:
-    match = {")": "(", "]": "[", "}": "{"}
-    stack: list[str] = []
-    for ch in s:
-        if ch in "([{":
-            stack.append(ch)
-        elif not stack or stack.pop() != match[ch]:
-            return False
-    return not stack                 # leftover openers → invalid
-```
+<div class="widget" data-widget="code">
+<script type="application/json" class="code-config">
+{"func":"is_valid","starter":"def is_valid(s: str) -> bool:\n    # push openers; on a closer, the popped top must be its match\n    pass","tests":[{"args":["()"],"expect":true},{"args":["()[]{}"],"expect":true},{"args":["(]"],"expect":false},{"args":["([)]"],"expect":false},{"args":["{[]}"],"expect":true}],"solution":"def is_valid(s: str) -> bool:\n    match = {\")\": \"(\", \"]\": \"[\", \"}\": \"{\"}\n    stack = []\n    for ch in s:\n        if ch in \"([{\":\n            stack.append(ch)\n        elif not stack or stack.pop() != match[ch]:\n            return False\n    return not stack"}
+</script>
+</div>
 
 *O(N) time, O(N) space.* **Pitfall:** two edge cases — a closer with an empty stack, and leftover openers at the end (`return not stack`).
 
@@ -69,43 +66,29 @@ class MyQueue:
 
 *Amortized O(1) per op, O(N) space.* **Pitfall:** transfer *only when `out_s` is empty*; each element moves at most once, giving the amortized bound.
 
-### 3. Daily Temperatures <span class="badge badge-med">Medium</span>
+### 3. Daily Temperatures <span class="badge badge-med">Medium</span> · [LeetCode ↗](https://leetcode.com/problems/daily-temperatures/)
 
 For each day, how many days until a warmer temperature (0 if none).
 
 **Approach.** A **monotonic decreasing stack of indices**: when today beats the top, that day's answer is resolved.
 
-```python
-def daily_temperatures(temps: list[int]) -> list[int]:
-    ans = [0] * len(temps)
-    stack: list[int] = []               # indices, temps decreasing
-    for i, t in enumerate(temps):
-        while stack and temps[stack[-1]] < t:
-            j = stack.pop()
-            ans[j] = i - j
-        stack.append(i)
-    return ans
-```
+<div class="widget" data-widget="code">
+<script type="application/json" class="code-config">
+{"func":"daily_temperatures","starter":"def daily_temperatures(temps: list[int]) -> list[int]:\n    # monotonic decreasing stack of indices; resolve a day when today beats the top\n    pass","tests":[{"args":[[73,74,75,71,69,72,76,73]],"expect":[1,1,4,2,1,1,0,0]},{"args":[[30,40,50,60]],"expect":[1,1,1,0]},{"args":[[30,60,90]],"expect":[1,1,0]},{"args":[[90,80,70]],"expect":[0,0,0]}],"solution":"def daily_temperatures(temps: list[int]) -> list[int]:\n    ans = [0] * len(temps)\n    stack = []\n    for i, t in enumerate(temps):\n        while stack and temps[stack[-1]] < t:\n            j = stack.pop()\n            ans[j] = i - j\n        stack.append(i)\n    return ans"}
+</script>
+</div>
 
 *O(N) time, O(N) space* (each index pushed/popped once). **Pitfall:** store **indices**, not values — you need the distance.
 
-### 4. Evaluate Reverse Polish Notation <span class="badge badge-med">Medium</span>
+### 4. Evaluate Reverse Polish Notation <span class="badge badge-med">Medium</span> · [LeetCode ↗](https://leetcode.com/problems/evaluate-reverse-polish-notation/)
 
 Evaluate a postfix expression.
 
-```python
-def eval_rpn(tokens: list[str]) -> int:
-    stack: list[int] = []
-    ops = {"+": lambda a, b: a + b, "-": lambda a, b: a - b,
-           "*": lambda a, b: a * b, "/": lambda a, b: int(a / b)}
-    for tok in tokens:
-        if tok in ops:
-            b, a = stack.pop(), stack.pop()      # order matters!
-            stack.append(ops[tok](a, b))
-        else:
-            stack.append(int(tok))
-    return stack[0]
-```
+<div class="widget" data-widget="code">
+<script type="application/json" class="code-config">
+{"func":"eval_rpn","starter":"def eval_rpn(tokens: list[str]) -> int:\n    # stack of operands; on an operator pop b then a, push a op b\n    pass","tests":[{"args":[["2","1","+","3","*"]],"expect":9},{"args":[["4","13","5","/","+"]],"expect":6},{"args":[["10","6","9","3","+","-11","*","/","*","17","+","5","+"]],"expect":22},{"args":[["3","-4","+"]],"expect":-1}],"solution":"def eval_rpn(tokens: list[str]) -> int:\n    stack = []\n    ops = {\"+\": lambda a, b: a + b, \"-\": lambda a, b: a - b,\n           \"*\": lambda a, b: a * b, \"/\": lambda a, b: int(a / b)}\n    for tok in tokens:\n        if tok in ops:\n            b, a = stack.pop(), stack.pop()\n            stack.append(ops[tok](a, b))\n        else:\n            stack.append(int(tok))\n    return stack[0]"}
+</script>
+</div>
 
 *O(N) time, O(N) space.* **Pitfall:** operand order — pop `b` then `a`, compute `a op b`. Use `int(a / b)` (truncates toward zero); `a // b` floors and is wrong for negatives.
 
@@ -129,46 +112,27 @@ class MinStack:
 
 *O(1) per op, O(N) space.* **Pitfall:** a single `min` variable can't be restored after `pop`; store the running min *alongside each element*.
 
-### 6. Sliding Window Maximum <span class="badge badge-hard">Hard</span>
+### 6. Sliding Window Maximum <span class="badge badge-hard">Hard</span> · [LeetCode ↗](https://leetcode.com/problems/sliding-window-maximum/)
 
 Maximum of every window of size `k` — a **monotonic deque**, not a heap.
 
-```python
-from collections import deque
-
-def max_sliding_window(nums: list[int], k: int) -> list[int]:
-    dq: deque[int] = deque()          # indices, values decreasing
-    out: list[int] = []
-    for i, x in enumerate(nums):
-        while dq and nums[dq[-1]] <= x:
-            dq.pop()                  # x dominates smaller tail values
-        dq.append(i)
-        if dq[0] <= i - k:            # front fell out of the window
-            dq.popleft()
-        if i >= k - 1:
-            out.append(nums[dq[0]])   # front is the window max
-    return out
-```
+<div class="widget" data-widget="code">
+<script type="application/json" class="code-config">
+{"func":"max_sliding_window","starter":"from collections import deque\n\ndef max_sliding_window(nums: list[int], k: int) -> list[int]:\n    # monotonic deque of indices (values decreasing); front is the window max\n    pass","tests":[{"args":[[1,3,-1,-3,5,3,6,7],3],"expect":[3,3,5,5,6,7]},{"args":[[1],1],"expect":[1]},{"args":[[1,-1],1],"expect":[1,-1]},{"args":[[9,11],2],"expect":[11]}],"solution":"from collections import deque\n\ndef max_sliding_window(nums: list[int], k: int) -> list[int]:\n    dq = deque()\n    out = []\n    for i, x in enumerate(nums):\n        while dq and nums[dq[-1]] <= x:\n            dq.pop()\n        dq.append(i)\n        if dq[0] <= i - k:\n            dq.popleft()\n        if i >= k - 1:\n            out.append(nums[dq[0]])\n    return out"}
+</script>
+</div>
 
 *O(N) time, O(k) space.* A heap gives O(N log k); the deque is O(N) because each index enters and leaves once. **Pitfall:** evict the stale front by index, and pop the tail while it's `≤` the incoming value.
 
-### 7. Largest Rectangle in Histogram <span class="badge badge-hard">Hard</span>
+### 7. Largest Rectangle in Histogram <span class="badge badge-hard">Hard</span> · [LeetCode ↗](https://leetcode.com/problems/largest-rectangle-in-histogram/)
 
 Biggest axis-aligned rectangle under a histogram.
 
-```python
-def largest_rectangle_area(heights: list[int]) -> int:
-    heights = [0] + heights + [0]      # sentinels flush the stack cleanly
-    stack = [0]                        # indices, heights increasing
-    best = 0
-    for i in range(1, len(heights)):
-        while heights[stack[-1]] > heights[i]:
-            h = heights[stack.pop()]
-            width = i - stack[-1] - 1
-            best = max(best, h * width)
-        stack.append(i)
-    return best
-```
+<div class="widget" data-widget="code">
+<script type="application/json" class="code-config">
+{"func":"largest_rectangle_area","starter":"def largest_rectangle_area(heights: list[int]) -> int:\n    # monotonic increasing stack with sentinels; width = i - stack[-1] - 1\n    pass","tests":[{"args":[[2,1,5,6,2,3]],"expect":10},{"args":[[2,4]],"expect":4},{"args":[[2,1,2]],"expect":3},{"args":[[6,2,5,4,5,1,6]],"expect":12}],"solution":"def largest_rectangle_area(heights: list[int]) -> int:\n    heights = [0] + heights + [0]\n    stack = [0]\n    best = 0\n    for i in range(1, len(heights)):\n        while heights[stack[-1]] > heights[i]:\n            h = heights[stack.pop()]\n            width = i - stack[-1] - 1\n            best = max(best, h * width)\n        stack.append(i)\n    return best"}
+</script>
+</div>
 
 *O(N) time, O(N) space.* **Pitfall:** width is `i − stack[-1] − 1` (span between the new left boundary and `i`), *not* `i − popped_index`. Sentinels avoid special-casing the ends.
 

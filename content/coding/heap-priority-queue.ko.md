@@ -41,7 +41,12 @@ heapq.nsmallest(k, data, key=fn)
 > [!WARNING] 크기-k heap의 방향은 반대입니다
 > **k largest**를 유지하려면 **크기 k의 min-heap**을 쓰고 `k`를 초과하면 pop하세요: 당첨자들 중 가장 작은 것이 root에 앉아 언제든 쫓겨날 준비가 됩니다. 여기서 max-heap을 쓰는 게 고전적인 실수입니다.
 
-## 대표 문제
+## Practice — 직접 구현하고 실행·테스트
+
+> [!TIP] 이 섹션 사용법
+> 아래 여러 문제에는 **라이브 Python 에디터**가 있습니다. 직접 풀이를 작성하고 **▶ Run tests**를 누르면 어떤 케이스가 통과하는지 보여줍니다. 막히면 참고용 **Solution**을 열어볼 수 있지만, 먼저 직접 시도하세요 — 그 씨름이 곧 연습입니다. 첫 Run에서 작은 Python 런타임(~10 MB)을 내려받고, 이후 실행은 즉시입니다. 본인 에디터가 편하면 각 lab의 **LeetCode** 링크로 이동하세요.
+
+상태를 가진 스트림 문제(Kth Largest, Median Finder)와 linked-list 병합은 정적 참고용으로 남기고, 순수 함수 문제 두 개는 라이브 lab입니다.
 
 ### 1. Kth Largest in a Stream (Easy)
 정확히 `k`개의 원소를 유지합니다; root가 답입니다.
@@ -63,35 +68,26 @@ class KthLargest:
 ```
 `add`는 `O(log k)`, 공간 `O(k)`.
 
-### 2. Top K Frequent Elements (Medium)
+### 2. Top K Frequent Elements <span class="badge badge-med">Medium</span> · [LeetCode ↗](https://leetcode.com/problems/top-k-frequent-elements/)
 개수를 센 뒤, 빈도를 키로 하는 크기-`k` min-heap을 유지합니다.
 
-```python
-from collections import Counter
+<div class="widget" data-widget="code">
+<script type="application/json" class="code-config">
+{"func":"top_k_frequent","starter":"from collections import Counter\nimport heapq\n\ndef top_k_frequent(nums: list[int], k: int) -> list[int]:\n    # count, then keep a size-k min-heap keyed by frequency\n    pass","tests":[{"args":[[1,1,1,2,2,3],2],"expect":[1,2],"unordered":true},{"args":[[1],1],"expect":[1],"unordered":true},{"args":[[4,4,4,5,5,6],2],"expect":[4,5],"unordered":true},{"args":[[7,7,8,8,9],3],"expect":[7,8,9],"unordered":true}],"solution":"from collections import Counter\nimport heapq\n\ndef top_k_frequent(nums: list[int], k: int) -> list[int]:\n    freq = Counter(nums)\n    h = []\n    for num, cnt in freq.items():\n        heapq.heappush(h, (cnt, num))\n        if len(h) > k:\n            heapq.heappop(h)\n    return [num for _, num in h]"}
+</script>
+</div>
 
-def top_k_frequent(nums: list[int], k: int) -> list[int]:
-    freq = Counter(nums)
-    h = []
-    for num, cnt in freq.items():
-        heapq.heappush(h, (cnt, num))
-        if len(h) > k:
-            heapq.heappop(h)
-    return [num for _, num in h]
-```
 `O(n log k)`. **대안을 말하세요:** 빈도별 bucket sort는 `O(n)`입니다 — `k`가 `n`에 가까울 때 엄격히 낫습니다. trade-off를 언급하는 것이 신호입니다.
 
-### 3. K Closest Points to Origin (Medium)
+### 3. K Closest Points to Origin <span class="badge badge-med">Medium</span> · [LeetCode ↗](https://leetcode.com/problems/k-closest-points-to-origin/)
 제곱 거리에 대한 크기-`k` max-heap (`sqrt` 불필요).
 
-```python
-def k_closest(points: list[list[int]], k: int) -> list[list[int]]:
-    h = []                                  # max-heap via negation
-    for x, y in points:
-        heapq.heappush(h, (-(x*x + y*y), x, y))
-        if len(h) > k:
-            heapq.heappop(h)
-    return [[x, y] for _, x, y in h]
-```
+<div class="widget" data-widget="code">
+<script type="application/json" class="code-config">
+{"func":"k_closest","starter":"import heapq\n\ndef k_closest(points: list[list[int]], k: int) -> list[list[int]]:\n    # size-k max-heap on squared distance (negate); no sqrt needed\n    pass","tests":[{"args":[[[1,3],[-2,2]],1],"expect":[[-2,2]],"unordered":true},{"args":[[[3,3],[5,-1],[-2,4]],2],"expect":[[3,3],[-2,4]],"unordered":true},{"args":[[[1,1],[2,2],[3,3]],1],"expect":[[1,1]],"unordered":true},{"args":[[[0,1],[1,0]],2],"expect":[[0,1],[1,0]],"unordered":true}],"solution":"import heapq\n\ndef k_closest(points: list[list[int]], k: int) -> list[list[int]]:\n    h = []\n    for x, y in points:\n        heapq.heappush(h, (-(x*x + y*y), x, y))\n        if len(h) > k:\n            heapq.heappop(h)\n    return [[x, y] for _, x, y in h]"}
+</script>
+</div>
+
 `O(n log k)` 시간, `O(k)` 공간. 정렬되지 않은 *집합*만 필요하면 Quickselect가 평균 `O(n)`을 줍니다.
 
 ### 4. Merge k Sorted Lists (Hard) — merge-k 관용구

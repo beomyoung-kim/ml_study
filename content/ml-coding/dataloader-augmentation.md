@@ -151,6 +151,60 @@ if __name__ == "__main__":
 > [!NOTE] Framework one-liner
 > `torch.utils.data.Dataset`/`DataLoader` + `torchvision.transforms.v2` (which transforms image + boxes + masks together) or `albumentations`. At scale: WebDataset shards or NVIDIA DALI for GPU-side decode/augment.
 
+## Practice — implement, run, test
+
+> [!TIP] How to use this section
+> Each problem below has a **live Python editor** with NumPy preloaded. Write your solution, hit **▶ Run tests**, and see which cases pass. Stuck? Reveal a reference **Solution** — but attempt first; the struggle *is* the practice. The first Run downloads a small Python runtime + NumPy (~15 MB); later runs are instant. These are the deterministic, pure-function core of the pipeline above (the `Dataset`/`DataLoader` classes stay as reference code); randomness is seeded so outputs are reproducible.
+
+### 1. Per-channel normalize
+
+Normalize a `(C, H, W)` image with per-channel `mean` and `std`: `(x − mean) / std`, broadcasting each stat over its channel.
+
+<div class="widget" data-widget="code">
+<script type="application/json" class="code-config">
+{"func":"normalize","packages":["numpy"],"approx":true,"starter":"import numpy as np\n\ndef normalize(image, mean, std):\n    # image is (C,H,W); reshape mean/std to (C,1,1) and apply (x - mean) / std\n    pass","tests":[{"args":[[[[0,2],[4,6]]],[2],[2]],"expect":[[[-1,0],[1,2]]]},{"args":[[[[0,0],[0,0]],[[1,1],[1,1]]],[0,1],[1,1]],"expect":[[[0,0],[0,0]],[[0,0],[0,0]]]},{"args":[[[[2,4]]],[0],[2]],"expect":[[[1,2]]]}],"solution":"import numpy as np\n\ndef normalize(image, mean, std):\n    image = np.asarray(image, np.float32)\n    mean = np.asarray(mean, np.float32)[:, None, None]\n    std = np.asarray(std, np.float32)[:, None, None]\n    return (image - mean) / std"}
+</script>
+</div>
+
+*Per-channel broadcast.* **Pitfall:** normalize *after* geometric transforms and *after* converting to float in $[0,1]$.
+
+### 2. Horizontal flip (image)
+
+Flip a `(C, H, W)` image left-right. Reverse the width axis — and `.copy()` so you return real memory, not a negative-stride view.
+
+<div class="widget" data-widget="code">
+<script type="application/json" class="code-config">
+{"func":"horizontal_flip","packages":["numpy"],"approx":true,"starter":"import numpy as np\n\ndef horizontal_flip(image):\n    # reverse the last (width) axis of a (C,H,W) image; return a real copy\n    pass","tests":[{"args":[[[[1,2,3],[4,5,6]]]],"expect":[[[3,2,1],[6,5,4]]]},{"args":[[[[1,2],[3,4]]]],"expect":[[[2,1],[4,3]]]},{"args":[[[[1,2],[3,4]],[[5,6],[7,8]]]],"expect":[[[2,1],[4,3]],[[6,5],[8,7]]]}],"solution":"import numpy as np\n\ndef horizontal_flip(image):\n    image = np.asarray(image)\n    return image[:, :, ::-1].copy()"}
+</script>
+</div>
+
+> [!DANGER] The `.copy()` bug
+> `x[:, :, ::-1]` returns a **view** with negative strides, not new memory. Later in-place ops (or PyTorch's `from_numpy`) can fail or alias. Always `.copy()` after a reversed/strided slice you intend to mutate or hand to a framework.
+
+### 3. Flip boxes with the image (label sync)
+
+The label-sync subtlety: when the image flips, `xyxy` boxes must flip too. For image width `W`, a box `[x1,y1,x2,y2]` becomes `[W−x2, y1, W−x1, y2]`.
+
+<div class="widget" data-widget="code">
+<script type="application/json" class="code-config">
+{"func":"flip_boxes","packages":["numpy"],"approx":true,"starter":"import numpy as np\n\ndef flip_boxes(boxes, width):\n    # boxes:(N,4) xyxy -> horizontally flipped: x1'=W-x2, x2'=W-x1, y unchanged\n    pass","tests":[{"args":[[[2,3,5,7]],10],"expect":[[5,3,8,7]]},{"args":[[[0,0,4,4],[1,1,2,2]],8],"expect":[[4,0,8,4],[6,1,7,2]]},{"args":[[[3,3,6,6]],10],"expect":[[4,3,7,6]]}],"solution":"import numpy as np\n\ndef flip_boxes(boxes, width):\n    boxes = np.asarray(boxes, float)\n    out = boxes.copy()\n    out[:, 0] = width - boxes[:, 2]\n    out[:, 2] = width - boxes[:, 0]\n    return out"}
+</script>
+</div>
+
+*Getting this wrong silently corrupts labels — the mysterious accuracy ceiling.*
+
+### 4. Seeded random crop
+
+Crop a `size × size` window from a `(C, H, W)` image. Seed a fresh generator so a given `seed` always crops the same window (drawing `top` then `left`).
+
+<div class="widget" data-widget="code">
+<script type="application/json" class="code-config">
+{"func":"random_crop","packages":["numpy"],"approx":true,"starter":"import numpy as np\n\ndef random_crop(image, size, seed):\n    # rng = np.random.default_rng(seed); draw top then left in [0, H-size] / [0, W-size]\n    pass","tests":[{"args":[[[[0,1,2,3],[10,11,12,13],[20,21,22,23],[30,31,32,33]]],2,0],"expect":[[[21,22],[31,32]]]},{"args":[[[[0,1,2,3],[10,11,12,13],[20,21,22,23],[30,31,32,33]]],2,1],"expect":[[[11,12],[21,22]]]},{"args":[[[[0,1,2,3],[10,11,12,13],[20,21,22,23],[30,31,32,33]]],3,5],"expect":[[[11,12,13],[21,22,23],[31,32,33]]]}],"solution":"import numpy as np\n\ndef random_crop(image, size, seed):\n    rng = np.random.default_rng(seed)\n    image = np.asarray(image)\n    _, H, W = image.shape\n    top = int(rng.integers(0, H - size + 1))\n    left = int(rng.integers(0, W - size + 1))\n    return image[:, top:top + size, left:left + size]"}
+</script>
+</div>
+
+*Seed the RNG inside the transform (or per worker), else every worker replays identical "random" crops.*
+
 ## Common bugs interviewers watch for
 
 - **Missing `.copy()`** after reversed slices (see above).
