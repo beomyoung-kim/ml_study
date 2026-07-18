@@ -12,7 +12,7 @@ Built as a lightweight, dependency-free **client-side Markdown single-page app**
 
 - **Online-book UX** — collapsible chapter navigation, on-page table of contents, prev/next paging, reading-progress bar.
 - **Full-text search** across every chapter (`/` to open).
-- **Light / dark theme** (respects your system, remembers your choice).
+- **Light / dark theme** and **Korean / English toggle** (both remember your choice; default is English, Korean keeps technical terms/code/math in English, with English fallback for any untranslated chapter).
 - **Rich rendering** — KaTeX math, Mermaid diagrams, syntax-highlighted code with copy buttons, GitHub-style callouts, Q&A accordions.
 - **Interactive widgets** — activation functions, gradient descent, LR schedules, precision/recall threshold, attention heatmaps (all self-contained canvas/SVG).
 - **Self-contained visuals** — inline SVG + Mermaid + CSS, theme-aware, no external image hosting.

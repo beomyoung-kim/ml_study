@@ -18,6 +18,17 @@
 
 ---
 
+## 2026-07-18 — Korean / English language toggle
+
+**Added**
+- **한 / EN language toggle** in the top bar (next to the theme toggle) — switches the whole book between English and Korean, persists your choice, and defaults to English. Korean mode keeps technical terms, code, and math in English by design.
+- **Korean translations (`.ko.md`) for all 83 chapters**, rendered natively (KaTeX / Mermaid / callouts / Q&A preserved). A chapter with no translation falls back to English with a small notice, so the book never breaks.
+
+**Changed**
+- Engine (`assets/app.js`) fetches `<chapter>.ko.md` in Korean mode with English fallback; UI chrome (sidebar, prev/next, search, footer) is localized. Manifest (`assets/book.js`) gained Korean part/chapter titles (`titleKo`). See `AUTHORING.md` for how to add or update a translation.
+
+---
+
 ## 2026-07-18 — PEFT + deeper RL detail
 
 **Added**

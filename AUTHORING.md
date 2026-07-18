@@ -56,6 +56,26 @@ chapter: write the `.md`, then add one line to the right part in `assets/book.js
 - Every conceptual chapter should have **at least one** diagram or widget.
 - Mermaid for flows/architectures/timelines; inline SVG for precise custom figures (loss curves, matrices, pipelines); widgets for anything the reader benefits from *manipulating*.
 
+## Translations (Korean)
+
+The book has a **한 / EN toggle** (default English). Each English chapter `content/<path>.md`
+may have a Korean sibling `content/<path>.ko.md`. In Korean mode the engine loads the `.ko.md`
+and **falls back to English** (with a small notice) when it's missing — so a partial translation
+never breaks the book.
+
+To translate or update a chapter:
+- Copy the English file to `<name>.ko.md` and translate **prose only**. Keep **verbatim**: all
+  code, math (`$…$`/`$$…$$`), ```mermaid blocks, inline `<svg>`, widget divs, HTML tags/classes,
+  callout markers (`> [!TIP]`), `<details class="qa">` structure, link *targets* (`#/…`, URLs),
+  badges, and tags. Preserve blank-line layout exactly (the engine relies on it).
+- **Keep technical terms in English** (attention, transformer, RLVR, LoRA, mIoU, …) — Korean
+  particles attach naturally (`attention을`, `transformer는`). Translate only the visible link
+  *text*, not the target.
+- Sidebar/UI labels: add `titleKo` on the part/chapter in `assets/book.js` for a Korean nav label;
+  omit it to keep the English (technical) title. UI chrome strings live in the `I18N` object in
+  `assets/app.js`.
+- After writing a `.ko.md`, sanity-check it renders (math/Mermaid intact) before committing.
+
 ## Don'ts
 - Don't dump prose walls. Prefer tables, lists, and figures.
 - Don't fabricate. If unsure of a number, describe the mechanism instead.

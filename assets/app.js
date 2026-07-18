@@ -36,6 +36,57 @@
     if (currentRoute) render(currentRoute.file, { rerender: true }); // recolor diagrams
   });
 
+  /* ---------------- Language (EN default; KO keeps technical terms in English) ---------------- */
+  const LANG_KEY = "mlcodex-lang";
+  const I18N = {
+    en: {
+      onThisPage: "On this page",
+      searchPlaceholder: "Search the whole book…",
+      searchHint: 'Tip: search covers every chapter. Press <kbd>/</kbd> anywhere to open.',
+      prev: "Previous", next: "Next",
+      footer: "Built by Beomyoung Kim · content is a living document, revised continuously.",
+      indexing: "Indexing the book…",
+      notFound: (f) => `<h1>Not found</h1><p>The chapter <code>${f}</code> isn't written yet. This is a living book — check the <a href="#/resources/changelog">changelog</a> or jump back to the <a href="#/">introduction</a>.</p>`,
+      noMatch: (q) => `No matches for “${q}”.`,
+      fallbackNote: "🌏 This chapter isn't translated into Korean yet — showing the English version.",
+    },
+    ko: {
+      onThisPage: "목차",
+      searchPlaceholder: "책 전체 검색…",
+      searchHint: '팁: 모든 챕터를 검색합니다. 어디서나 <kbd>/</kbd> 를 눌러 여세요.',
+      prev: "이전", next: "다음",
+      footer: "Beomyoung Kim 제작 · 지속적으로 갱신되는 살아있는 문서입니다.",
+      indexing: "책을 색인하는 중…",
+      notFound: (f) => `<h1>찾을 수 없음</h1><p><code>${f}</code> 챕터는 아직 작성되지 않았습니다. 살아있는 문서이니 <a href="#/resources/changelog">변경 이력</a>을 확인하거나 <a href="#/">소개</a>로 돌아가세요.</p>`,
+      noMatch: (q) => `“${q}” 에 대한 검색 결과가 없습니다.`,
+      fallbackNote: "🌏 이 챕터는 아직 한국어로 번역되지 않아 영어 원문을 표시합니다.",
+    },
+  };
+  function currentLang() { return document.documentElement.getAttribute("data-lang") || "en"; }
+  function t() { return I18N[currentLang()] || I18N.en; }
+  function chTitle(ch) { return (currentLang() === "ko" && ch && ch.titleKo) ? ch.titleKo : (ch ? ch.title : ""); }
+  function partTitle(p) { return (currentLang() === "ko" && p.titleKo) ? p.titleKo : p.title; }
+  function applyI18n() {
+    const s = t();
+    const si = $("#search-input"); if (si) si.placeholder = s.searchPlaceholder;
+    const sh = $(".search-hint"); if (sh) sh.innerHTML = s.searchHint;
+    const pt = $(".page-toc-title"); if (pt) pt.textContent = s.onThisPage;
+    const ff = $("#page-footer > div"); if (ff) ff.textContent = s.footer;
+  }
+  function applyLang(l) {
+    document.documentElement.setAttribute("data-lang", l);
+    document.documentElement.lang = l;
+    localStorage.setItem(LANG_KEY, l);
+    applyI18n();
+  }
+  (function initLang() { applyLang(localStorage.getItem(LANG_KEY) || "en"); })();
+  $("#lang-toggle").addEventListener("click", () => {
+    applyLang(currentLang() === "ko" ? "en" : "ko");
+    searchIndex = null;             // rebuild search index in the new language
+    buildSidebar();
+    if (currentRoute) render(currentRoute.file);
+  });
+
   /* ---------------- Sidebar ---------------- */
   function buildSidebar() {
     const toc = $("#toc");
@@ -46,7 +97,7 @@
       wrap.dataset.part = pi;
       const btn = document.createElement("button");
       btn.className = "part-title";
-      btn.innerHTML = `<span class="part-emoji">${part.emoji || ""}</span><span>${part.title}</span><span class="chev">▾</span>`;
+      btn.innerHTML = `<span class="part-emoji">${part.emoji || ""}</span><span>${partTitle(part)}</span><span class="chev">▾</span>`;
       btn.addEventListener("click", () => wrap.classList.toggle("collapsed"));
       const ul = document.createElement("ul");
       ul.className = "chapter-list";
@@ -56,7 +107,7 @@
         a.href = "#/" + ch.file;
         a.dataset.file = ch.file;
         const badge = ch.badge ? ` <span class="badge badge-${ch.badge === "2026" ? "2026" : "new"}" style="font-size:9px;padding:0 6px">${ch.badge === "2026" ? "2026" : "NEW"}</span>` : "";
-        a.innerHTML = `${ch.title}${badge}`;
+        a.innerHTML = `${chTitle(ch)}${badge}`;
         li.appendChild(a);
         ul.appendChild(li);
       });
@@ -244,19 +295,27 @@
     pager.innerHTML = "";
     if (idx < 0) return;
     const prev = window.BOOK_FLAT[idx - 1], next = window.BOOK_FLAT[idx + 1];
-    if (prev) pager.innerHTML += `<a class="prev" href="#/${prev.file}"><div class="dir">‹ Previous</div><div class="ttl">${prev.title}</div></a>`;
+    if (prev) pager.innerHTML += `<a class="prev" href="#/${prev.file}"><div class="dir">‹ ${t().prev}</div><div class="ttl">${chTitle(prev)}</div></a>`;
     else pager.innerHTML += `<span style="flex:1"></span>`;
-    if (next) pager.innerHTML += `<a class="next" href="#/${next.file}"><div class="dir">Next ›</div><div class="ttl">${next.title}</div></a>`;
+    if (next) pager.innerHTML += `<a class="next" href="#/${next.file}"><div class="dir">${t().next} ›</div><div class="ttl">${chTitle(next)}</div></a>`;
   }
 
   /* ---------------- Fetch + render a page ---------------- */
   async function fetchMd(file) {
-    if (cache.has(file)) return cache.get(file);
+    const lang = currentLang();
+    const key = lang + ":" + file;
+    if (cache.has(key)) return cache.get(key);
+    if (lang === "ko") {
+      // Prefer a Korean translation; fall back to English if it doesn't exist yet.
+      const rk = await fetch(CONTENT_DIR + file + ".ko.md", { cache: "no-cache" });
+      if (rk.ok) { const tk = await rk.text(); cache.set(key, { text: tk, translated: true }); return { text: tk, translated: true }; }
+    }
     const res = await fetch(CONTENT_DIR + file + ".md", { cache: "no-cache" });
     if (!res.ok) throw new Error("404");
     const text = await res.text();
-    cache.set(file, text);
-    return text;
+    const val = { text, translated: lang === "en" };
+    cache.set(key, val);
+    return val;
   }
 
   let currentRoute = { file: "index", anchor: null };
@@ -264,17 +323,21 @@
   async function render(file, opts = {}) {
     currentRoute.file = file;
     if (!opts.rerender) { contentEl.innerHTML = `<div class="loading"><div class="spinner"></div></div>`; }
-    let md;
+    let doc;
     try {
-      md = await fetchMd(file);
+      doc = await fetchMd(file);
     } catch (e) {
-      contentEl.innerHTML = `<h1>Not found</h1><p>The chapter <code>${file}</code> isn't written yet. This is a living book — check the <a href="#/resources/changelog">changelog</a> or jump back to the <a href="#/">introduction</a>.</p>`;
+      contentEl.innerHTML = t().notFound(file);
       $("#pager").innerHTML = ""; buildPageToc([]);
       return;
     }
     // strip optional YAML frontmatter
-    md = md.replace(/^---\n[\s\S]*?\n---\n/, "");
-    contentEl.innerHTML = renderMarkdown(md);
+    const md = doc.text.replace(/^---\n[\s\S]*?\n---\n/, "");
+    let html = renderMarkdown(md);
+    if (currentLang() === "ko" && !doc.translated) {
+      html = `<div class="callout callout-note lang-fallback">${t().fallbackNote}</div>` + html;
+    }
+    contentEl.innerHTML = html;
     processLinks(contentEl);
     processCallouts(contentEl);
     processMermaid(contentEl);
@@ -286,7 +349,7 @@
     buildPager(file);
     setActiveNav(file);
     const meta = window.BOOK_BY_FILE[file];
-    document.title = (meta ? meta.title + " · " : "") + "ML Interview Codex";
+    document.title = (meta ? chTitle(meta) + " · " : "") + "ML Interview Codex";
 
     if (opts.rerender) return;
     // scroll to anchor or top
@@ -348,11 +411,11 @@
   }
   async function buildSearchIndex() {
     if (searchIndex) return searchIndex;
-    searchResults.innerHTML = `<div class="search-empty">Indexing the book…</div>`;
+    searchResults.innerHTML = `<div class="search-empty">${t().indexing}</div>`;
     const entries = await Promise.all(window.BOOK_FLAT.map(async (ch) => {
       try {
-        const md = await fetchMd(ch.file);
-        return { ...ch, text: stripMd(md) };
+        const doc = await fetchMd(ch.file);
+        return { ...ch, text: stripMd(doc.text) };
       } catch (e) { return null; }
     }));
     searchIndex = entries.filter(Boolean);
@@ -377,7 +440,7 @@
     const terms = q.split(/\s+/).filter(Boolean);
     const scored = [];
     idx.forEach((e) => {
-      const hayTitle = e.title.toLowerCase(), hayText = e.text.toLowerCase();
+      const hayTitle = (e.title + " " + (e.titleKo || "")).toLowerCase(), hayText = e.text.toLowerCase();
       let score = 0, allInText = true;
       terms.forEach((t) => {
         if (hayTitle.includes(t)) score += 12;
@@ -388,9 +451,9 @@
       if (allInText && score > 0) scored.push({ e, score });
     });
     scored.sort((a, b) => b.score - a.score);
-    if (!scored.length) { searchResults.innerHTML = `<div class="search-empty">No matches for “${escapeHtml(q)}”.</div>`; return; }
+    if (!scored.length) { searchResults.innerHTML = `<div class="search-empty">${t().noMatch(escapeHtml(q))}</div>`; return; }
     searchResults.innerHTML = scored.slice(0, 20).map(({ e }) =>
-      `<a class="search-result" href="#/${e.file}"><div class="sr-part">${e.partEmoji} ${e.part}</div><div class="sr-title">${e.title}</div><div class="sr-snip">${snippet(e.text, terms)}</div></a>`
+      `<a class="search-result" href="#/${e.file}"><div class="sr-part">${e.partEmoji} ${currentLang() === "ko" && e.partKo ? e.partKo : e.part}</div><div class="sr-title">${chTitle(e)}</div><div class="sr-snip">${snippet(e.text, terms)}</div></a>`
     ).join("");
     $$(".search-result").forEach((a) => a.addEventListener("click", closeSearch));
   }
