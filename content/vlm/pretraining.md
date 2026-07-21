@@ -46,8 +46,55 @@ This is symmetric InfoNCE (softmax over the batch, both directions). Two consequ
 - **The batch *is* the negatives.** Quality scales with batch size — CLIP used ~32k. This couples statistical quality to systems (large all-gather across devices).
 - **The softmax is global.** You get "is there a cat" but not "the left red cup" — CLIP is weak on spatial relations, counting, and OCR. That gap is *why* generative VLMs and grounded models exist.
 
+### How CLIP actually trains and does zero-shot
+
+**Architecture:** two encoders — an **image encoder** (ViT or ResNet) and a **text encoder** (Transformer) — each with a linear projection into a shared $d$-dim space; embeddings are **L2-normalized** so a dot product *is* cosine similarity. The temperature $\tau$ is a **learned** scalar (stored as $\log(1/\tau)$ and clipped). Trained on ~**400M** noisy web (image, alt-text) pairs — scale + a simple objective, not clean labels.
+
+One training step is ~6 lines:
+
+```python
+I = l2_normalize(image_encoder(images) @ W_i)   # (N, d)
+T = l2_normalize(text_encoder(texts)   @ W_t)   # (N, d)
+logits = (I @ T.T) * exp(t)                      # (N,N) cosine sims / temperature
+labels = arange(N)                               # matched pair = the diagonal
+loss = (cross_entropy(logits, labels, axis=0)    # image → text
+      + cross_entropy(logits, labels, axis=1)) / 2   # text → image
+```
+
+**Zero-shot classification** then needs *no* fine-tuning: embed each class name through a prompt template ("a photo of a {class}"), embed the image, pick the highest cosine similarity. Because the classifier is literally *built from text*, **prompt engineering / template ensembling** measurably lifts accuracy — that reprogrammability is CLIP's magic.
+
 > [!NOTE] SigLIP: the sigmoid fix
 > **SigLIP** replaces the softmax with an independent **sigmoid** loss per pair — every (image, text) pair is a binary "match / no-match" logistic problem. This decouples the loss from the global batch normalizer, so it trains well at *small* batch sizes and shards trivially. **SigLIP 2** (Google DeepMind, Feb 2025) [VERIFIED] adds caption-based pretraining, self-distillation, masked prediction, and online data curation on top, and ships **native-aspect-ratio** variants with better localization/dense features — which is exactly what you want when the encoder feeds a *grounded* VLM.
+
+## 1.5 · Contrastive learning (the general recipe)
+
+CLIP is one instance of a broader idea: **learn representations by pulling "positive" pairs together and pushing "negatives" apart** — no class labels, just a notion of what should be similar.
+
+**InfoNCE**, the workhorse loss. For an anchor $x$ with one positive $x^+$ and negatives $\{x^-_j\}$, similarity $s(\cdot,\cdot)$ (cosine) and temperature $\tau$:
+
+$$
+\mathcal L_{\text{InfoNCE}}=-\log\frac{e^{s(x,x^+)/\tau}}{e^{s(x,x^+)/\tau}+\sum_j e^{s(x,x^-_j)/\tau}}
+$$
+
+It's a **softmax cross-entropy that asks "which candidate is the positive?"** CLIP is exactly this with the *other modality's* embeddings as candidates (in-batch items = negatives).
+
+<dl class="kv">
+<dt>Positives</dt><dd>Two views of the same thing: two augmentations of one image (SimCLR), an image and its caption (CLIP), a query and its key.</dd>
+<dt>Negatives</dt><dd>Everything else. More/harder negatives → better features, up to a point; where they come from is the main design axis.</dd>
+<dt>Temperature $\tau$</dt><dd>Sharpens the softmax. Low $\tau$ focuses on the hardest negatives (sharper, riskier); high $\tau$ is softer. A sensitive, important knob.</dd>
+</dl>
+
+| Method | Positives / negatives | Key trick |
+| --- | --- | --- |
+| **SimCLR** | 2 augmentations of an image; negatives = rest of batch | needs **large batches**; strong augmentation + projection head |
+| **MoCo** | same, negatives from a **momentum queue** | decouples #negatives from batch size (memory bank + EMA encoder) |
+| **CLIP** | image ↔ its text; negatives = other pairs | cross-modal; batch = negatives (~32k) |
+| **Triplet** | (anchor, positive, negative) | margin loss; needs hard-negative mining |
+
+**Classic metric-learning losses** (pre-InfoNCE): the **contrastive loss** pulls a positive pair to distance 0 and pushes negatives past a margin $m$, $\;y\,d^2+(1-y)\max(0,m-d)^2$; the **triplet loss** ranks the positive closer than the negative by a margin, $\;\max(0,\,d(a,p)-d(a,n)+m)$. These power face recognition and [visual-search](#/system-design/case-studies) embeddings.
+
+> [!WARNING] Representation collapse — and how non-contrastive methods avoid it
+> The failure mode is **collapse**: the encoder maps everything to one vector (trivially zero positive distance). **Negatives** are what prevent it in contrastive methods. **Non-contrastive** methods — BYOL, SimSiam, and **DINO** — drop negatives entirely and instead avoid collapse with a **momentum/EMA target network + stop-gradient** (plus centering/sharpening in DINO). That's the key conceptual split: *contrastive needs negatives; self-distillation engineers collapse-avoidance differently.* See the [DINO training detail](#/cv/foundation-models).
 
 ## 2 · Generative VLP: captioning and autoregressive objectives
 

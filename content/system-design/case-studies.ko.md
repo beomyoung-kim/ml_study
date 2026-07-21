@@ -1,9 +1,9 @@
 # Worked Case Studies
 
-<div class="tag-row"><span class="tag">matting API</span><span class="tag">visual search</span><span class="tag">content moderation</span><span class="tag">auto-labeling data engine</span></div>
+<div class="tag-row"><span class="tag">matting API</span><span class="tag">visual search</span><span class="tag">content moderation</span><span class="tag">auto-labeling data engine</span><span class="tag">face auth / anti-spoofing</span><span class="tag">recommendation</span><span class="tag">OCR / document AI</span></div>
 
 > [!TIP] 이걸 어떻게 쓰나
-> 각 case는 [9-step framework](#/system-design/framework)를 따라 걷습니다. CV/VLM research-applied 후보의 영역 정중앙에 놓이도록 골랐습니다 — background removal / matting, visual search, vision moderation, segmentation data engine — 그래서 framing을 그대로 당신의 loop로 들어올릴 수 있어요. 정확한 숫자가 아니라 *구조*와 *trade-off 논거*를 훔치세요. 당일에는 당신 자신의 가정을 말하면 됩니다.
+> 각 case는 [9-step framework](#/system-design/framework)를 따라 걷습니다. CV/VLM research-applied 후보의 영역 정중앙에 놓이도록 골랐습니다 — background removal / matting, visual search, vision moderation, segmentation data engine, face auth / anti-spoofing, recommendation ranking, OCR / document AI — 그래서 framing을 그대로 당신의 loop로 들어올릴 수 있어요. 정확한 숫자가 아니라 *구조*와 *trade-off 논거*를 훔치세요. 당일에는 당신 자신의 가정을 말하면 됩니다.
 
 > [!NOTE] 당신의 CV를 소리 내어 말하세요
 > case가 실제 ship한 작업과 닿는 곳 — foreground-segmentation API, ZIM zero-shot matting → CLOVA X, on-device ONNX human seg(~10 ms class), FaceSign anti-spoofing, grounded-VLM 데이터 작업 — 에서는 **그것을 명시하세요**. "정확히 이것의 한 버전을 ship했습니다; 여기서 무엇을 재사용하고 100× 규모에서 무엇을 바꿀지 말씀드리죠"는 design 라운드에서 할 수 있는 가장 강한 문장입니다.
@@ -230,6 +230,125 @@ flowchart LR
 >
 > **Deep:** 실패는 confirmation bias입니다: high-confidence한 *틀린* mask가 auto-accept되고, 학습되고, 강화됩니다. 완화책: (1) labeler 자신의 logit이 아니라 *독립적인* 신호(ensemble/detector agreement)에서 나온 confidence; (2) loop의 self-reported 품질 대비 진짜 품질을 측정하는, loop 밖의 gold set; (3) low-confidence만이 아니라 auto-accept의 random sample을 audit; (4) auto-accept rate를 상한 걸어서 사람이 tail에 신선한 신호를 계속 주입하게. 이는 생성 데이터에서의 model-collapse 우려를 그대로 반영합니다 — 실제 supervision을 축적하되 대체하지 마세요. [Weak & Semi-Supervised](#/cv/weak-semi-supervised)를 보세요.
 
+---
+
+## Case E — Face authentication & liveness (anti-spoofing)
+
+> *"spoofing(사진, replay, mask)에 견고한 face-authentication 시스템(unlock / payment)을 설계하라."* 후보가 정확히 이것을 ship했습니다 — **FaceSign** — 그러니 security/on-device 비중이 큰 panel에서는 이걸 앞세우세요.
+
+### 1–2 · Clarify + metrics
+- **두 개의 하위 문제:** face **recognition**(이게 enroll된 사용자인가?) + liveness / **presentation-attack detection (PAD)**(사진/replay/mask가 아니라 살아있는 사람인가?). PAD가 어렵고 security-critical한 절반입니다.
+- **Cost asymmetry:** **false accept**(spoof 성공)는 payment에 치명적이고; false reject는 그저 성가실 뿐 → **고정된 매우 낮은 FAR**(예: 1e-5–1e-6)에서 동작시키고 *그 지점에서의* FRR를 최소화.
+- **Metrics:** recognition = **TAR@FAR**(verification ROC); PAD = **APCER / BPCER / ACER**(ISO 30107-3의 attack vs bona-fide error rate). Guardrail: on-device latency; **fairness** = skin tone / age / gender에 걸친 error parity는 필수.
+- **Privacy:** face template은 biometric → **on-device, encrypted, 원본 이미지를 서버로 보내지 않음**(FaceSign의 정부 인증 맥락).
+
+### 3 · Architecture
+```mermaid
+flowchart TB
+  Cam[Camera + IR/depth if available] --> Live[Liveness / PAD model]
+  Live -->|spoof| Rej[Reject]
+  Live -->|live| Emb[Face embedding model]
+  Emb --> M{Cosine vs enrolled template}
+  M -->|match| Acc[Accept]
+  M -->|no| Fb[Reject → PIN fallback]
+  subgraph SE["Secure enclave (on-device)"]
+    Live
+    Emb
+    Tpl[(Encrypted template)]
+  end
+  style Live fill:#e0533f,color:#fff
+```
+
+### 4–6 · Data, model, eval
+- **PAD data:** device/lighting에 걸친 다양한 **attack instrument**(print, screen replay, 2D/3D mask, cutout); 이는 **open-set** 문제(새 attack이 계속 등장)이므로 단순 binary classification이 아니라 robustness/anomaly framing.
+- **Signals:** 하드웨어가 허락하면 multi-modal(**IR/depth**가 대부분의 2D replay를 무력화), texture/moiré 단서, 고위험 action에는 선택적 active challenge(blink/turn).
+- **Model:** 컴팩트한 CNN embedding(recognition은 **ArcFace-style margin loss**) + PAD head; enclave용으로 distill/quantize.
+- **Eval:** **cross-dataset / cross-attack** generalization이 진짜 시험(일부 attack으로 학습, 보지 못한 것으로 테스트) — in-distribution PAD 수치는 오해를 부를 만큼 높습니다.
+
+### 7–9 · Serve, monitor, govern
+- 모든 inference는 secure enclave에서 **on-device**; 서버는 pass/fail + audit metadata만 봅니다.
+- **Monitoring:** spoof-attempt rate, device/OS 업데이트별 FRR drift, new-attack campaign 탐지; 새로 관측된 attack을 추가하는 빠른 loop.
+- **Failure/abuse:** liveness down → PIN으로 fallback(**절대** accept로 fail-open 안 됨); template 유출 → 취소 가능하고 재등록 가능하게.
+
+> [!QUESTION] "왜 accuracy가 아니라 고정된 FAR에서 PAD를 최적화하나요?"
+> **Short:** 비용이 극도로 비대칭입니다 — false accept 하나가 payment 계정을 비울 수 있어요 — 그래서 operating point를 PAD ROC 위 아주 작은 고정 FAR에서 고르고, data/threshold/model을 모두 *그 지점에서* false reject를 최소화하도록 튜닝합니다. 평범한 accuracy는 security 시스템에서 유일하게 중요한 숫자를 숨깁니다.
+
+---
+
+## Case F — Recommendation / ranking system
+
+> *"feed / product recommendation을 위한 ranking 시스템을 설계하라."*
+
+### 1–2 · Clarify + metrics
+- **단계로 나누기:** candidate **retrieval**(수백만 → 수백) → **ranking**(각각 점수화) → **re-rank / policy**(diversity, freshness, business rule).
+- **Objective:** 보통은 blend — pCTR, dwell/watch-time, conversion — 을 하나의 score로 결합; 단일 proxy 최적화(clickbait)를 경계.
+- **Metrics:** offline은 logged data에서 **AUC / logloss / NDCG**; online은 north-star(engagement, revenue)에 대한 **A/B** + guardrail(diversity, reported-content, latency). Online이 진실이고, offline은 candidate를 *순위 매길* 뿐입니다.
+
+### 3 · Architecture (multi-stage funnel)
+```mermaid
+flowchart LR
+  U[User + context] --> Ret[Retrieval<br/>two-tower ANN + heuristics]
+  Item[(Item corpus)] --> Ret
+  Ret -->|~hundreds| Rank[Ranker<br/>GBDT / DLRM]
+  Rank --> Rr[Re-rank<br/>diversity · freshness · rules]
+  Rr --> Feed[Feed]
+  Log[(Interaction logs)] --> FS[Feature store] --> Rank
+  Log --> Tr[Train] --> Reg[(Registry)] -.-> Rank
+  style Rank fill:#e0533f,color:#fff
+```
+
+### 4–6 · Data, model, eval
+- **Retrieval:** in-batch negative를 쓰는 **two-tower**(user tower / item tower) → item embedding에 대한 ANN(Case B와 같은 기술).
+- **Ranker:** 풍부한 cross-feature(user×item×context); **GBDT** baseline → high-cardinality ID를 위한 embedding을 가진 **DLRM / deep ranking**. score가 blend/auction으로 들어간다면 calibrated probability가 중요합니다.
+- **Feedback loop & bias:** log는 **현재 모델에 의해 편향**됩니다(보여준 것에 대한 click만 관측) → **position-bias** 보정, exploration(ε-greedy / bandit), inverse-propensity weighting. 이것이 rec 시스템을 규정하는 *바로 그* 미묘함입니다.
+- **Eval:** offline에서 counterfactual/replay 추정, 그다음 A/B; **feedback-loop amplification**(rich-get-richer, filter bubble)을 감시.
+
+### 7–9 · Serve, monitor, govern
+- **Serving:** **train/serve parity**(최우선 버그 원천)를 갖춘 feature store, 사전 계산된 user/item embedding, 빠듯한 p99, caching.
+- **Cold start:** 신규 user/item → interaction이 쌓일 때까지 content feature + exploration.
+- **Monitoring:** train/serve skew, feature drift, calibration, diversity/fairness, 그리고 offline↔online gap.
+
+> [!QUESTION] "왜 큰 모델로 전부 점수화하지 않고 two-stage인가요?"
+> **Short:** 요청마다 수백만 item에 무거운 ranker를 돌릴 수 없습니다; 싼 retrieval이 수백으로 좁히고, 비싼 모델이 그것들을 점수화합니다 — visual search와 같은 latency-vs-quality split이죠(retrieval은 싸게 recall을 사고, ranking은 작은 집합에서 precision을 삽니다).
+
+---
+
+## Case G — OCR / document understanding pipeline
+
+> *"촬영된 문서/영수증에서 structured data(총액, 날짜, 필드)를 대규모로 추출하라."*
+
+### 1–2 · Clarify + metrics
+- **Stages:** text region 탐지 → text 인식(OCR) → **layout** 이해 → **key-value / entity** 추출. 사진은 skew, blur, lighting, 굽은 페이지를 더합니다.
+- **Metrics:** OCR = **CER / WER**; detection = box F1; **end-task = field-level precision/recall / exact-match**(사용자가 실제로 신경 쓰는 것) + human-correction rate. Guardrail: latency, 언어별 coverage.
+- **ML framing:** staged pipeline(detector + recognizer + layout/KV) **또는** end-to-end **document VLM**(Qwen-VL / InternVL-class) — 논쟁할 만한 진짜 trade-off.
+
+### 3 · Architecture
+```mermaid
+flowchart LR
+  Img[Doc photo] --> Pre[Dewarp · deskew · denoise]
+  Pre --> Det[Text detector]
+  Det --> Rec[Recognizer OCR]
+  Rec --> Lay[Layout + KV extraction<br/>LayoutLM-class or doc-VLM]
+  Lay --> Val[Validation / business rules]
+  Val -->|low conf| Human[Human-in-the-loop]
+  Val -->|ok| Out[Structured output]
+  Human --> Store[(Corrected → retrain)]
+  style Lay fill:#e0533f,color:#fff
+```
+
+### 4–6 · Data, model, eval
+- **Pipeline vs VLM:** 고전적 pipeline(DBNet-class detector + CRNN/transformer recognizer + LayoutLM)은 stage별로 제어 가능하고, 싸고, debug 가능; **document VLM**은 더 단순하고 지저분한 layout에 더 강하지만 무겁고 field를 **hallucinate**할 수 있습니다. Hybrid: 이해는 VLM, 숫자는 **deterministic parsing/validation**.
+- **Data:** synthetic document 생성(font, template, augmentation) + real labeled scan; multilingual.
+- **Eval:** field별·document-type별 slice(receipt vs invoice vs ID); VLM 경로의 **hallucinated-field** rate 추적.
+
+### 7–9 · Serve, monitor, govern
+- **Confidence-gated human loop:** low-confidence field → reviewer → correction이 retraining으로 피드백(data engine, cf. Case D).
+- **Monitoring:** template/language별 field accuracy, OCR CER drift, new-template 탐지.
+- **Failure:** 영수증의 틀린 총액은 high-cost → validation rule(checksum, 총액이 합과 일치해야) + 사람에게 fail.
+
+> [!QUESTION] "document-VLM 하나인가, staged pipeline인가?"
+> **Short:** 지저분하고 굽은 layout에 대한 robustness와 적은 per-template 엔지니어링이면 VLM; stage별 metric, cost, control이면 pipeline. 저라면 layout/understanding에는 VLM을 쓰되 numeric field에는 **deterministic validation**(regex, checksum, 총액)을 유지하고 low-confidence는 사람에게 라우팅하겠습니다 — VLM은 하필 중요한 숫자를 hallucinate하거든요.
+
 ### Follow-ups they'll push (any case)
 
 - *"offline metric은 좋아졌는데 online metric은 안 그래요 — debug하세요."* → proxy/KPI mismatch, game 가능한 metric, 검정력 부족한 A/B, 혹은 train/serve skew.
@@ -245,6 +364,9 @@ flowchart LR
 | **B · Visual search** | metric learning + ANN + re-rank | two-stage retrieval; PQ-compressed index | encoder version skew across query/catalog |
 | **C · Moderation** | multi-label detection | hash-first + cheap→heavy cascade; fail-closed | adversarial drift; slice-unfair recall |
 | **D · Data engine** | model-in-the-loop labeling | self-improving flywheel + active learning | self-reinforcing label bias (no gold set) |
+| **E · Face auth / PAD** | recognition + presentation-attack detection | on-device enclave; operate at fixed low FAR | false accept (spoof); cross-attack generalization |
+| **F · Recommendation** | retrieval + ranking (+ re-rank) | two-tower ANN → heavy ranker; debias logs | feedback-loop bias; train/serve skew |
+| **G · OCR / doc AI** | detect → recognize → layout/KV | pipeline vs doc-VLM + deterministic validation | VLM hallucinated numeric fields |
 
 > [!TIP] 모든 case에서 점수를 따는 수
 > **gaming에 견디는 metric과 hard-case slice**를 앞세우고, **SOTA 모델 전에 baseline**을 제안하고, **monitoring할 하나의 failure mode**를 대세요. 그 세 가지 — 측정의 엄밀함, 이겨야 할 기준선, 이름 붙인 리스크 — 가 panel이 실제로 사는 research/applied 신호입니다.

@@ -18,6 +18,18 @@
 
 ---
 
+## 2026-07-19 — CLIP/DINO 학습 · contrastive learning · MLSD 사례 추가
+
+**Added**
+- [VLM Pretraining](#/vlm/pretraining): "**CLIP은 실제로 어떻게 학습되고 zero-shot을 하나**"(듀얼 인코더, ~400M 쌍, learnable temperature, 6줄 학습 의사코드, 프롬프트 기반 zero-shot) + 신규 **§1.5 Contrastive learning** 섹션(InfoNCE 일반형; SimCLR / MoCo / CLIP / Triplet 표; temperature; 고전 contrastive·triplet loss; representation collapse와 비대조 BYOL/SimSiam/DINO의 회피 방식).
+- [Vision Foundation Models](#/cv/foundation-models): "**DINO는 어떻게 학습되나**" — self-distillation, EMA teacher, multi-crop, 목적식, **centering + sharpening**(negative 없이 collapse 회피), iBOT/KoLeo, student–teacher 도식.
+- [ML System Design Case Studies](#/system-design/case-studies): 신규 사례 3개 — **E · 얼굴 인증 & liveness(anti-spoofing)**(FaceSign 연결), **F · 추천/랭킹**, **G · OCR/문서 이해** — tag-row·cheat-sheet 갱신.
+
+**Changed**
+- 세 챕터의 한국어(`.ko.md`) 버전도 동일하게 갱신.
+
+---
+
 ## 2026-07-19 — 아키텍처 심화 · 손실 이론 · 시각 자료
 
 **Added**

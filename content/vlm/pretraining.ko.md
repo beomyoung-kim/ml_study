@@ -46,8 +46,55 @@ $$\mathcal{L}_{\text{CLIP}} = -\frac{1}{2N}\sum_{i=1}^{N}\Big[\log\frac{e^{\lang
 - **Batch *가* negative입니다.** 품질은 batch size에 따라 스케일합니다 — CLIP은 ~32k를 썼습니다. 이는 통계적 품질을 시스템(디바이스 간 대규모 all-gather)과 결합시킵니다.
 - **Softmax는 global합니다.** "고양이가 있는가"는 얻지만 "왼쪽의 빨간 컵"은 못 얻습니다 — CLIP은 spatial relation, counting, OCR에 약합니다. 그 격차가 바로 generative VLM과 grounded 모델이 존재하는 *이유*입니다.
 
+### How CLIP actually trains and does zero-shot
+
+**Architecture:** 두 개의 encoder — **image encoder**(ViT 또는 ResNet)와 **text encoder**(Transformer) — 각각 공유 $d$-차원 공간으로 가는 linear projection을 갖습니다; embedding은 **L2-normalized**되어 dot product가 곧 cosine similarity입니다. Temperature $\tau$는 **학습되는** scalar입니다($\log(1/\tau)$로 저장하고 clip). 정제된 label이 아니라 스케일 + 단순한 objective로, ~**400M**개의 노이즈 있는 웹 (image, alt-text) 쌍으로 학습됩니다.
+
+학습 한 스텝은 ~6줄입니다:
+
+```python
+I = l2_normalize(image_encoder(images) @ W_i)   # (N, d)
+T = l2_normalize(text_encoder(texts)   @ W_t)   # (N, d)
+logits = (I @ T.T) * exp(t)                      # (N,N) cosine sims / temperature
+labels = arange(N)                               # matched pair = the diagonal
+loss = (cross_entropy(logits, labels, axis=0)    # image → text
+      + cross_entropy(logits, labels, axis=1)) / 2   # text → image
+```
+
+**Zero-shot classification**은 그다음 fine-tuning이 *전혀* 필요 없습니다: 각 class 이름을 prompt template("a photo of a {class}")로 embed하고, image를 embed한 뒤, cosine similarity가 가장 높은 것을 고릅니다. Classifier가 말 그대로 *text로부터 만들어지기* 때문에, **prompt engineering / template ensembling**이 정확도를 측정 가능한 수준으로 끌어올립니다 — 그 재프로그래밍 가능성이 CLIP의 마법입니다.
+
 > [!NOTE] SigLIP: the sigmoid fix
 > **SigLIP**은 softmax를 쌍마다 독립적인 **sigmoid** loss로 대체합니다 — 모든 (image, text) 쌍이 이진 "match / no-match" logistic 문제가 됩니다. 이는 loss를 global batch normalizer로부터 분리하므로 *작은* batch size에서도 잘 학습되고 손쉽게 shard됩니다. **SigLIP 2**(Google DeepMind, Feb 2025) [VERIFIED]는 그 위에 caption 기반 pretraining, self-distillation, masked prediction, online data curation를 더하고, 더 나은 localization/dense feature를 가진 **native-aspect-ratio** 변형을 제공합니다 — encoder가 *grounded* VLM에 feed할 때 정확히 원하는 특성입니다.
+
+## 1.5 · Contrastive learning (the general recipe)
+
+CLIP은 더 넓은 아이디어의 한 사례입니다: **"positive" 쌍은 당기고 "negative"는 밀어내면서 representation을 학습한다** — class label 없이, 무엇이 비슷해야 하는가라는 개념만으로.
+
+**InfoNCE**, 주력 loss. Anchor $x$에 대해 positive $x^+$ 하나와 negative $\{x^-_j\}$, similarity $s(\cdot,\cdot)$(cosine), temperature $\tau$가 주어졌을 때:
+
+$$
+\mathcal L_{\text{InfoNCE}}=-\log\frac{e^{s(x,x^+)/\tau}}{e^{s(x,x^+)/\tau}+\sum_j e^{s(x,x^-_j)/\tau}}
+$$
+
+이것은 **"어느 후보가 positive인가?"를 묻는 softmax cross-entropy**입니다. CLIP은 정확히 이것으로, *다른 modality의* embedding을 후보로 씁니다(in-batch 항목 = negative).
+
+<dl class="kv">
+<dt>Positives</dt><dd>같은 대상의 두 view: 한 image의 두 augmentation(SimCLR), image와 그 caption(CLIP), query와 그 key.</dd>
+<dt>Negatives</dt><dd>그 외 전부. 더 많고/더 어려운 negative → 어느 지점까지는 더 나은 feature; 이들이 어디서 오는가가 핵심 설계 축입니다.</dd>
+<dt>Temperature $\tau$</dt><dd>Softmax를 sharpen합니다. 낮은 $\tau$는 가장 어려운 negative에 집중(더 sharp, 더 위험); 높은 $\tau$는 더 부드럽습니다. 민감하고 중요한 knob입니다.</dd>
+</dl>
+
+| Method | Positives / negatives | Key trick |
+| --- | --- | --- |
+| **SimCLR** | image의 augmentation 2개; negative = batch의 나머지 | **큰 batch** 필요; 강한 augmentation + projection head |
+| **MoCo** | 동일하되, negative는 **momentum queue**에서 | #negative를 batch size와 분리(memory bank + EMA encoder) |
+| **CLIP** | image ↔ 그 text; negative = 다른 쌍들 | cross-modal; batch = negative (~32k) |
+| **Triplet** | (anchor, positive, negative) | margin loss; hard-negative mining 필요 |
+
+**고전적 metric-learning loss**(InfoNCE 이전): **contrastive loss**는 positive 쌍을 거리 0으로 당기고 negative는 margin $m$ 너머로 밀어냅니다, $\;y\,d^2+(1-y)\max(0,m-d)^2$; **triplet loss**는 positive가 negative보다 margin만큼 더 가깝도록 순위를 매깁니다, $\;\max(0,\,d(a,p)-d(a,n)+m)$. 이들은 face recognition과 [visual-search](#/system-design/case-studies) embedding을 구동합니다.
+
+> [!WARNING] Representation collapse — and how non-contrastive methods avoid it
+> 실패 모드는 **collapse**입니다: encoder가 모든 것을 하나의 벡터로 매핑합니다(자명하게 positive 거리 0). Contrastive 방법에서 이를 막는 것이 **negative**입니다. **Non-contrastive** 방법 — BYOL, SimSiam, **DINO** — 은 negative를 완전히 버리고, 대신 **momentum/EMA target network + stop-gradient**(DINO에서는 centering/sharpening 추가)로 collapse를 피합니다. 그것이 핵심 개념적 분기입니다: *contrastive는 negative가 필요하고; self-distillation은 collapse 회피를 다르게 설계한다.* [DINO training detail](#/cv/foundation-models)을 참고하세요.
 
 ## 2 · Generative VLP: captioning and autoregressive objectives
 

@@ -1,9 +1,9 @@
 # Worked Case Studies
 
-<div class="tag-row"><span class="tag">matting API</span><span class="tag">visual search</span><span class="tag">content moderation</span><span class="tag">auto-labeling data engine</span></div>
+<div class="tag-row"><span class="tag">matting API</span><span class="tag">visual search</span><span class="tag">content moderation</span><span class="tag">auto-labeling data engine</span><span class="tag">face auth / anti-spoofing</span><span class="tag">recommendation</span><span class="tag">OCR / document AI</span></div>
 
 > [!TIP] How to use these
-> Each case is walked through the [9-step framework](#/system-design/framework). They're chosen to sit squarely on a CV/VLM research-applied candidate's turf — background removal / matting, visual search, vision moderation, and a segmentation data engine — so you can lift the framing straight into your own loop. Steal the *structure* and the *trade-off arguments*, not the exact numbers; state your own assumptions on the day.
+> Each case is walked through the [9-step framework](#/system-design/framework). They're chosen to sit squarely on a CV/VLM research-applied candidate's turf — background removal / matting, visual search, vision moderation, a segmentation data engine, face auth / anti-spoofing, recommendation ranking, and OCR / document AI — so you can lift the framing straight into your own loop. Steal the *structure* and the *trade-off arguments*, not the exact numbers; state your own assumptions on the day.
 
 > [!NOTE] Say your CV out loud
 > Where a case touches shipped work — foreground-segmentation API, ZIM zero-shot matting → CLOVA X, on-device ONNX human seg (~10 ms class), FaceSign anti-spoofing, grounded-VLM data work — **name it**. "I shipped a version of exactly this; here's what I'd reuse and what I'd change at 100× scale" is the strongest sentence you can say in a design round.
@@ -230,6 +230,125 @@ The loop **improves its own labeler**: better model → more auto-accepts → ch
 >
 > **Deep:** The failure is confirmation bias: high-confidence *wrong* masks get auto-accepted, trained on, and reinforced. Mitigations: (1) confidence from *independent* signals (ensemble/detector agreement), not the labeler's own logit; (2) a gold set outside the loop to measure real quality vs the loop's self-reported quality; (3) audit a random sample of auto-accepts, not just low-confidence ones; (4) cap the auto-accept rate so humans keep injecting fresh signal on the tail. This mirrors the model-collapse concern in generative data — accumulate real supervision, don't replace it. See [Weak & Semi-Supervised](#/cv/weak-semi-supervised).
 
+---
+
+## Case E — Face authentication & liveness (anti-spoofing)
+
+> *"Design a face-authentication system (unlock / payment) robust to spoofing — photos, replays, masks."* The candidate shipped exactly this — **FaceSign** — so lead with it at a security/on-device-heavy panel.
+
+### 1–2 · Clarify + metrics
+- **Two sub-problems:** face **recognition** (is this the enrolled user?) + **liveness / presentation-attack detection (PAD)** (a live person, not a photo/replay/mask?). PAD is the hard, security-critical half.
+- **Cost asymmetry:** a **false accept** (spoof succeeds) is catastrophic for payments; a false reject is merely annoying → operate at a **fixed, very low FAR** (e.g. 1e-5–1e-6) and minimize FRR *there*.
+- **Metrics:** recognition = **TAR@FAR** (verification ROC); PAD = **APCER / BPCER / ACER** (ISO 30107-3 attack vs bona-fide error rates). Guardrail: on-device latency; **fairness** = error parity across skin tone / age / gender is mandatory.
+- **Privacy:** face templates are biometric → **on-device, encrypted, no raw images to server** (FaceSign's government-certified context).
+
+### 3 · Architecture
+```mermaid
+flowchart TB
+  Cam[Camera + IR/depth if available] --> Live[Liveness / PAD model]
+  Live -->|spoof| Rej[Reject]
+  Live -->|live| Emb[Face embedding model]
+  Emb --> M{Cosine vs enrolled template}
+  M -->|match| Acc[Accept]
+  M -->|no| Fb[Reject → PIN fallback]
+  subgraph SE["Secure enclave (on-device)"]
+    Live
+    Emb
+    Tpl[(Encrypted template)]
+  end
+  style Live fill:#e0533f,color:#fff
+```
+
+### 4–6 · Data, model, eval
+- **PAD data:** diverse **attack instruments** (print, screen replay, 2D/3D mask, cutout) across devices/lighting; it's an **open-set** problem (new attacks appear) → robustness/anomaly framing, not just binary classification.
+- **Signals:** multi-modal when hardware allows (**IR/depth** kills most 2D replays), texture/moiré cues, optional active challenge (blink/turn) for high-risk actions.
+- **Model:** compact CNN embeddings (**ArcFace-style margin loss** for recognition) + a PAD head; distilled/quantized for the enclave.
+- **Eval:** **cross-dataset / cross-attack** generalization is the real test (train on some attacks, test on unseen) — in-distribution PAD numbers are misleadingly high.
+
+### 7–9 · Serve, monitor, govern
+- All inference **on-device** in a secure enclave; server sees only pass/fail + audit metadata.
+- **Monitoring:** spoof-attempt rate, FRR drift by device/OS update, new-attack campaign detection; a fast loop to add newly-seen attacks.
+- **Failure/abuse:** liveness down → fall back to PIN (**never** fail-open to accept); template compromise → revocable, re-enrollable.
+
+> [!QUESTION] "Why optimize PAD at a fixed FAR instead of accuracy?"
+> **Short:** the costs are wildly asymmetric — one false accept can drain a payment account — so the operating point is chosen on the PAD ROC at a tiny fixed FAR, and data/threshold/model are all tuned to minimize false rejects *there*. Plain accuracy hides the only number that matters for a security system.
+
+---
+
+## Case F — Recommendation / ranking system
+
+> *"Design the ranking system for a feed / product recommendations."*
+
+### 1–2 · Clarify + metrics
+- **Stage it:** candidate **retrieval** (millions → hundreds) → **ranking** (score each) → **re-rank / policy** (diversity, freshness, business rules).
+- **Objective:** usually a blend — pCTR, dwell/watch-time, conversion — combined into one score; beware optimizing a single proxy (clickbait).
+- **Metrics:** offline **AUC / logloss / NDCG** on logged data; online **A/B** on the north-star (engagement, revenue) + guardrails (diversity, reported-content, latency). Online is truth; offline only *ranks candidates*.
+
+### 3 · Architecture (multi-stage funnel)
+```mermaid
+flowchart LR
+  U[User + context] --> Ret[Retrieval<br/>two-tower ANN + heuristics]
+  Item[(Item corpus)] --> Ret
+  Ret -->|~hundreds| Rank[Ranker<br/>GBDT / DLRM]
+  Rank --> Rr[Re-rank<br/>diversity · freshness · rules]
+  Rr --> Feed[Feed]
+  Log[(Interaction logs)] --> FS[Feature store] --> Rank
+  Log --> Tr[Train] --> Reg[(Registry)] -.-> Rank
+  style Rank fill:#e0533f,color:#fff
+```
+
+### 4–6 · Data, model, eval
+- **Retrieval:** **two-tower** (user tower / item tower) with in-batch negatives → ANN over item embeddings (same tech as Case B).
+- **Ranker:** rich cross-features (user×item×context); **GBDT** baseline → **DLRM / deep ranking** with embeddings for high-cardinality IDs. Calibrated probabilities matter if scores feed a blend/auction.
+- **Feedback loops & bias:** logs are **biased by the current model** (you only observe clicks on what was shown) → **position-bias** correction, exploration (ε-greedy / bandits), inverse-propensity weighting. This is *the* defining subtlety of rec systems.
+- **Eval:** counterfactual/replay estimates offline, then A/B; watch **feedback-loop amplification** (rich-get-richer, filter bubbles).
+
+### 7–9 · Serve, monitor, govern
+- **Serving:** feature store with **train/serve parity** (the #1 bug source), precomputed user/item embeddings, tight p99, caching.
+- **Cold start:** new users/items → content features + exploration until interactions accrue.
+- **Monitoring:** train/serve skew, feature drift, calibration, diversity/fairness, and the offline↔online gap.
+
+> [!QUESTION] "Why two stages instead of scoring everything with the big model?"
+> **Short:** you can't run a heavy ranker over millions of items per request; cheap retrieval narrows to hundreds, then the expensive model scores those — the same latency-vs-quality split as visual search (retrieval buys recall cheaply, ranking buys precision on a small set).
+
+---
+
+## Case G — OCR / document understanding pipeline
+
+> *"Extract structured data (totals, dates, fields) from photographed documents/receipts at scale."*
+
+### 1–2 · Clarify + metrics
+- **Stages:** detect text regions → recognize text (OCR) → understand **layout** → extract **key-value / entities**. Photos add skew, blur, lighting, curved pages.
+- **Metrics:** OCR = **CER / WER**; detection = box F1; **end-task = field-level precision/recall / exact-match** (what users actually care about) + human-correction rate. Guardrail: latency, per-language coverage.
+- **ML framing:** a staged pipeline (detector + recognizer + layout/KV) **or** an end-to-end **document VLM** (Qwen-VL / InternVL-class) — a real trade-off to argue.
+
+### 3 · Architecture
+```mermaid
+flowchart LR
+  Img[Doc photo] --> Pre[Dewarp · deskew · denoise]
+  Pre --> Det[Text detector]
+  Det --> Rec[Recognizer OCR]
+  Rec --> Lay[Layout + KV extraction<br/>LayoutLM-class or doc-VLM]
+  Lay --> Val[Validation / business rules]
+  Val -->|low conf| Human[Human-in-the-loop]
+  Val -->|ok| Out[Structured output]
+  Human --> Store[(Corrected → retrain)]
+  style Lay fill:#e0533f,color:#fff
+```
+
+### 4–6 · Data, model, eval
+- **Pipeline vs VLM:** the classic pipeline (DBNet-class detector + CRNN/transformer recognizer + LayoutLM) is controllable, cheap, debuggable per stage; a **document VLM** is simpler and stronger on messy layouts but heavier and can **hallucinate** fields. Hybrid: VLM for understanding, **deterministic parsing/validation** for the numbers.
+- **Data:** synthetic document generation (fonts, templates, augmentation) + real labeled scans; multilingual.
+- **Eval:** per-field and per-document-type slices (receipt vs invoice vs ID); track the VLM path's **hallucinated-field** rate.
+
+### 7–9 · Serve, monitor, govern
+- **Confidence-gated human loop:** low-confidence fields → reviewers → corrections feed retraining (a data engine, cf. Case D).
+- **Monitoring:** field accuracy by template/language, OCR CER drift, new-template detection.
+- **Failure:** a wrong total on a receipt is high-cost → validation rules (checksums, totals must sum) + fail to human.
+
+> [!QUESTION] "One document-VLM or a staged pipeline?"
+> **Short:** VLM for robustness to messy/curved layouts and less per-template engineering; pipeline for per-stage metrics, cost, and control. I'd use a VLM for layout/understanding but keep **deterministic validation** (regex, checksums, totals) on numeric fields and route low-confidence to humans — VLMs hallucinate exactly the numbers that matter.
+
 ### Follow-ups they'll push (any case)
 
 - *"Your offline metric improved but the online metric didn't — debug it."* → proxy/KPI mismatch, gameable metric, underpowered A/B, or train/serve skew.
@@ -245,6 +364,9 @@ The loop **improves its own labeler**: better model → more auto-accepts → ch
 | **B · Visual search** | metric learning + ANN + re-rank | two-stage retrieval; PQ-compressed index | encoder version skew across query/catalog |
 | **C · Moderation** | multi-label detection | hash-first + cheap→heavy cascade; fail-closed | adversarial drift; slice-unfair recall |
 | **D · Data engine** | model-in-the-loop labeling | self-improving flywheel + active learning | self-reinforcing label bias (no gold set) |
+| **E · Face auth / PAD** | recognition + presentation-attack detection | on-device enclave; operate at fixed low FAR | false accept (spoof); cross-attack generalization |
+| **F · Recommendation** | retrieval + ranking (+ re-rank) | two-tower ANN → heavy ranker; debias logs | feedback-loop bias; train/serve skew |
+| **G · OCR / doc AI** | detect → recognize → layout/KV | pipeline vs doc-VLM + deterministic validation | VLM hallucinated numeric fields |
 
 > [!TIP] The move that scores in every case
 > Lead with the **metric that resists gaming and the hard-case slice**, propose a **baseline before the SOTA model**, and name the **one failure mode you'd monitor for**. That trio — measurement rigor, a bar to beat, and a named risk — is the research/applied signal panels are actually buying.

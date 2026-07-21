@@ -68,7 +68,33 @@ flowchart TB
 
 **DINO → DINOv2 → DINOv3.** 레이블 **no**로 하는 self-**di**stillation: student가 augment된 view 전반에서 momentum-teacher의 출력을 맞추고; emergent attention map이 객체를 공짜로 localize합니다.
 
-- **DINOv2** (2023): scaling된 SSL로 범용 frozen feature를 만듭니다; depth, matting 인접, robotics 작업의 표준 backbone.
+### How DINO trains (self-distillation, no labels, no negatives)
+
+**같은 architecture**를 가진 두 네트워크: gradient descent로 갱신되는 **student** $g_{\theta_s}$, 그리고 student의 **EMA**로서 절대 back-propagation되지 않는 **teacher** $g_{\theta_t}$. **Multi-crop** augmentation은 한 이미지에서 여러 개의 **global** crop(큰 것)과 여러 개의 **local** crop(작은 것)을 만듭니다. student는 *모든* crop을 보고; teacher는 global crop만 봅니다. student는 자신의 출력 분포가 **teacher의 것과 일치하도록** 학습됩니다 — "다른 view로부터 이 이미지에 대한 teacher의 view를 예측하라":
+
+$$
+\min_{\theta_s}\ \sum_{\text{views}} H\big(\,p_t(x_{\text{global}}),\ p_s(x_{\text{view}})\,\big),\qquad p(\cdot)=\mathrm{softmax}\!\big(g(\cdot)/\tau\big)
+$$
+
+($H$ = cross-entropy; teacher temperature $\tau_t$가 작으면 = sharp, student는 $\tau_s$). 결정적으로 여기엔 **negative pair가 없습니다** — 그렇다면 무엇이 상수로의 collapse를 막을까요? teacher에 작용하는 두 가지 대립하는 힘:
+
+- **Centering** — teacher의 logit에서 EMA mean을 빼서, 어떤 단일 출력 차원도 지배하지 못하게 합니다 (one-hot collapse 방지).
+- **Sharpening** — 작은 teacher temperature가 target을 뾰족하게 유지합니다 (uniform collapse 방지).
+
+이 둘의 균형이 자명한 해들을 배제합니다. teacher는 $\theta_t\leftarrow\lambda\theta_t+(1-\lambda)\theta_s$ (stop-gradient)로 student를 추종하고, segmentation 레이블이 하나도 없이 객체를 분할하는 self-attention이 **emerge**합니다.
+
+```mermaid
+flowchart LR
+  IMG[image] --> C[global + local crops]
+  C --> S[Student gθs<br/>all crops]
+  C --> T[Teacher gθt<br/>global crops only]
+  T -->|softmax /τt + center| PT[teacher target]
+  S -->|softmax /τs| PS[student pred]
+  PS -->|cross-entropy| PT
+  S -.->|EMA update| T
+```
+
+- **DINOv2** (2023): 여기에 **iBOT 스타일의 patch-level masked prediction**(global objective 위에 얹은 dense/local objective) + KoLeo feature-spreading + 대대적인 data curation을 더해 scaling → 범용 *frozen* feature (depth, matting 인접, robotics의 표준 backbone).
 - **DINOv3** (Meta, Aug 2025): 플래그십 **7B params, ~1.7B 이미지, 완전 self-supervised**; 더 작은 ViT/ConvNeXt variant로 distill됩니다. 핵심 기법은 **Gram anchoring**입니다.
 
 > [!QUESTION] "DINOv3 is fully self-supervised yet beats supervised models on *frozen* dense prediction. What is Gram anchoring solving?"

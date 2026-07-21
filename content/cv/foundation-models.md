@@ -68,7 +68,33 @@ flowchart TB
 
 **DINO → DINOv2 → DINOv3.** Self-**di**stillation with **no** labels: a student matches a momentum-teacher's output across augmented views; emergent attention maps localize objects for free.
 
-- **DINOv2** (2023): scaled SSL producing general-purpose frozen features; the standard backbone for depth, matting-adjacent, and robotics work.
+### How DINO trains (self-distillation, no labels, no negatives)
+
+Two networks with the **same architecture**: a **student** $g_{\theta_s}$ (updated by gradient descent) and a **teacher** $g_{\theta_t}$ (an **EMA** of the student — never back-propagated). **Multi-crop** augmentation makes several **global** crops (large) and several **local** crops (small) of one image. The student sees *all* crops; the teacher sees only the global ones. The student is trained so its output distribution **matches the teacher's** — "predict the teacher's view of this image from a different view":
+
+$$
+\min_{\theta_s}\ \sum_{\text{views}} H\big(\,p_t(x_{\text{global}}),\ p_s(x_{\text{view}})\,\big),\qquad p(\cdot)=\mathrm{softmax}\!\big(g(\cdot)/\tau\big)
+$$
+
+($H$ = cross-entropy; teacher temperature $\tau_t$ small = sharp, student $\tau_s$). Crucially it uses **no negative pairs** — so what stops it collapsing to a constant? Two opposing forces on the teacher:
+
+- **Centering** — subtract an EMA mean from the teacher's logits, so no single output dimension can dominate (prevents one-hot collapse).
+- **Sharpening** — the small teacher temperature keeps the target peaky (prevents uniform collapse).
+
+Their balance rules out the trivial solutions. The teacher tracks the student as $\theta_t\leftarrow\lambda\theta_t+(1-\lambda)\theta_s$ (stop-gradient), and object-segmenting self-attention **emerges** with zero segmentation labels.
+
+```mermaid
+flowchart LR
+  IMG[image] --> C[global + local crops]
+  C --> S[Student gθs<br/>all crops]
+  C --> T[Teacher gθt<br/>global crops only]
+  T -->|softmax /τt + center| PT[teacher target]
+  S -->|softmax /τs| PS[student pred]
+  PS -->|cross-entropy| PT
+  S -.->|EMA update| T
+```
+
+- **DINOv2** (2023): scales this with **iBOT-style patch-level masked prediction** (a dense/local objective on top of the global one) + KoLeo feature-spreading + heavy data curation → general-purpose *frozen* features (the standard backbone for depth, matting-adjacent, robotics).
 - **DINOv3** (Meta, Aug 2025): flagship **7B params, ~1.7B images, fully self-supervised**; distilled into smaller ViT/ConvNeXt variants. Its key trick is **Gram anchoring**.
 
 > [!QUESTION] "DINOv3 is fully self-supervised yet beats supervised models on *frozen* dense prediction. What is Gram anchoring solving?"

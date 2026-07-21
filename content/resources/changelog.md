@@ -18,6 +18,18 @@
 
 ---
 
+## 2026-07-19 — CLIP/DINO training, contrastive learning & more MLSD cases
+
+**Added**
+- [VLM Pretraining](#/vlm/pretraining): "**How CLIP actually trains and does zero-shot**" (dual encoder, ~400M pairs, learnable temperature, 6-line training pseudocode, prompt-based zero-shot) + a new **§1.5 Contrastive learning** section (InfoNCE general form; SimCLR / MoCo / CLIP / Triplet table; temperature; classic contrastive & triplet losses; representation collapse and how non-contrastive BYOL/SimSiam/DINO avoid it).
+- [Vision Foundation Models](#/cv/foundation-models): "**How DINO trains**" — self-distillation, EMA teacher, multi-crop, the objective, **centering + sharpening** (collapse-avoidance without negatives), iBOT/KoLeo, and a student–teacher diagram.
+- [ML System Design Case Studies](#/system-design/case-studies): three new fully-worked cases — **E · Face authentication & liveness (anti-spoofing)** (ties to FaceSign), **F · Recommendation / ranking**, **G · OCR / document understanding** — plus updated tag-row and cheat-sheet.
+
+**Changed**
+- Korean (`.ko.md`) siblings of all three chapters updated to match.
+
+---
+
 ## 2026-07-19 — Architectures deep-dive, loss theory & visual explainers
 
 **Added**
