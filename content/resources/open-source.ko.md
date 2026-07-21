@@ -86,6 +86,47 @@ Amidi Stanford VIP 시트가 본받아야 할 포맷입니다: **한 페이지, 
 - **CS224n (NLP)** — [web.stanford.edu/class/cs224n](http://web.stanford.edu/class/cs224n/). NLP/transformer 대응편.
 - **d2l.ai — Dive into Deep Learning** — [d2l.ai](https://d2l.ai/). 실행 가능한 코드 교과서. 유도 공백을 메우기에 훌륭.
 
+## Visual, animated & interactive explainers
+
+*움직이는 걸 직접 볼 때* 더 빨리 이해되는 개념들. 모든 링크는 라이브 검증됨(2026-07).
+
+**Convolution / CNN**
+- [conv_arithmetic](https://github.com/vdumoulin/conv_arithmetic) — Dumoulin & Visin. conv / transposed / dilated convolution의 정전이 된 애니메이션 GIF(파랑=input, 청록=output).
+- [CNN Explainer](https://poloclub.github.io/cnn-explainer/) — Georgia Tech (Polo Chau). 실제 activation과 함께 라이브 CNN을 레이어별로 클릭해가며 봅니다.
+- [Animated AI](https://animatedai.github.io/) — stride, padding, grouped/depthwise-separable convolution의 깔끔한 애니메이션.
+
+**Attention & Transformer**
+- [The Illustrated Transformer](https://jalammar.github.io/illustrated-transformer/) — Jay Alammar. 가장 많이 인용되는 self-attention 그림 설명.
+- [Transformer Explainer](https://poloclub.github.io/transformer-explainer/) — 브라우저에서 라이브 GPT-2를 실행. 텍스트를 입력하고 attention map을 관찰하세요.
+- [Attention? Attention!](https://lilianweng.github.io/posts/2018-06-24-attention/) — Lilian Weng. attention 변형들에 대한 결정판 서베이.
+- [3Blue1Brown — Attention, step by step](https://www.3blue1brown.com/lessons/attention) — Q/K/V에 대한 Manim 애니메이션 기하학적 직관.
+
+**ViT (Vision Transformer)**
+- [A Visual Guide to Vision Transformers](https://blog.mdturp.ch/posts/2024-04-05-visual_guide_to_vision_transformer.html) — MDTURP. patch에서 training까지 14단계 애니메이션 스크롤 스토리.
+
+**Backpropagation**
+- [3Blue1Brown — Backpropagation](https://www.3blue1brown.com/lessons/backpropagation) & [Backprop calculus](https://www.youtube.com/watch?v=tIeHLnjs5U8) — 애니메이션으로 보는 gradient 흐름 + chain-rule 메커니즘.
+
+**Gradient descent & optimizers**
+- [Why Momentum Really Works](https://distill.pub/2017/momentum/) — Distill (Gabriel Goh). 인터랙티브. 슬라이더를 드래그해 momentum을 체감하세요.
+- [An overview of gradient descent optimization algorithms](https://www.ruder.io/optimizing-gradient-descent/) — Sebastian Ruder. 표준 SGD/Momentum/RMSprop/Adam 레퍼런스.
+- [TensorFlow Playground](https://playground.tensorflow.org/) — LR / activation / data를 바꿔가며 net이 라이브로 학습하는 걸 관찰.
+
+**RNN / LSTM / GRU**
+- [Understanding LSTM Networks](https://colah.github.io/posts/2015-08-Understanding-LSTMs/) — Chris Olah. gate별로 그린 고전적 그림 설명.
+
+**Positional encoding**
+- [Transformer Architecture: The Positional Encoding](https://kazemnejad.com/blog/transformer_architecture_positional_encoding/) — Amirhossein Kazemnejad. sinusoid에 대한 시각적 + 수학적 직관.
+
+**Mamba / State-Space Models**
+- [A Visual Guide to Mamba and State Space Models](https://newsletter.maartengrootendorst.com/p/a-visual-guide-to-mamba-and-state) — Maarten Grootendorst. SSM 기초부터 selective scan까지 50개 이상의 커스텀 비주얼.
+- [The Annotated S4](https://srush.github.io/annotated-s4/) — Sasha Rush. 실행 가능한 JAX와 함께하는 주석 논문 walkthrough.
+- [Mamba & S4 Explained](https://www.youtube.com/watch?v=8Q_tqwpTpVU) — Umar Jamil. 제1원리 기반 애니메이션 유도.
+
+**General interactive playgrounds**
+- [Distill.pub](https://distill.pub/) — 인터랙티브하고 애니메이션이 풍부한 ML 설명글의 본거지.
+- [Explained Visually (setosa.io)](https://setosa.io/ev/) — PCA, eigenvector, image kernel, Markov chain 등.
+
 ## Behavioral & research-scientist-specific
 
 > [!WARNING] 서비스가 부족한 카테고리

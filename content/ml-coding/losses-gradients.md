@@ -14,6 +14,64 @@ Implement MSE, BCE, cross-entropy, and focal loss with **numerically stable** co
 | Cross-entropy | $-\log p_y,\ \ p=\text{softmax}(z)$ | multi-class |
 | Focal | $-\alpha_t(1-p_t)^\gamma\log p_t$ | class-imbalanced detection |
 
+## Why cross-entropy? (CE vs KL, BCE vs CE, and why not L1/L2)
+
+### Cross-entropy vs KL divergence
+For a true distribution $p$ and predicted $q$:
+
+$$
+H(p,q)=-\sum_i p_i\log q_i,\qquad
+D_{\mathrm{KL}}(p\Vert q)=\sum_i p_i\log\frac{p_i}{q_i}=\underbrace{H(p,q)}_{\text{cross-entropy}}-\underbrace{H(p)}_{\text{entropy of }p}
+$$
+
+So **CE = entropy of the labels + KL**. In supervised training the labels $p$ are *fixed*, so $H(p)$ is a constant (and for a one-hot label $H(p)=0$) — therefore **minimizing CE is exactly minimizing $D_{\mathrm{KL}}(p\Vert q)$**, the "distance" from your prediction to the truth. We optimize CE because it drops the constant and is cheaper.
+
+<dl class="kv">
+<dt>Use CE</dt><dd>Standard classification loss — target is a fixed (usually one-hot) label. It's the negative log-likelihood of the true class.</dd>
+<dt>Use KL</dt><dd>When <b>both</b> sides are real distributions: <b>knowledge distillation</b> (soft teacher targets), <b>VAEs</b> (KL to a prior), <b>RLHF/PPO</b> (KL penalty keeping the policy near a reference), variational inference. KL is <b>asymmetric</b> ($D_{\mathrm{KL}}(p\Vert q)\ne D_{\mathrm{KL}}(q\Vert p)$): forward KL is mode-covering, reverse KL mode-seeking.</dd>
+</dl>
+
+### BCE vs CE — functionally different
+- **BCE (sigmoid per output):** each output is an **independent** yes/no. Use for **multi-label** ("cat" *and* "outdoor" can both be true) — $C$ independent Bernoulli problems, probabilities need **not** sum to 1.
+- **CE (softmax over classes):** one **categorical** over **mutually exclusive** classes; softmax *couples* the logits so probabilities **sum to 1**. Use for single-label multi-class.
+- They coincide in the 2-class case: **2-way softmax-CE ≡ BCE on one logit**. Rule of thumb: *mutually exclusive → softmax-CE; independent/multi-label → BCE.*
+
+### Why not L1/L2 (MSE) for classification?
+Put a sigmoid/softmax on the output and it's tempting to just regress with MSE. Three reasons it's the wrong tool:
+
+**1) The gradient vanishes exactly when you're most wrong.** With sigmoid + MSE, $L=\tfrac12(\sigma(z)-y)^2$ and
+
+$$
+\frac{\partial L}{\partial z}=(\sigma(z)-y)\,\sigma'(z),\qquad \sigma'(z)=\sigma(z)(1-\sigma(z))
+$$
+
+If the truth is $y=1$ but the model says $z=-5$ ($\sigma\approx0.007$), then $\sigma'\approx0.007$, so the gradient is $\approx(-0.993)(0.007)\approx-0.007$ — **tiny**, even though the prediction is confidently wrong. With sigmoid + **BCE** (or softmax + CE) the $\sigma'$ **cancels**:
+
+$$
+\frac{\partial L_{\text{BCE}}}{\partial z}=\sigma(z)-y\ \ (\approx-0.993\text{ here})
+$$
+
+a **large** signal proportional to the error. CE learns fast from mistakes; MSE-on-sigmoid stalls.
+
+**2) Unbounded penalty for confident wrongness.** $-\log p_y\to\infty$ as $p_y\to0$, so CE strongly punishes being confidently wrong and pushes calibrated probabilities; MSE's penalty is bounded ($\le1$).
+
+<figure>
+<svg viewBox="0 0 360 226" font-family="Inter, sans-serif" font-size="11">
+  <line x1="40" y1="200" x2="335" y2="200" stroke="#98a3b2"/>
+  <line x1="40" y1="200" x2="40" y2="24" stroke="#98a3b2"/>
+  <polyline points="54,30 69,70 98,109 127,132 185,161 243,180 330,200" fill="none" stroke="#e0533f" stroke-width="2.4"/>
+  <polyline points="40,143 98,164 156,180 214,191 272,198 330,200" fill="none" stroke="#6366f1" stroke-width="2.4"/>
+  <text x="60" y="42" fill="#f4917f" font-weight="700">CE = −log p</text>
+  <text x="150" y="140" fill="#a5b4fc" font-weight="700">MSE = (1−p)²</text>
+  <text x="188" y="218" text-anchor="middle" fill="#98a3b2">predicted prob of true class p →</text>
+  <text x="20" y="115" fill="#98a3b2" transform="rotate(-90 20,115)">loss</text>
+  <text x="46" y="20" fill="#6b7686" font-size="9.5">→∞</text>
+</svg>
+<figcaption>Loss vs. probability assigned to the <b>true</b> class. CE blows up as $p\to0$ (huge push away from confident-wrong); MSE flattens (weak signal), and its sigmoid gradient shrinks further.</figcaption>
+</figure>
+
+**3) Right likelihood / convexity.** CE is the negative log-likelihood under a Bernoulli/Categorical model — the *correct* probabilistic loss for class labels; MSE corresponds to a **Gaussian** likelihood (right for regression, wrong for categories). CE is also convex in the logits, while MSE-through-a-sigmoid is non-convex with poor local minima. **When L1/L2 *is* right:** regression / continuous targets, and bounding-box coordinate regression (smooth-L1 / Huber).
+
 ## Deriving the softmax-CE gradient
 
 For logits $z$, $p_i = e^{z_i}/\sum_j e^{z_j}$, loss $L = -\log p_y$. The softmax Jacobian is $\partial p_i/\partial z_k = p_i(\delta_{ik} - p_k)$. Then:

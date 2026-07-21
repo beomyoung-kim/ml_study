@@ -5,6 +5,9 @@
 > [!TIP] Say this first
 > Architecture questions are rarely "recite the diagram." They test whether you can reason about **inductive bias vs. scale**, complexity, data efficiency, and *when to pick what*. The one-liner that wins the room: *"With enough data and compute, a Transformer replaces hand-built bias with learned bias; when data or latency is tight, a CNN's built-in bias still wins."*
 
+> [!NOTE] See these move
+> Much of this clicks faster animated. Companions: [convolution GIFs](https://github.com/vdumoulin/conv_arithmetic) · [CNN Explainer](https://poloclub.github.io/cnn-explainer/) · [The Illustrated Transformer](https://jalammar.github.io/illustrated-transformer/) · [Transformer Explainer (live)](https://poloclub.github.io/transformer-explainer/) · [Understanding LSTMs](https://colah.github.io/posts/2015-08-Understanding-LSTMs/) · [A Visual Guide to Mamba](https://newsletter.maartengrootendorst.com/p/a-visual-guide-to-mamba-and-state). Full curated list → [Visual explainers](#/resources/open-source).
+
 ## The mental model: bias ↔ scale
 
 Every backbone is a bet about structure. CNNs hard-code **locality + translation equivariance**; RNNs hard-code **sequential recurrence**; Transformers hard-code **almost nothing** and pay for it with data and $O(n^2)$ attention. The 2026 frontier (below) mixes them deliberately.
@@ -29,18 +32,62 @@ $$
 
 Dilated (atrous) convs (DeepLab/ASPP) enlarge RF **without** losing resolution or adding parameters — but too-aggressive dilation causes *gridding artifacts* (kernel taps sample the input too sparsely). Note the **effective** RF is smaller and more Gaussian than the theoretical one, so "big RF" ≠ "sees everything."
 
-### Depthwise-separable convolution
+### Depthwise-separable convolution — where the savings come from
 
-Split a standard conv into a per-channel spatial conv (**depthwise**) + a $1\times1$ channel mix (**pointwise**). Cost ratio vs. standard $K\times K$ conv is roughly $\tfrac{1}{C_{out}}+\tfrac{1}{K^2}$ — the core trick behind MobileNet-class on-device models (see [Mixed Precision & Efficiency](#/foundations/mixed-precision-efficiency)).
+Split a standard $K\times K$ conv into two cheaper steps:
+1. **Depthwise**: one $K\times K$ filter *per input channel* — mixes **space**, not channels.
+2. **Pointwise**: a $1\times1$ conv mixing channels $C_{in}\to C_{out}$ — mixes **channels**, not space.
 
-### Residual connections — why depth became trainable
+Count the multiply–adds for an $H\times W$ output:
 
-ResNet's $y=x+F(x)$ adds an **identity path** so gradients flow directly and each block only learns a *residual correction*. This fixed the **degradation** problem (deeper plain nets underperforming shallower ones) and is now universal — the Transformer's residual stream is the same idea.
+$$
+\underbrace{H W\, C_{in} C_{out} K^2}_{\text{standard}}
+\;\longrightarrow\;
+\underbrace{H W\, C_{in} K^2}_{\text{depthwise}}+\underbrace{H W\, C_{in} C_{out}}_{\text{pointwise}}
+= H W\, C_{in}\,(K^2+C_{out})
+$$
+
+so the cost (and parameter) ratio is
+
+$$
+\frac{C_{in}(K^2+C_{out})}{C_{in} C_{out} K^2}=\frac{1}{C_{out}}+\frac{1}{K^2}.
+$$
+
+**Why it's cheaper (intuition):** a standard conv mixes space *and* channels **simultaneously**, costing $C_{in}C_{out}K^2$ per pixel. Depthwise-separable **factorizes** that into "mix space, then mix channels," and $K^2+C_{out}$ is far smaller than $K^2 C_{out}$. For $K=3$ and large $C_{out}$ the ratio $\to \tfrac19$ — roughly **8–9× fewer FLOPs and params**. Core trick behind MobileNet/EfficientNet on-device models. **Caveat:** slightly less expressive per layer, and depthwise/pointwise ops are often **memory-bandwidth-bound** on real hardware (low FLOPs ≠ automatically fast) — see [Mixed Precision & Efficiency](#/foundations/mixed-precision-efficiency).
+
+### Residual connections — the gradient view of why vanishing stops
+
+ResNet's $y=x+F(x)$ adds an **identity path**. The payoff shows up in the **backward pass**. For one block,
+
+$$
+\frac{\partial \mathcal L}{\partial x}=\frac{\partial \mathcal L}{\partial y}\Big(I+\frac{\partial F}{\partial x}\Big)
+$$
+
+— the gradient reaching the input is the upstream gradient times $\big(I+\partial F/\partial x\big)$. That $I$ is a term that is **not** multiplied by the block's Jacobian. Now stack $L$ blocks:
+
+- **Plain net:** $\dfrac{\partial \mathcal L}{\partial x_0}=\dfrac{\partial \mathcal L}{\partial x_L}\prod_{\ell=1}^{L}\dfrac{\partial F_\ell}{\partial x_{\ell-1}}$ — a product of $L$ Jacobians. If their singular values sit below 1 the product **shrinks geometrically → vanishing gradient**; above 1 → exploding.
+- **Residual net:** $\dfrac{\partial \mathcal L}{\partial x_0}=\dfrac{\partial \mathcal L}{\partial x_L}\prod_{\ell=1}^{L}\Big(I+\dfrac{\partial F_\ell}{\partial x_{\ell-1}}\Big)$ — expanding the product always yields the **identity term $I$** (a clean "1" path) plus higher-order corrections.
+
+So there is always a **direct, undiluted highway** carrying gradient from the loss back to any early layer, regardless of depth. This fixed the **degradation** problem (deep plain nets doing *worse* than shallow ones) and is now universal — the Transformer's **residual stream** is the same mechanism (and why Pre-LN, which keeps that path clean, trains more stably — see [Normalization & Stability](#/foundations/normalization-stability)).
 
 > [!NOTE] Activation functions live here
 > Nonlinearity choice interacts with depth and normalization. Play with saturation and dead-ReLU behavior below.
 
 <div class="widget" data-widget="activation"></div>
+
+Formulas for the curves above (toggle them in the widget):
+
+| Activation | Formula | Notes |
+| --- | --- | --- |
+| ReLU | $\max(0,x)$ | cheap, sparse; can "die" (stuck at 0 forever) |
+| LeakyReLU | $\max(\alpha x, x),\ \alpha\approx0.01$ | small negative slope fixes dead ReLU |
+| Sigmoid | $\sigma(x)=\dfrac{1}{1+e^{-x}}$ | output in $(0,1)$; saturates → vanishing grad |
+| Tanh | $\dfrac{e^{x}-e^{-x}}{e^{x}+e^{-x}}$ | zero-centered sigmoid; still saturates |
+| GELU | $x\,\Phi(x)$, $\Phi=$ normal CDF | smooth; Transformer default |
+| SiLU / Swish | $x\,\sigma(x)$ | smooth, self-gated; GELU-like |
+| Softmax | $\dfrac{e^{x_i}}{\sum_j e^{x_j}}$ | vector → probability simplex (output layer) |
+
+Modern default: **GELU/SiLU** in Transformers (smooth, non-monotonic near 0), **ReLU** where speed matters. Saturating units (sigmoid/tanh) are avoided in deep *hidden* layers because their flat tails zero out the gradient; sigmoid/softmax stay at the **output** to produce probabilities.
 
 <details class="qa"><summary>What does dilation buy you over stride/pooling for growing the receptive field?</summary>
 <div class="qa-body">
@@ -52,9 +99,31 @@ ResNet's $y=x+F(x)$ adds an **identity path** so gradients flow directly and eac
 
 ---
 
-## 2 · RNNs, LSTMs, and why attention displaced them
+## 2 · RNNs, LSTMs, GRUs — and why attention displaced them
 
-A vanilla RNN, $h_t=\tanh(W_h h_{t-1}+W_x x_t+b)$, propagates gradient through repeated multiplication by $W_h$. Spectral radius $<1$ → **vanishing**; $>1$ → **exploding**. LSTMs add a gated **cell state** with an additive path:
+### Vanilla RNN
+Carries a single hidden state forward, one step at a time:
+
+$$h_t=\tanh(W_h h_{t-1}+W_x x_t+b),\qquad y_t=W_y h_t$$
+
+```mermaid
+flowchart LR
+  h0((h₀)) --> h1((h₁))
+  h1 --> h2((h₂))
+  h2 --> h3((h₃))
+  h3 --> hn((…))
+  x1[x₁] --> h1
+  x2[x₂] --> h2
+  x3[x₃] --> h3
+  h1 --> y1[y₁]
+  h2 --> y2[y₂]
+  h3 --> y3[y₃]
+```
+
+Backprop-through-time multiplies by $W_h$ at *every* step, so gradient scales like $\lVert W_h\rVert^{t}$: spectral radius below 1 → **vanishing**, above 1 → **exploding**. Usable memory is only ~tens of steps.
+
+### LSTM — a gated cell-state highway
+Adds a gated **cell state** with an additive path:
 
 $$
 \begin{aligned}
@@ -64,29 +133,123 @@ o_t&=\sigma(W_o[h_{t-1},x_t]) & h_t&=o_t\odot\tanh(c_t)
 \end{aligned}
 $$
 
-When $f_t\approx1$ the cell behaves like a residual highway, preserving gradient. GRUs merge gates for fewer parameters. **Why the field moved to attention:** (1) recurrence is inherently *sequential* → poor GPU utilization; Transformers process the whole sequence in parallel. (2) LSTMs still struggle with very long range and information bottleneck through a fixed-size state. (3) Attention gives every token direct access to every other token in one hop. RNN/SSM ideas survive where **streaming, low latency, or $O(n)$ memory** matter — which motivates the 2026 hybrids below.
+The key is the **additive** update $c_t=f_t\odot c_{t-1}+i_t\odot\tilde c_t$: when the forget gate $f_t\approx1$, the cell (and its gradient) flows forward nearly unchanged — a **residual highway through time**, the same trick as ResNet above.
+
+<figure>
+<svg viewBox="0 0 500 168" font-family="Inter, sans-serif" font-size="12">
+  <line x1="34" y1="52" x2="466" y2="52" stroke="#e0533f" stroke-width="2.6"/>
+  <text x="30" y="42" fill="#f4917f">cₜ₋₁</text><text x="452" y="42" fill="#f4917f">cₜ</text>
+  <circle cx="165" cy="52" r="15" fill="none" stroke="#6366f1" stroke-width="1.8"/><text x="165" y="57" text-anchor="middle" fill="#a5b4fc">×</text>
+  <text x="165" y="26" text-anchor="middle" fill="#98a3b2">forget fₜ</text>
+  <circle cx="300" cy="52" r="15" fill="none" stroke="#12a150" stroke-width="1.8"/><text x="300" y="58" text-anchor="middle" fill="#34d399">+</text>
+  <text x="300" y="26" text-anchor="middle" fill="#98a3b2">input iₜ⊙c̃ₜ</text>
+  <line x1="385" y1="52" x2="385" y2="108" stroke="#98a3b2"/>
+  <rect x="348" y="108" width="74" height="26" rx="5" fill="none" stroke="#0ea5e9"/><text x="385" y="125" text-anchor="middle" fill="#7dd3fc">tanh · oₜ</text>
+  <text x="385" y="156" text-anchor="middle" fill="#f2f6fb">hₜ (output)</text>
+  <text x="232" y="86" text-anchor="middle" fill="#6b7686">cell state passes through mostly-additively → gradient preserved</text>
+</svg>
+<figcaption>The top <b>cell state</b> only meets a multiply (forget) and an add (input); with <code>fₜ≈1</code> it is a residual highway along the time axis.</figcaption>
+</figure>
+
+### GRU — a lighter gate set
+$$
+\begin{aligned}
+z_t&=\sigma(W_z[h_{t-1},x_t]) & r_t&=\sigma(W_r[h_{t-1},x_t])\\
+\tilde h_t&=\tanh\!\big(W_h[\,r_t\odot h_{t-1},\,x_t]\big) & h_t&=(1-z_t)\odot h_{t-1}+z_t\odot\tilde h_t
+\end{aligned}
+$$
+
+GRU merges the cell and hidden state and uses **2 gates** (update $z$, reset $r$) instead of LSTM's 3 → ~25% fewer parameters, often comparable accuracy, slightly faster.
+
+### Pros / cons
+| | Vanilla RNN | LSTM | GRU |
+| --- | --- | --- | --- |
+| Gates | 0 | 3 (forget/input/output) | 2 (update/reset) |
+| Long-range memory | poor | strong | strong |
+| Params / speed | fewest / — | most / slowest | middle / faster |
+| Use when | almost never | long dependencies, more capacity | similar, less data/compute |
+
+### Why the field moved to attention
+1. Recurrence is inherently **sequential** → poor GPU utilization; Transformers run the whole sequence **in parallel**.
+2. A **fixed-size state** bottlenecks long context; even LSTMs fade over very long range.
+3. Attention gives every token **direct, one-hop access** to every other token.
+
+RNN/SSM ideas survive where **streaming, low latency, or $O(n)$ memory** matter — motivating the 2026 hybrids and **Mamba** (§5) below.
 
 ---
 
 ## 3 · The Transformer
 
-### Block structure
+### Architecture (recreating the original paper's figure)
+
+The encoder–decoder stack from *Attention Is All You Need* — inputs enter bottom-left, output probabilities exit top-right; the **encoder's output feeds the decoder's cross-attention as K, V**.
+
+<figure>
+<svg viewBox="0 0 540 520" font-family="Inter, sans-serif" font-size="10.5">
+  <defs><marker id="ah" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0 0 L6 3 L0 6" fill="#98a3b2"/></marker></defs>
+  <!-- helper styles inline -->
+  <!-- ENCODER outer -->
+  <rect x="70" y="150" width="170" height="185" rx="8" fill="none" stroke="#3a4657" stroke-dasharray="4 3"/>
+  <text x="60" y="245" fill="#98a3b2" transform="rotate(-90 60,245)">N×</text>
+  <!-- encoder inner boxes (top→bottom) -->
+  <rect x="88" y="163" width="134" height="20" rx="4" fill="rgba(217,119,6,.14)" stroke="#d97706"/><text x="155" y="177" text-anchor="middle" fill="#fbbf24">Add &amp; Norm</text>
+  <rect x="88" y="190" width="134" height="26" rx="4" fill="rgba(18,161,80,.16)" stroke="#12a150"/><text x="155" y="207" text-anchor="middle" fill="#34d399">Feed Forward</text>
+  <rect x="88" y="224" width="134" height="20" rx="4" fill="rgba(217,119,6,.14)" stroke="#d97706"/><text x="155" y="238" text-anchor="middle" fill="#fbbf24">Add &amp; Norm</text>
+  <rect x="88" y="251" width="134" height="26" rx="4" fill="rgba(99,102,241,.18)" stroke="#6366f1"/><text x="155" y="268" text-anchor="middle" fill="#a5b4fc">Multi-Head Attention</text>
+  <!-- DECODER outer -->
+  <rect x="300" y="90" width="170" height="245" rx="8" fill="none" stroke="#3a4657" stroke-dasharray="4 3"/>
+  <text x="484" y="215" fill="#98a3b2" transform="rotate(-90 484,215)">N×</text>
+  <rect x="318" y="103" width="134" height="20" rx="4" fill="rgba(217,119,6,.14)" stroke="#d97706"/><text x="385" y="117" text-anchor="middle" fill="#fbbf24">Add &amp; Norm</text>
+  <rect x="318" y="130" width="134" height="26" rx="4" fill="rgba(18,161,80,.16)" stroke="#12a150"/><text x="385" y="147" text-anchor="middle" fill="#34d399">Feed Forward</text>
+  <rect x="318" y="164" width="134" height="20" rx="4" fill="rgba(217,119,6,.14)" stroke="#d97706"/><text x="385" y="178" text-anchor="middle" fill="#fbbf24">Add &amp; Norm</text>
+  <rect x="318" y="191" width="134" height="26" rx="4" fill="rgba(99,102,241,.18)" stroke="#6366f1"/><text x="385" y="208" text-anchor="middle" fill="#a5b4fc">Multi-Head Attention</text>
+  <rect x="318" y="225" width="134" height="20" rx="4" fill="rgba(217,119,6,.14)" stroke="#d97706"/><text x="385" y="239" text-anchor="middle" fill="#fbbf24">Add &amp; Norm</text>
+  <rect x="318" y="252" width="134" height="26" rx="4" fill="rgba(99,102,241,.18)" stroke="#6366f1"/><text x="385" y="269" text-anchor="middle" fill="#a5b4fc">Masked Multi-Head Attn</text>
+  <!-- embeddings + PE -->
+  <rect x="88" y="360" width="134" height="24" rx="4" fill="none" stroke="#0ea5e9"/><text x="155" y="376" text-anchor="middle" fill="#7dd3fc">Input Embedding</text>
+  <rect x="318" y="360" width="134" height="24" rx="4" fill="none" stroke="#0ea5e9"/><text x="385" y="376" text-anchor="middle" fill="#7dd3fc">Output Embedding</text>
+  <circle cx="155" cy="330" r="10" fill="none" stroke="#e0533f"/><text x="155" y="334" text-anchor="middle" fill="#f4917f">+</text>
+  <circle cx="385" cy="330" r="10" fill="none" stroke="#e0533f"/><text x="385" y="334" text-anchor="middle" fill="#f4917f">+</text>
+  <text x="250" y="333" text-anchor="middle" fill="#6b7686" font-size="9.5">Positional Encoding</text>
+  <!-- bottom labels -->
+  <text x="155" y="405" text-anchor="middle" fill="#d6dde6">Inputs</text>
+  <text x="385" y="405" text-anchor="middle" fill="#d6dde6">Outputs (shifted right)</text>
+  <!-- top: Linear / Softmax / Probs -->
+  <rect x="335" y="55" width="100" height="22" rx="4" fill="none" stroke="#e0533f"/><text x="385" y="70" text-anchor="middle" fill="#f4917f">Linear</text>
+  <rect x="335" y="26" width="100" height="22" rx="4" fill="none" stroke="#e0533f"/><text x="385" y="41" text-anchor="middle" fill="#f4917f">Softmax</text>
+  <text x="385" y="14" text-anchor="middle" fill="#d6dde6">Output Probabilities</text>
+  <!-- arrows -->
+  <line x1="155" y1="398" x2="155" y2="386" stroke="#98a3b2" marker-end="url(#ah)"/>
+  <line x1="155" y1="360" x2="155" y2="342" stroke="#98a3b2" marker-end="url(#ah)"/>
+  <line x1="155" y1="320" x2="155" y2="279" stroke="#98a3b2" marker-end="url(#ah)"/>
+  <line x1="385" y1="398" x2="385" y2="386" stroke="#98a3b2" marker-end="url(#ah)"/>
+  <line x1="385" y1="360" x2="385" y2="342" stroke="#98a3b2" marker-end="url(#ah)"/>
+  <line x1="385" y1="320" x2="385" y2="280" stroke="#98a3b2" marker-end="url(#ah)"/>
+  <line x1="385" y1="90" x2="385" y2="79" stroke="#98a3b2" marker-end="url(#ah)"/>
+  <line x1="385" y1="55" x2="385" y2="50" stroke="#98a3b2" marker-end="url(#ah)"/>
+  <!-- encoder output → decoder cross-attention (K,V) -->
+  <path d="M240,255 C 270,255 270,205 316,204" fill="none" stroke="#e0533f" stroke-width="1.6" stroke-dasharray="4 3" marker-end="url(#ah)"/>
+  <text x="270" y="228" fill="#f4917f" font-size="9.5">K, V</text>
+  <line x1="155" y1="150" x2="155" y2="150" stroke="#98a3b2"/>
+</svg>
+<figcaption>Encoder (left, ×N) and decoder (right, ×N). Each sublayer is wrapped by a residual <b>Add &amp; Norm</b>. The decoder adds a <b>masked</b> self-attention (can't peek ahead) and a <b>cross-attention</b> that reads the encoder output as K, V. Decoder-only LLMs (GPT/LLaMA) keep just the right column without cross-attention.</figcaption>
+</figure>
+
+Inside **one** sublayer's residual wrapper (modern **Pre-LN** placement):
 
 ```mermaid
 flowchart TB
-  subgraph block ["Transformer block (Pre-LN)"]
-    X[x] --> N1[Norm]
-    N1 --> A[Multi-Head Self-Attn]
-    A --> S1[+]
-    X --> S1
-    S1 --> N2[Norm]
-    N2 --> F[FFN / SwiGLU]
-    F --> S2[+]
-    S1 --> S2
-  end
+  X[x] --> N1[Norm]
+  N1 --> A[Multi-Head Attn]
+  A --> S1[+]
+  X --> S1
+  S1 --> N2[Norm]
+  N2 --> F[FFN / SwiGLU]
+  F --> S2[+]
+  S1 --> S2
 ```
 
-*(Original paper is Post-LN; modern LLMs are Pre-LN — see [Normalization & Stability](#/foundations/normalization-stability).)*
+*(Original paper puts Norm **after** the residual add (Post-LN); modern LLMs use **Pre-LN** for stability — see [Normalization & Stability](#/foundations/normalization-stability).)*
 
 ### Scaled dot-product attention
 
@@ -108,6 +271,10 @@ Frontier LLM decoders converge on a near-standard recipe: **RMSNorm + Pre-LN + R
 
 Self-attention is **permutation-equivariant**, so position must be injected.
 
+**Why it matters:** attention is a *set* operation — it mixes tokens by content with **no built-in notion of order**, so without positional info "the cat sat" and "sat cat the" would produce *identical* representations. PE tells each token "where am I," recovering word order, syntax, and distance. The design axis:
+- **Absolute PE** — give each position its own vector (sinusoidal or learned), *added* to the token embedding. Simple, but generalizes poorly beyond the trained length.
+- **Relative PE** — encode the *offset* $i-j$ between query and key. Matches how language works ("the previous word") and extrapolates far better — why **RoPE/ALiBi** dominate.
+
 | Scheme | Idea | Extrapolation |
 | --- | --- | --- |
 | Sinusoidal (abs) | fixed $\sin/\cos$ of position | limited |
@@ -120,6 +287,8 @@ RoPE is the LLaMA-era default; ALiBi trades a little modeling power for clean lo
 $$
 PE_{(pos,2i)}=\sin(pos/10000^{2i/d}),\quad PE_{(pos,2i+1)}=\cos(pos/10000^{2i/d})
 $$
+
+**Intuition for the sinusoids:** each dimension $i$ is a sine/cosine of a different wavelength (geometric, from $2\pi$ up to $\sim\!10000\cdot2\pi$), so a position's vector is a unique multi-frequency **fingerprint** — low frequencies encode coarse position, high frequencies fine position. And because sine/cosine have shift identities, a fixed offset $k$ acts as a **linear (rotation) transform** on the encoding, so attention can read *relative* distance straight from a dot product — the seed of the RoPE idea.
 
 <details class="qa"><summary>Why divide attention logits by √d_k, and why does multi-head beat one big head?</summary>
 <div class="qa-body">
@@ -167,6 +336,30 @@ Hierarchical successors add back useful bias: **Swin** (shifted-window local att
 
 Pure Transformers pay $O(n^2)$; pure state-space models (SSMs) are $O(n)$ but weaker at precise recall. The 2026 consensus is **neither pure Transformer nor pure Mamba — mix them.**
 
+### How a state-space model (Mamba) works
+
+An **SSM** processes a sequence through a small recurrent hidden state $h_t$ — like an RNN, but *linear*:
+
+$$
+h_t = A\,h_{t-1} + B\,x_t,\qquad y_t = C\,h_t
+$$
+
+- Because a classic SSM is **linear time-invariant** (fixed $A,B,C$), the same computation can be unrolled as a **convolution** → trainable **in parallel** like a CNN, yet runnable as an **$O(1)$-memory recurrence** at inference like an RNN. (S4 added a **HiPPO** initialization of $A$ so the state provably remembers long history.)
+- **Mamba's key idea — selectivity.** Make $B$, $C$, and the step size $\Delta$ **input-dependent** (functions of the current token). Now the model can *choose* what to keep or forget per token (content-based gating) — the very thing plain SSMs and linear attention couldn't do. This breaks time-invariance (no more simple convolution), so Mamba uses a **hardware-aware parallel scan** to stay GPU-fast.
+
+**Cost profile:** training $O(n)$ (parallel scan); inference **$O(1)$ memory, $O(n)$ time, no KV cache** (the state is a fixed-size summary) — versus a Transformer's $O(n^2)$ attention and a KV cache that grows with context.
+
+<div class="proscons">
+<div><div class="pros-t">Mamba / SSM — Pros</div>
+Linear time, constant inference memory, no KV cache → cheap ultra-long context + streaming; strong on audio, DNA, and long signal sequences.
+</div>
+<div><div class="cons-t">Cons vs Transformer</div>
+Weaker at <b>exact recall</b> / copying / in-context retrieval (history is compressed into a fixed-size state); less mature ecosystem; one-hop content lookups that attention does trivially are hard.
+</div>
+</div>
+
+That recall gap is exactly why 2026 models **interleave a minority of full-attention layers** rather than going pure-Mamba:
+
 <dl class="kv">
 <dt>Mamba / Mamba-2</dt><dd>Selective state-space models; linear-time sequence mixing. Mamba-2's <b>SSD</b> framework formally links SSMs and attention. <span class="badge badge-easy">verifiable</span></dd>
 <dt>Nemotron-H</dt><dd>NVIDIA hybrid: most self-attention layers replaced by Mamba-2, a few kept full; reported up to ~3× throughput at long context. <span class="badge badge-easy">verifiable</span></dd>
@@ -211,6 +404,8 @@ flowchart TD
 | Attention | $\mathrm{softmax}(QK^\top/\sqrt{d_k})V$; $O(n^2)$; MHA = parallel relations. |
 | RoPE vs ALiBi | RoPE rotates Q/K (relative, YaRN-extendable); ALiBi = distance-bias, free extrapolation. |
 | ViT vs CNN | ViT wins at scale; CNN's locality bias wins in small-data/low-latency regimes. |
+| Positional encoding | Attention is order-blind; inject position. Absolute (sinusoidal/learned) vs relative (RoPE/ALiBi). |
+| Mamba / SSM | Linear recurrence $h_t=Ah_{t-1}+Bx_t$; **selective** (input-dep $B,C,\Delta$); $O(1)$ infer memory, no KV cache; weak exact recall. |
 | 2026 hybrid | 3:1–7:1 linear+full attention (Nemotron-H, Qwen3-Next, MiniMax) — recall + throughput. |
 
 **Related:** [Normalization & Stability](#/foundations/normalization-stability) · [Distributed Training](#/foundations/distributed-training) · [Mixed Precision & Efficiency](#/foundations/mixed-precision-efficiency) · [LLM Fundamentals](#/llm/fundamentals) · [Optimization](#/foundations/optimization)

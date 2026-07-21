@@ -18,6 +18,18 @@
 
 ---
 
+## 2026-07-19 — Architectures deep-dive, loss theory & visual explainers
+
+**Added**
+- [Architectures](#/foundations/architectures): depthwise-separable FLOP derivation (the ~9× saving, *why*); residual-connection **gradient proof** of why vanishing stops; activation **formula table** beside the live widget; full **RNN/LSTM/GRU** section (unrolled diagram, cell-state-highway SVG, GRU equations, pros/cons); an **original SVG recreation of the Transformer encoder–decoder**; **positional-encoding** intuition (order-blindness, absolute vs relative, sinusoid fingerprint); and a **Mamba/SSM deep-dive** (selective SSM, O(1) memory / no KV cache, pros/cons vs Transformer).
+- [Losses & Gradients](#/ml-coding/losses-gradients): "**Why cross-entropy?**" — CE vs KL ($CE=H(p)+D_{KL}$), BCE vs CE, and why not L1/L2 for classification (vanishing-gradient math + a loss-curve figure).
+- [Curated Open-Source Resources](#/resources/open-source): "**Visual, animated & interactive explainers**" directory (conv GIFs, CNN/Transformer Explainers, Illustrated Transformer, 3Blue1Brown, colah's LSTMs, distill momentum, positional-encoding, A Visual Guide to Mamba…), links verified live.
+
+**Changed**
+- Korean (`.ko.md`) siblings of all three chapters updated to match.
+
+---
+
 ## 2026-07-18 — Code lab rollout (all coding + ML-coding)
 
 **Added**

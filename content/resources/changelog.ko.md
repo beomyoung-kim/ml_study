@@ -18,6 +18,18 @@
 
 ---
 
+## 2026-07-19 — 아키텍처 심화 · 손실 이론 · 시각 자료
+
+**Added**
+- [Architectures](#/foundations/architectures): depthwise-separable FLOP 유도(~9× 절감과 *이유*); residual connection이 vanishing gradient를 왜 해소하는지 **gradient 관점 증명**; activation **수식 표**(라이브 위젯 옆); **RNN/LSTM/GRU** 전체 섹션(unrolled 도식, cell-state highway SVG, GRU 수식, 장단점); **Transformer encoder–decoder 아키텍처 SVG**(원본 재현); **positional encoding** 직관(순서 무지·absolute vs relative·sinusoid fingerprint); **Mamba/SSM 심화**(selective SSM, O(1) 메모리·KV cache 없음, Transformer 대비 장단점).
+- [Losses & Gradients](#/ml-coding/losses-gradients): "**왜 cross-entropy인가?**" — CE vs KL ($CE=H(p)+D_{KL}$), BCE vs CE, classification에 왜 L1/L2를 안 쓰는지(vanishing gradient 수식 + loss 곡선 그림).
+- [Curated Open-Source Resources](#/resources/open-source): "**시각·애니메이션·인터랙티브 설명 자료**" 디렉터리(conv GIF, CNN/Transformer Explainer, Illustrated Transformer, 3Blue1Brown, colah LSTM, distill momentum, positional encoding, A Visual Guide to Mamba…), 링크 live 확인.
+
+**Changed**
+- 세 챕터의 한국어(`.ko.md`) 버전도 동일하게 갱신.
+
+---
+
 ## 2026-07-18 — 코드 랩 전체 확장 (coding + ML-coding)
 
 **Added**

@@ -4,3 +4,4 @@ PRISM-full.local.md
 
 # stray root-level scratch (book content lives in content/)
 /coding/
+*.local.html

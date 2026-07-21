@@ -86,6 +86,47 @@ The Amidi Stanford VIP sheets are the format to emulate: **one page, formula-den
 - **CS224n (NLP)** — [web.stanford.edu/class/cs224n](http://web.stanford.edu/class/cs224n/). The NLP/transformer counterpart.
 - **d2l.ai — Dive into Deep Learning** — [d2l.ai](https://d2l.ai/). Runnable-code textbook; great for filling derivation gaps.
 
+## Visual, animated & interactive explainers
+
+Concepts that click faster when you *see them move*. All links verified live (2026-07).
+
+**Convolution / CNN**
+- [conv_arithmetic](https://github.com/vdumoulin/conv_arithmetic) — Dumoulin & Visin. The canonical animated GIFs of conv / transposed / dilated convolution (blue=input, cyan=output).
+- [CNN Explainer](https://poloclub.github.io/cnn-explainer/) — Georgia Tech (Polo Chau). Click through a live CNN layer-by-layer with real activations.
+- [Animated AI](https://animatedai.github.io/) — clean animations of stride, padding, and grouped/depthwise-separable convolution.
+
+**Attention & Transformer**
+- [The Illustrated Transformer](https://jalammar.github.io/illustrated-transformer/) — Jay Alammar. The most-cited illustrated walkthrough of self-attention.
+- [Transformer Explainer](https://poloclub.github.io/transformer-explainer/) — runs a live GPT-2 in your browser; type text and watch the attention maps.
+- [Attention? Attention!](https://lilianweng.github.io/posts/2018-06-24-attention/) — Lilian Weng. The definitive attention-variants survey.
+- [3Blue1Brown — Attention, step by step](https://www.3blue1brown.com/lessons/attention) — Manim-animated geometric intuition for Q/K/V.
+
+**ViT (Vision Transformer)**
+- [A Visual Guide to Vision Transformers](https://blog.mdturp.ch/posts/2024-04-05-visual_guide_to_vision_transformer.html) — MDTURP. A 14-step animated scroll-story from patches to training.
+
+**Backpropagation**
+- [3Blue1Brown — Backpropagation](https://www.3blue1brown.com/lessons/backpropagation) & [Backprop calculus](https://www.youtube.com/watch?v=tIeHLnjs5U8) — animated gradient flow + the chain-rule mechanics.
+
+**Gradient descent & optimizers**
+- [Why Momentum Really Works](https://distill.pub/2017/momentum/) — Distill (Gabriel Goh). Interactive; drag sliders to feel momentum.
+- [An overview of gradient descent optimization algorithms](https://www.ruder.io/optimizing-gradient-descent/) — Sebastian Ruder. Standard SGD/Momentum/RMSprop/Adam reference.
+- [TensorFlow Playground](https://playground.tensorflow.org/) — tweak LR / activation / data and watch a net train live.
+
+**RNN / LSTM / GRU**
+- [Understanding LSTM Networks](https://colah.github.io/posts/2015-08-Understanding-LSTMs/) — Chris Olah. The classic gate-by-gate illustrated explainer.
+
+**Positional encoding**
+- [Transformer Architecture: The Positional Encoding](https://kazemnejad.com/blog/transformer_architecture_positional_encoding/) — Amirhossein Kazemnejad. Visual + mathematical intuition for the sinusoids.
+
+**Mamba / State-Space Models**
+- [A Visual Guide to Mamba and State Space Models](https://newsletter.maartengrootendorst.com/p/a-visual-guide-to-mamba-and-state) — Maarten Grootendorst. 50+ custom visuals from SSM basics to selective scan.
+- [The Annotated S4](https://srush.github.io/annotated-s4/) — Sasha Rush. Annotated-paper walkthrough with runnable JAX.
+- [Mamba & S4 Explained](https://www.youtube.com/watch?v=8Q_tqwpTpVU) — Umar Jamil. First-principles animated derivation.
+
+**General interactive playgrounds**
+- [Distill.pub](https://distill.pub/) — home of interactive, animation-rich ML explainers.
+- [Explained Visually (setosa.io)](https://setosa.io/ev/) — PCA, eigenvectors, image kernels, Markov chains, and more.
+
 ## Behavioral & research-scientist-specific
 
 > [!WARNING] The under-served category
