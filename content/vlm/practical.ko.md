@@ -106,6 +106,21 @@ flowchart TB
 
 **[VERIFIED] anchor:** *Qwen2.5-VL*(arXiv 2502.13923)는 window attention으로 native dynamic-resolution ViT를 처음부터 학습하고 absolute-time mRoPE를 사용합니다; *LLaVA-NeXT / InternVL*은 fixed encoder 위에 AnyRes tiling을 사용합니다. 밀집 OCR/document에는 native-resolution이 대체로 이기고; tiling은 기성 encoder를 재사용할 때의 실용적 경로입니다.
 
+## 3½ · Extreme inputs: tiny objects, 1:100 aspect ratios, giant images
+
+면접관이 좋아하는 시나리오: *"12000×800이나 8K image에서 작은 결함을 찾아라 / 아주 작은 라벨을 읽어라."* **고정 square resize(예: 224²)가 바로 여기서 망가지는 지점입니다** — (a) 작은 객체를 patch size 아래로 줄여서 사라지게 만들고, (b) 극단적 aspect ratio를 뭉개서 text/구조를 왜곡시킵니다. 정량적으로: 폭 4000px image를 224로 resize하면 40px 객체가 ~2px가 되는데 — 이는 14px patch 하나보다 작아서, 즉 **정보이론적으로 사라진** 것입니다. 어떤 downstream 트릭으로도 복구할 수 없습니다.
+
+**실제로 통하는 것들(단계적 toolkit):**
+- **Native / dynamic resolution** (Qwen2.5/3-VL): 실제 aspect ratio를 그대로 넣고 patch count가 변하도록 둡니다 — 뭉갬 없음. 가장 먼저 손이 가야 할 것.
+- **Tiling / AnyRes** (LLaVA-NeXT, InternVL): 큰 image를 fixed tile로 쪼갭니다(+ global thumbnail 하나); 각 tile이 full detail로 encode됩니다. Encoder는 한정하지만 token을 배로 늘립니다.
+- **Coarse-to-fine (retrieve-then-zoom):** 다운샘플된 image에 값싼 pass를 돌려 region of interest를 *localize*한 뒤, 그 region을 **high/native resolution**으로 다시 crop해 재실행합니다. 사람이 눈을 가늘게 뜨고 보다가 가까이 다가가는 것과 같고 — visual agent가 `crop`/`zoom` tool을 쓰는 방식입니다([Visual Reasoning Agents](#/vlm/visual-agents) 참고).
+- **Aspect-ratio bucketing:** image를 몇 개의 AR bucket으로 묶고 square로 강제하는 대신 bucket 안에서 pad합니다 — geometry를 보존하면서 batch를 규칙적으로 유지합니다.
+- **Sliding-window / patch inference**는 1:100 파노라마나 gigapixel image용: 겹치는 window들 위로 실행하고 이어붙입니다(medical / satellite / document strip에서 고전적).
+- **Token-budget control:** 위의 모든 것이 token을 부풀리므로, pixel-shuffle merging / max-pixel cap과 함께 쓰세요(§4).
+
+> [!QUESTION] MLSD framing — "How would you handle huge / extreme-aspect / small-object images?"
+> 이 순서로 답하세요: **(1) 왜 fixed resize가 실패하는지 짚기**(작은 객체 → sub-patch → 사라짐; 극단적 AR → 왜곡). **(2) 요구사항 명시** — 가장 작은 객체(px)와 가장 큰 image, 그리고 latency 예산 → 이것이 **반드시 보존해야 할 최소 resolution**을 정합니다. **(3) 메커니즘 선택**: encoder가 지원하면 native-res, 아니면 AnyRes tiling; 객체가 작고 드물면 **coarse-to-fine**을 추가(어디서나 full-res를 지불하지 말 것). **(4) token budget 제어**(tile cap, pixel-shuffle, ROI만 high-res). **(5) hard slice에서 평가** — small-object / extreme-AR 세트를 **size-stratified** metric으로, 평균 정확도는 바로 이런 실패를 숨기기 때문입니다. 시니어 신호는 resolution 결정을 *잃어서는 안 되는 가장 작은 feature*에 묶는 것이지, "그냥 더 큰 encoder를 써라"가 아닙니다.
+
 ## 4 · The visual token budget
 
 Visual token이 sequence와 compute/memory 비용을 지배합니다. patch-14 ViT에 대한 대략적 산수:

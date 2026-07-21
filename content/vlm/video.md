@@ -21,6 +21,40 @@ flowchart TB
 
 An hour of video at 1 fps is 3,600 frames; at ~256 tokens/frame that is ~920k visual tokens — impossible to feed raw. So video-language is largely the art of **spending a fixed token budget where the information is**.
 
+## Two worlds: video *understanding* vs video *perception*
+
+"Process video" means very different things by task, and conflating them is a common stumble. There are **three temporal paradigms** — pick by *what the task needs* and *whether it must run online*:
+
+| Paradigm | How frames enter | Sees | Used for | Latency |
+| --- | --- | --- | --- | --- |
+| **Sparse sampling → VLM** (understanding) | pick K keyframes, tokenize, feed together | the sampled frames (≈global) | video QA, captioning, long-video (this chapter) | bounded by token budget |
+| **Streaming / recurrent (causal)** | one frame at a time, carry a **memory/state** forward | **past only** | tracking, VOS, robotics, live assistants | low, bounded memory, real-time |
+| **Clip / window (offline, bidirectional)** | stack a window $[t{-}k,\dots,t,\dots,t{+}k]$, process jointly | **past + future** | offline video segmentation, action recognition | high, needs whole clip |
+
+### Streaming / recurrent memory — the SAM 2 pattern
+This is the **perception** default, and it is *not* keyframe sampling. SAM 2 processes frames **in order** and keeps a **memory bank**: encode the current frame, then a **memory-attention** block lets its features **cross-attend to a memory of past frames' features + past mask predictions (object pointers)**; it outputs the current mask and **writes it back** into the memory for future frames. The previous state feeds **recursively** into the current prediction — like an RNN hidden state, but implemented as attention over a FIFO of recent frames.
+
+```mermaid
+flowchart LR
+  F1[frame t] --> Enc[frame encoder]
+  Enc --> MA[memory attention<br/>cross-attend to past]
+  Mem[(memory bank<br/>past feats + mask tokens)] --> MA
+  MA --> Dec[mask decoder] --> Out[mask t]
+  Out -->|write back| Mem
+  style MA fill:#e0533f,color:#fff
+```
+
+Properties: **causal** (past only), **constant memory** (fixed-size bank), **online/real-time** → the right design for tracking and interactive/streaming video. Failure modes: ID-switches and drift after long occlusions.
+
+### Clip / window — bidirectional context
+Offline tasks that don't need real-time do better by seeing **past *and* future** at once: stack a temporal window and mix it with **3D convolutions** or **spatio-temporal attention** (Video Swin / UniFormer for action recognition; Mask2Former-VIS / VisTR-style for video instance segmentation). Future context disambiguates the present — an object briefly occluded *now* is resolved by a later frame. Cost: you need the whole clip (no streaming) and compute grows with window length.
+
+### Per-frame + association (tracking-by-detection)
+The simplest: run an **image** model every frame, then **link** detections across time with a tracker (ByteTrack / SORT) or mask propagation. Modular and strong, but association is a separate, error-prone stage (the ID-switch problem).
+
+> [!NOTE] The distinction to say out loud
+> **Video-LLMs sample sparse keyframes** and reason over them (spatial-semantic, token-budget-bound). **Video perception is temporal-first**: causal recurrent memory (SAM 2) for online tracking/VOS, or bidirectional clip/window (3D conv / spatio-temporal attention) for offline segmentation. *"Do I need past-only (online) or past+future (offline)?"* is the first question — it picks the paradigm.
+
 ## 1 · Frame sampling
 
 | Strategy | Idea | Failure |

@@ -21,6 +21,40 @@ flowchart TB
 
 1시간 video를 1 fps로 하면 3,600 frame이고; frame당 ~256 token이면 ~920k visual token입니다 — raw로 feed하기 불가능. 그래서 video-language는 대체로 **고정된 token 예산을 정보가 있는 곳에 쓰는** 기술입니다.
 
+## Two worlds: video *understanding* vs video *perception*
+
+"video를 처리한다"는 것은 task에 따라 아주 다른 것을 뜻하고, 이를 뭉뚱그리는 것이 흔한 실수입니다. **세 가지 temporal paradigm**이 있습니다 — *task가 무엇을 필요로 하는지*와 *online으로 돌아가야 하는지*로 고르세요:
+
+| Paradigm | Frame이 들어오는 방식 | 보는 것 | 용도 | Latency |
+| --- | --- | --- | --- | --- |
+| **Sparse sampling → VLM** (understanding) | K개 keyframe을 골라 tokenize, 함께 feed | sample된 frame(≈global) | video QA, captioning, long-video (이 chapter) | token 예산에 의해 제한 |
+| **Streaming / recurrent (causal)** | 한 번에 한 frame씩, **memory/state**를 앞으로 이월 | **과거만** | tracking, VOS, robotics, live assistant | 낮음, bounded memory, real-time |
+| **Clip / window (offline, bidirectional)** | window $[t{-}k,\dots,t,\dots,t{+}k]$를 쌓아 함께 처리 | **과거 + 미래** | offline video segmentation, action recognition | 높음, 전체 clip 필요 |
+
+### Streaming / recurrent memory — the SAM 2 pattern
+이것이 **perception**의 기본값이고, keyframe sampling이 *아닙니다*. SAM 2는 frame을 **순서대로** 처리하고 **memory bank**를 유지합니다: 현재 frame을 encode한 뒤 **memory-attention** block이 그 feature를 **과거 frame들의 feature + 과거 mask 예측(object pointer)에 대한 memory에 cross-attend**하게 합니다; 현재 mask를 출력하고 이를 미래 frame을 위해 memory에 **다시 write**합니다. 이전 state가 현재 예측에 **재귀적으로** 들어갑니다 — RNN hidden state와 비슷하지만, 최근 frame의 FIFO에 대한 attention으로 구현됩니다.
+
+```mermaid
+flowchart LR
+  F1[frame t] --> Enc[frame encoder]
+  Enc --> MA[memory attention<br/>cross-attend to past]
+  Mem[(memory bank<br/>past feats + mask tokens)] --> MA
+  MA --> Dec[mask decoder] --> Out[mask t]
+  Out -->|write back| Mem
+  style MA fill:#e0533f,color:#fff
+```
+
+특성: **causal**(과거만), **constant memory**(고정 크기 bank), **online/real-time** → tracking과 interactive/streaming video에 맞는 설계. 실패 양상: 긴 occlusion 후 ID-switch와 drift.
+
+### Clip / window — bidirectional context
+real-time가 필요 없는 offline task는 **과거 *와* 미래**를 한 번에 보는 편이 낫습니다: temporal window를 쌓아 **3D convolution**이나 **spatio-temporal attention**으로 섞습니다(action recognition에는 Video Swin / UniFormer; video instance segmentation에는 Mask2Former-VIS / VisTR 계열). 미래 맥락이 현재를 disambiguate합니다 — *지금* 잠깐 occlusion된 객체가 나중 frame으로 해소됩니다. 비용: 전체 clip이 필요하고(streaming 불가) window 길이에 따라 compute가 커집니다.
+
+### Per-frame + association (tracking-by-detection)
+가장 단순한 방식: 매 frame마다 **image** 모델을 돌린 뒤 tracker(ByteTrack / SORT)나 mask propagation으로 시간에 걸쳐 detection을 **연결**합니다. 모듈적이고 강력하지만, association이 별도의 오류 나기 쉬운 단계입니다(ID-switch 문제).
+
+> [!NOTE] The distinction to say out loud
+> **Video-LLM은 희소 keyframe을 sample**하고 그 위에서 reasoning합니다(spatial-semantic, token-예산 제약). **Video perception은 temporal-first입니다**: online tracking/VOS에는 causal recurrent memory(SAM 2), offline segmentation에는 bidirectional clip/window(3D conv / spatio-temporal attention). *"과거만(online) 필요한가, 과거+미래(offline) 필요한가?"*가 첫 질문이고 — 그것이 paradigm을 고릅니다.
+
 ## 1 · Frame sampling
 
 | Strategy | Idea | Failure |

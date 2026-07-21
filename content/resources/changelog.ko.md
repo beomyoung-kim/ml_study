@@ -18,6 +18,19 @@
 
 ---
 
+## 2026-07-19 — RAG/MCP · 모델 네이밍 · 극한 이미지 · 비디오 패러다임
+
+**Added**
+- [Agentic AI & Tool Use](#/llm/agents): **MCP**(Model Context Protocol) 서브섹션(M×N→M+N, host/client/server, primitive, 공격면) + **RAG** 섹션(chunk/embed/index/rerank/generate, RAG vs long-context vs fine-tune, 실패 모드, agentic RAG).
+- [LLM Fundamentals](#/llm/fundamentals) §8: **모델 이름 읽기** — Base / Instruct / **Thinking** / -Zero 학습 접미사와 dense / **`A3B`**(MoE active) / **`E4B`**(MatFormer effective footprint) 크기 태그.
+- [VLM Implementation Details](#/vlm/practical) §3½: **극한 입력** — 작은 물체·1:100 aspect ratio·초대형 이미지; *fixed resize가 왜 실패하는지*, native-res / AnyRes tiling / coarse-to-fine / bucketing / sliding-window, 그리고 5단계 **ML 시스템 디자인 답변 프레이밍**.
+- [Video-Language Models](#/vlm/video): **비디오 3대 패러다임** — sparse-sampling → VLM(understanding) vs **streaming/recurrent memory(SAM 2)** vs **clip/window bidirectional**(3D conv / spatio-temporal attn) vs tracking-by-detection.
+
+**Changed**
+- 네 챕터의 한국어(`.ko.md`) 버전도 동일하게 갱신.
+
+---
+
 ## 2026-07-19 — CLIP/DINO 학습 · contrastive learning · MLSD 사례 추가
 
 **Added**

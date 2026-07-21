@@ -106,6 +106,21 @@ flowchart TB
 
 **[VERIFIED] anchor:** *Qwen2.5-VL* (arXiv 2502.13923) trains a native dynamic-resolution ViT from scratch with window attention and uses absolute-time mRoPE; *LLaVA-NeXT / InternVL* use AnyRes tiling on a fixed encoder. For dense OCR/documents, native-resolution generally wins; tiling is the pragmatic path when reusing an off-the-shelf encoder.
 
+## 3½ · Extreme inputs: tiny objects, 1:100 aspect ratios, giant images
+
+The scenario interviewers love: *"find the small defect / read the tiny label in a 12000×800 or 8K image."* **Fixed square resize (e.g. 224²) is exactly what breaks here** — it (a) shrinks a small object below the patch size so it vanishes, and (b) squashes an extreme aspect ratio so text/structure distorts. Quantified: resize a 4000-px-wide image to 224 and a 40-px object becomes ~2 px — smaller than one 14-px patch, i.e. **information-theoretically gone**. No downstream trick recovers it.
+
+**What actually works (escalating toolkit):**
+- **Native / dynamic resolution** (Qwen2.5/3-VL): feed the true aspect ratio, let patch count vary — no squashing. First thing to reach for.
+- **Tiling / AnyRes** (LLaVA-NeXT, InternVL): split the big image into fixed tiles (+ a global thumbnail); each tile encodes at full detail. Bounds the encoder but multiplies tokens.
+- **Coarse-to-fine (retrieve-then-zoom):** a cheap pass on the downsampled image to *localize* the region of interest, then re-crop that region at **high/native resolution** and re-run. Like a person squinting then leaning in — and how visual agents use a `crop`/`zoom` tool (see [Visual Reasoning Agents](#/vlm/visual-agents)).
+- **Aspect-ratio bucketing:** group images into a few AR buckets and pad within a bucket instead of forcing a square — preserves geometry while keeping batches regular.
+- **Sliding-window / patch inference** for the 1:100 panorama or gigapixel image: run over overlapping windows and stitch (classic in medical / satellite / document strips).
+- **Token-budget control:** all of the above inflate tokens, so pair with pixel-shuffle merging / a max-pixel cap (§4).
+
+> [!QUESTION] MLSD framing — "How would you handle huge / extreme-aspect / small-object images?"
+> Answer in this order: **(1) name why fixed resize fails** (small object → sub-patch → gone; extreme AR → distortion). **(2) State the requirement** — smallest object (in px) and largest image, plus latency budget → that sets the **minimum resolution you must preserve**. **(3) Pick the mechanism**: native-res if the encoder supports it, else AnyRes tiling; add **coarse-to-fine** when objects are tiny and sparse (don't pay full-res everywhere). **(4) Control the token budget** (tile cap, pixel-shuffle, ROI-only high-res). **(5) Evaluate on a hard slice** — a small-object / extreme-AR set with **size-stratified** metrics, because average accuracy hides exactly these failures. The senior signal is tying the resolution decision to the *smallest feature you must not lose*, not "just use a bigger encoder."
+
 ## 4 · The visual token budget
 
 Visual tokens dominate the sequence and the compute/memory bill. Rough arithmetic for a patch-14 ViT:

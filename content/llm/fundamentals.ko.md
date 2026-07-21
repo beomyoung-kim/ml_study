@@ -182,6 +182,33 @@ flowchart LR
 
 </div></div>
 
+## 8 · Reading a model name (Instruct / Thinking / A3B / E4B …)
+
+open-weight 이름은 학습 + 아키텍처 스토리 전체를 suffix에 담는다. 해독해 보자:
+
+**Training-stage suffix** — *어떤 post-training을 거쳤는가* ([Alignment](#/llm/alignment) 참고):
+
+| Suffix | 의미 |
+| --- | --- |
+| *(없음)* / **Base** / **-pt** | pretrained만 됨(next-token). instruction-following이 아니며, 추가 tuning용이다. |
+| **Instruct / -it / Chat** | SFT + preference optimization → instruction을 따르고 chat template을 쓴다. *실사용*의 기본값. |
+| **Thinking / Reasoning / -R / R1** | 답하기 전에 긴 chain-of-thought를 내도록 학습됨(보통 **RLVR**) → test-time compute를 쓴다. |
+| **-Zero** | SFT cold-start **없이** RL만(DeepSeek-R1-Zero) — 프로덕션용이 아닌 연구 산물. |
+| **Coder / Math / VL / Omni** | 도메인 / modality 특화(코드, 수학, vision-language, any-to-any). |
+
+**Size / architecture 태그** — *compute & memory 비용이 얼마인가*:
+
+| Tag | 의미 | 예시 |
+| --- | --- | --- |
+| 그냥 **N B** | 총 parameter, **dense**(모든 token에서 전부 active) | `31B`, `7B` |
+| **N B-A K B** | **MoE**: N total, token당 **K active** | `30B-A3B` = 30B total, ~3B active; `235B-A22B` |
+| **E K B** | **effective** parameter: raw parameter는 더 많아도 *K-B dense 모델의 memory/compute로* 돈다 — Gemma 3n의 **MatFormer**(큰 모델 안에 중첩된 더 작은 sub-model) + elastic inference용 Per-Layer Embeddings | `E2B`, `E4B` |
+| version / date | 계열 버전 또는 data cutoff | `-2507`, `3.5` |
+| quant / format | 사후 quantization / serving format | `-AWQ`, `-FP8`, `-GGUF` |
+
+> [!TIP] 각 태그가 실전에서 바꾸는 것
+> **Instruct vs Thinking**은 *inference 동작*을 바꾼다 — Thinking은 긴 reasoning trace를 낸다(latency/token 증가, 어려운 task 정확도 상승). 2026년 많은 모델이 이것을 **toggle**로 만든다("하나의 모델, 조절 가능한 thinking"). **A-태그(MoE)**는 *비용 모델*을 바꾼다: **memory는 total로, latency는 active로** 잡아라. **E-태그**는 *memory-footprint* 약속(elastic sub-model)이지 품질 주장이 아니다. 그래서 `Qwen3-30B-A3B-Instruct-2507` = 30B-total / ~3B-active MoE, instruction-tuned, 2025년 7월 리프레시; `Gemma-3n-E4B-it` = ~4B-dense memory footprint의 edge 모델, instruction-tuned.
+
 ## Cheat-sheet
 
 | Concept | 한 줄 요약 |
@@ -194,6 +221,7 @@ flowchart LR
 | RoPE / ALiBi / YaRN | relative-position 회전 / 거리 bias / long context용 freq-선택적 RoPE scaling |
 | KV cache | prefill = compute-bound, decode = memory-bound(HBM에서 KV read) |
 | MoE | active ≪ total params; top-k routing; load balancing + all-to-all이 비용 |
+| Model name | Instruct = SFT+pref · Thinking = RLVR long-CoT · **A** = MoE active params · **E** = effective (MatFormer) footprint |
 
 ## Related
 

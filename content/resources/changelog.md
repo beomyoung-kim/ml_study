@@ -18,6 +18,19 @@
 
 ---
 
+## 2026-07-19 — RAG/MCP, model-name decoding, extreme images, video paradigms
+
+**Added**
+- [Agentic AI & Tool Use](#/llm/agents): an **MCP** (Model Context Protocol) subsection (M×N→M+N, host/client/server, primitives, attack surface) + a **RAG** section (chunk/embed/index/rerank/generate, RAG vs long-context vs fine-tune, failure modes, agentic RAG).
+- [LLM Fundamentals](#/llm/fundamentals) §8: **reading a model name** — Base / Instruct / **Thinking** / -Zero training suffixes and dense / **`A3B`** (MoE active) / **`E4B`** (MatFormer effective footprint) size tags.
+- [VLM Implementation Details](#/vlm/practical) §3½: **extreme inputs** — tiny objects, 1:100 aspect ratios, giant images; *why fixed resize fails*, native-res / AnyRes tiling / coarse-to-fine / bucketing / sliding-window, plus a 5-step **MLSD answer framing**.
+- [Video-Language Models](#/vlm/video): **three video paradigms** — sparse-sampling → VLM (understanding) vs **streaming/recurrent memory (SAM 2)** vs **clip/window bidirectional** (3D conv / spatio-temporal attn) vs tracking-by-detection.
+
+**Changed**
+- Korean (`.ko.md`) siblings of all four chapters updated to match.
+
+---
+
 ## 2026-07-19 — CLIP/DINO training, contrastive learning & more MLSD cases
 
 **Added**

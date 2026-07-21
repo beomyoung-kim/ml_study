@@ -182,6 +182,33 @@ flowchart LR
 
 </div></div>
 
+## 8 · Reading a model name (Instruct / Thinking / A3B / E4B …)
+
+Open-weight names pack the whole training + architecture story into a suffix. Decode it:
+
+**Training-stage suffixes** — *what post-training it got* (see [Alignment](#/llm/alignment)):
+
+| Suffix | Meaning |
+| --- | --- |
+| *(none)* / **Base** / **-pt** | pretrained only (next-token). Not instruction-following; meant for further tuning. |
+| **Instruct / -it / Chat** | SFT + preference optimization → follows instructions, uses a chat template. The default to *use*. |
+| **Thinking / Reasoning / -R / R1** | trained (usually **RLVR**) to emit a long chain-of-thought before answering → spends test-time compute. |
+| **-Zero** | RL with **no** SFT cold-start (DeepSeek-R1-Zero) — a research artifact, not for production. |
+| **Coder / Math / VL / Omni** | domain / modality specialization (code, math, vision-language, any-to-any). |
+
+**Size / architecture tags** — *what the compute & memory cost is*:
+
+| Tag | Meaning | Example |
+| --- | --- | --- |
+| plain **N B** | total parameters, **dense** (all active every token) | `31B`, `7B` |
+| **N B-A K B** | **MoE**: N total, **K active** per token | `30B-A3B` = 30B total, ~3B active; `235B-A22B` |
+| **E K B** | **effective** params: runs with the *memory/compute of a K-B dense model* despite more raw params — Gemma 3n's **MatFormer** (a smaller sub-model nested inside the big one) + Per-Layer Embeddings for elastic inference | `E2B`, `E4B` |
+| version / date | family version or data cutoff | `-2507`, `3.5` |
+| quant / format | post-hoc quantization / serving format | `-AWQ`, `-FP8`, `-GGUF` |
+
+> [!TIP] What each tag changes in practice
+> **Instruct vs Thinking** changes *inference behavior* — Thinking emits a long reasoning trace (more latency/tokens, higher hard-task accuracy), and many 2026 models make it a **toggle** ("one model, adjustable thinking"). **A-tags (MoE)** change the *cost model*: budget **memory by total, latency by active**. **E-tags** are a *memory-footprint* promise (elastic sub-models), not a quality claim. So `Qwen3-30B-A3B-Instruct-2507` = 30B-total / ~3B-active MoE, instruction-tuned, a July-2025 refresh; `Gemma-3n-E4B-it` = an edge model with a ~4B-dense memory footprint, instruction-tuned.
+
 ## Cheat-sheet
 
 | Concept | One-liner |
@@ -194,6 +221,7 @@ flowchart LR
 | RoPE / ALiBi / YaRN | relative-position rotation / distance bias / freq-selective RoPE scaling for long context |
 | KV cache | prefill = compute-bound, decode = memory-bound (reads KV from HBM) |
 | MoE | active ≪ total params; top-k routing; load balancing + all-to-all are the costs |
+| Model name | Instruct = SFT+pref · Thinking = RLVR long-CoT · **A** = MoE active params · **E** = effective (MatFormer) footprint |
 
 ## Related
 
