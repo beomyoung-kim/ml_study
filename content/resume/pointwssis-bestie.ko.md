@@ -3,13 +3,13 @@
 <div class="tag-row"><span class="tag">CVPR 2023 · CVPR 2022</span><span class="tag">weakly / semi-supervised</span><span class="tag">point supervision</span><span class="tag">instance seg</span><span class="tag">first author</span></div>
 
 > [!TIP] 30초 피치
-> instance segmentation의 annotation 비용을 **proposal 병목을 공략**해서 줄인 두 편의 1저자 CVPR 논문. **BESTIE** (CVPR 2022)는 image-level (WSSS) 지식을 instance로 전이하고, self-refinement로 *semantic drift*를 잡는다 — off-the-shelf proposal 없이. **PointWSSIS** (CVPR 2023)는 **weakly-semi (소수 full + 다수 point) 세팅**을 제안하고 proposal의 false-negative/false-positive 병목을 직접 제거해서, 마스크는 극히 일부만 쓰면서 near-fully-supervised AP에 도달한다. 둘은 하나의 싸움이다: **레이블에 덜 쓰면서 pseudo-label noise를 통제하기.**
+> instance-segmentation annotation 비용을 **proposal 병목**에서 줄인 두 편의 1저자 CVPR 논문입니다. **BESTIE** (CVPR 2022)는 image-level 지식을 instance로 전이하고 self-refinement로 semantic drift를 줄입니다. **PointWSSIS** (CVPR 2023)는 few-full + many-point setting에서 point로 proposal ambiguity를 줄이고 mask를 refine합니다. 논문은 COCO 50% full-label setting에서 fully supervised reference에 가까운 AP, 5% setting에서는 비교한 semi-supervised baseline보다 높은 AP를 보고합니다. 공통 질문은 **label budget을 줄이면서 pseudo-label noise를 어떻게 통제할 것인가**입니다.
 
 **Public references:** BESTIE [arXiv 2109.09477](https://arxiv.org/abs/2109.09477) / [code](https://github.com/clovaai/BESTIE); PointWSSIS [arXiv 2303.15062](https://arxiv.org/abs/2303.15062) / [code](https://github.com/clovaai/PointWSSIS). Backing chapter: [Weak & Semi-Supervised](#/cv/weak-semi-supervised).
 
 ## proposal이 왜 병목인가
 
-거의 모든 instance segmenter는 **proposal → mask** 구조다 (box, point, 또는 query 다음에 mask head). proposal 단계가 객체를 놓치면 (false negative), mask head가 아무리 좋아도 **그 instance를 낼 수 없다.** 더 많이 잡으려고 confidence threshold를 낮추면 false positive가 쏟아진다. semi-supervised instance seg (SSIS)에서 pseudo-label은 정확히 이 FN↔FP 트레이드오프 위에 놓인다. 두 논문 모두 이 과제를 *"mask head를 개선한다"*가 아니라 *"올바른 proposal을 싸게 얻은 뒤 refine한다"*로 재정의한다.
+많은 instance-segmentation pipeline은 proposal·query·candidate를 만든 뒤 mask를 예측합니다. Candidate stage가 객체를 놓치면 뒤의 mask head만으로 복구하기 어렵고, confidence threshold를 낮추면 false positive가 늘 수 있습니다. 두 논문은 이 SSIS trade-off를 candidate selection과 pseudo-label refinement 문제로 재구성합니다.
 
 ## BESTIE (CVPR 2022) — weak label 하에서 semantic → instance
 
@@ -23,6 +23,7 @@
 <dt>Instance-Aware Guidance (IAG)</dt><dd>center/offset loss를 <b>레이블된 instance 영역에만</b> 적용해서, 레이블 없는/놓친 객체가 background로 끌려가지 않게 한다.</dd>
 <dt>Self-refinement</dt><dd>네트워크 자신의 출력을 <b>online</b> (mini-batch 단위)으로 grouping해서 refine된 레이블로 만들고, soft weight와 함께 되먹인다 — offline iteration 없이 FN→TP를 촉진.</dd>
 </dl>
+
 선택적으로 Mask R-CNN refinement 단계. **결과:** VOC mAP50 **51.0%** (MRCNN refine 포함); image-level에서 COCO AP50 ~28.0%; point cue로 바꾸면 더 오른다.
 
 ## PointWSSIS (CVPR 2023) — weakly-semi 세팅
@@ -32,11 +33,12 @@
 **방법 (teacher → filter → refine → student).**
 <dl class="kv">
 <dt>1. Teacher</dt><dd>소수의 full label로 SOLOv2 teacher를 학습.</dd>
-<dt>2. Point-guided proposal filtering</dt><dd>point를 써서 <b>true-positive</b> proposal만 남긴다 — point가 <i>어디</i>인지 알려주므로 FN/FP 딜레마가 사라진다.</dd>
+<dt>2. Point-guided proposal filtering</dt><dd>point 위치와 일치하는 proposal을 골라 false-positive/false-negative trade-off를 줄입니다. Point도 annotation noise와 proposal miss를 완전히 없애지는 않으므로 논문 protocol 안에서 설명합니다.</dd>
 <dt>3. Adaptive Pyramid-Level Selection (APS)</dt><dd>point는 크기 정보가 없으므로, 여러 level에 걸쳐 <b>confidence argmax</b>로 FPN level을 고른다; GT-size oracle과의 격차는 작다.</dd>
 <dt>4. MaskRefineNet</dt><dd>입력 = concat(image crop, rough teacher mask, point Gaussian heatmap) → refined mask. 세 입력 모두 필요하다 (ablation); rough mask가 없으면 수렴하지 않는다. full label이 극소량 (1–5%)일 때 핵심 모듈.</dd>
 <dt>5. Student</dt><dd>full + 고품질 pseudo-label로 재학습.</dd>
 </dl>
+
 **결과:** COCO **50%** full → **38.8 AP** ≈ fully-supervised 39.7; COCO **5%** full → **33.7** vs SSIS baseline 24.9. BDD100K에서 full 7k를 고정하고 point를 20k→67k로 늘리면 AP 22.1→27.9. budget–AP Pareto에서 box-only weak supervision과 SSIS를 능가한다.
 
 ```mermaid
@@ -84,7 +86,7 @@ flowchart TB
 
 **Short:** point는 *위치*를 더해주고, 이것이 true-positive proposal을 선택하게 해준다; image-level은 잘못 분류된 것을 거부하게만 해준다.
 
-**Deep:** point 하나의 annotation 비용은 image-level보다 겨우 몇 초 더 든다 (문헌 추정치는 둘 다 box/mask보다 훨씬 낮다). 하지만 그 위치 신호가 FN/FP proposal 딜레마를 깨끗한 선택으로 바꾼다: point가 들어간 proposal을 남기면 된다. 이것이 비용 격차는 미미한데도 AP 격차 (예: COCO 5%: 33.7 vs 24.9)가 큰 이유다.
+**Deep:** 논문이 채택한 annotation-cost 가정에서는 point가 box/mask보다 저렴하면서 위치 정보를 더합니다. 그 위치로 proposal을 filter할 수 있어 image-level label보다 ambiguity가 줄어듭니다. 실제 비용은 annotation UI·품질 기준·domain에 따라 달라지므로 절대 초 단위 대신 가정과 COCO 5% 결과(33.7 vs 비교 baseline 24.9)를 함께 말합니다.
 </div></details>
 
 <details class="qa"><summary>왜 MaskRefineNet은 세 입력이 모두 필요한가?</summary>
@@ -126,7 +128,7 @@ flowchart TB
 <details class="qa"><summary>둘 중 어느 쪽을 발표하겠고, 왜?</summary>
 <div class="qa-body">
 
-**제품/데이터 효율** 청중에게는 PointWSSIS (5% 마스크로 near-full AP). **weak-supervision/이론** 청중에게는 BESTIE (drift, cue 추출). 무엇보다도: **그 흐름 자체**를 발표하기 — 둘 다 병목을 재정의하고 (proposal vs cue) pseudo-label noise를 통제해서 이긴다는 점이 재사용 가능한 아이디어다.
+**제품/데이터 효율** 청중에게는 PointWSSIS의 5% setting baseline 개선과 50% setting의 fully supervised reference 근접 결과를 구분해 말하세요. **Weak supervision** 청중에게는 BESTIE의 drift와 cue extraction을 강조합니다. 공통점은 candidate/cue 병목을 재정의하고 pseudo-label noise를 통제한 것입니다.
 </div></details>
 
 ## 솔직한 한계
@@ -135,13 +137,13 @@ flowchart TB
 - **PointWSSIS:** 여전히 *일부* point가 필요하다 — 순수 unlabeled web-scale 확장은 future work.
 - 둘 다 query-based universal segmenter보다 앞선 시기다; 전이는 논증되었을 뿐 benchmark로 검증되진 않았다.
 
-## 어떤 JD와 연결되나
+## 어떤 JD signal과 연결되는가
 
-| Company | Connection |
+| JD signal | 연결할 근거 |
 | --- | --- |
-| Apple / Meta | weak/cheap 신호로 하는 대규모 데이터 curation |
-| Adobe | 제한된 annotation 하의 mask 품질 |
-| NVIDIA | 로보틱스/AV 데이터를 위한 효율적 labeling 파이프라인 |
+| Low-label data curation | image/point/full-label budget과 AP Pareto |
+| Weak/semi-supervised segmentation | proposal FN/FP, semantic drift, pseudo-label refinement |
+| Robotics/AV labeling pipeline | point annotation 가정과 domain-transfer 한계를 함께 설명 |
 
 ## Cheat-sheet
 
@@ -151,8 +153,8 @@ flowchart TB
 | PointWSSIS | CVPR 2023, first author; COCO 5% **33.7** vs 24.9; 50% **38.8** ≈ full 39.7 |
 | PointWSSIS modules | point filter → **APS** (confidence로 FPN level) → **MaskRefineNet** (img + rough mask + point heatmap) |
 | Prequel | **DRS** (AAAI 2021): discriminative 영역을 억제해서 CAM을 퍼뜨림 |
-| One idea | **proposal/cue 병목**을 재정의; **pseudo-label noise**를 통제해서 승리 |
+| One idea | **proposal/cue 병목**을 재정의하고 **pseudo-label noise**를 통제 |
 
 ## Cross-links
 - Topical: [Weak & Semi-Supervised](#/cv/weak-semi-supervised) · [Segmentation](#/cv/segmentation) · [Object Detection](#/cv/detection)
-- Deep-dives: [ECLIPSE](#/resume/eclipse) · [ZIM](#/resume/zim) · back to the [CV → Interview Map](#/resume/overview)
+- Deep-dives: [ECLIPSE](#/resume/eclipse) · [ZIM](#/resume/zim) · [Phoenix (ECCV'26 mask refinement)](#/resume/phoenix-mask-refinement) — MaskRefineNet 계보의 일반화 · back to the [CV → Interview Map](#/resume/overview)

@@ -3,11 +3,11 @@
 <div class="tag-row"><span class="tag">rejection reasons</span><span class="tag">per-round pitfalls</span><span class="tag">RS/AS-specific</span><span class="tag">how to avoid</span></div>
 
 > [!TIP] 자료만이 아니라 실패 모드를 배우세요
-> 대부분의 탈락은 "충분히 알지 못해서"가 아니라 **예측 가능하고 피할 수 있는 실수** 때문입니다: 시간 압박 속 처음부터 구현 못 함, 자기 논문 방어 못 함, 기여를 가림, "모르겠습니다" 대신 허세. 이 챕터는 책 전체의 음화(negative image)입니다 — 이것들을 알면 no-hire의 대다수를 피합니다.
+> 탈락 사유는 공개되지 않는 경우가 많아 비율을 단정할 수 없습니다. 다만 mock과 회고로 줄일 수 있는 반복적 위험은 있습니다: 시간 압박 속 구현 실패, 자기 연구 방어 부족, 기여 경계의 모호함, 모르는 것을 추측으로 덮는 습관. 이 챕터는 그런 **관찰 가능한 실패 모드**를 진단하는 체크리스트입니다.
 
-## RS/AS 후보의 최상위 탈락 사유
+## RS/AS 후보에게 반복되는 위험
 
-강한 연구자가 왜 여전히 탈락하는지에 대한 실무자 기고를 종합한 것입니다. 각각은 패널이 기록하는 *signal*입니다 — 당신의 것을 해결책에 매핑하세요.
+아래 항목이 실제 회사의 공식 순위나 rubric이라는 뜻은 아닙니다. 이번 role의 prep guide와 recruiter 설명을 우선하고, 자신의 mock에서 관찰된 항목을 해결책에 매핑하세요.
 
 ```mermaid
 flowchart TB
@@ -22,17 +22,17 @@ flowchart TB
 
 | # | 탈락 사유 | 강한 사람에게도 일어나는 이유 | 해결책 |
 | --- | --- | --- | --- |
-| 1 | **처음부터 구현 못 함** | "매일 ML 사용" ≠ "attention / backward pass / SGD loop를 맨몸으로 코딩". | [ML-coding from scratch](#/ml-coding/intro)를 드릴하세요: attention, NMS/IoU, k-means, training loop을 깔끔하게, <30분. |
-| 2 | **Breadth gap** | RS fundamentals 라운드는 "거의 아무거나 묻습니다", 구멍 하나(RL, diffusion, MoE, RoPE)가 가라앉힙니다. | [foundations](#/foundations/optimization) 맵을 커버하세요, 모든 곳에 깊이는 필요 없지만 0점은 없어야 합니다. |
-| 3 | **자기 작업 방어 못 함** | *자기 논문*의 baseline, ablation, 한계를 더듬는 건 research 직군에서 실격 사유. | 모든 논문을 pre-mortem: "왜 baseline X가 아닌가?", 실패 사례, 무엇을 다시 할지. [job talk](#/research/job-talk) 참고. |
+| 1 | **처음부터 구현 못 함** | "매일 ML 사용"과 제한된 환경에서 핵심 연산을 구현하는 능력은 다릅니다. | [ML-coding from scratch](#/ml-coding/intro)를 시간 제한과 실제 도구 정책에 맞춰 연습. |
+| 2 | **Breadth gap** | 역할의 핵심 기초에서 설명이 끊기면 다른 강점을 보여줄 시간이 줄어듭니다. | JD와 prep guide 기준으로 [foundations](#/foundations/optimization) 맵의 우선순위를 정함. |
+| 3 | **자기 작업 방어 못 함** | 대표 작업의 baseline, ablation, 한계를 설명하지 못하면 ownership 판단이 어려워집니다. | 모든 대표 논문을 pre-mortem: "왜 baseline X가 아닌가?", 실패 사례, 무엇을 다시 할지. [job talk](#/research/job-talk) 참고. |
 | 4 | **기여를 가림** | "we"를 남용해 패널이 *당신이* 한 것을 분리 못 함. | 깔끔한 [I-vs-we 분리](#/behavioral/star): 목표에는 "we", 모든 결정에는 "I". |
 | 5 | **coding 위생 / 디버깅 못 함** | 특히 AS/RE 트랙 — 지저분, 테스트 없음, 라이브 디버깅 못 함. | 타입, 테스트, 작은 함수, 디버깅을 내레이션. |
 | 6 | **Behavioral 실책** | 구체적 결과 없음, 회고 없음, 협업 signal 부실, 남 탓. | 모든 story를 정량화, ownership + 학습으로 마무리. |
-| 7 | **Fit 불일치 (시니어)** | 1~2 자리 팀은 "강하지만 fit 안 맞음"을 통과시킴, eng 트랙으로 리다이렉트할 수도. | *현재* 문제가 맞는 팀을 타겟, [HM 스크린](#/process/recruiter-hm)에서 fit을 명시적으로. |
-| 8 | **협상에서의 integrity** | 부풀리거나 위조한 경쟁 오퍼 — 이 연봉대에서 즉각적 신뢰 상실. | 범위를 정직하게 공유, 절대 날조하지 말 것. [Negotiation](#/process/negotiation) 참고. |
+| 7 | **Fit 불일치** | 강한 일반 역량과 이번 팀이 필요한 scope는 다를 수 있습니다. | *현재* 문제가 맞는 팀을 타겟하고 [HM 스크린](#/process/recruiter-hm)에서 fit을 확인. |
+| 8 | **협상 integrity 훼손** | 부풀리거나 위조한 경쟁 offer는 신뢰·관계·문서상 위험을 만듭니다. | 실제 사실과 deadline만 공유. [Negotiation](#/process/negotiation) 참고. |
 
-> [!DANGER] research 직군의 치명적 두 가지
-> **자기 출판 작업을 방어 못 함**과 **기여를 가림**이 research 특유의 킬러입니다. 질문 아래 해부하지 못하는 훌륭한 논문, 또는 패널이 당신이 개인적으로 무엇을 주도했는지 알 수 없는 story, 둘 다 "공저자가 캐리했을지도"로 읽힙니다. CV의 그 무엇도 이 인상에서 회복시키지 못합니다.
+> [!WARNING] research 직군에서 특히 점검할 두 가지
+> **자기 출판 작업을 방어하는 능력**과 **기여 경계를 명확히 하는 능력**은 ownership을 판단할 핵심 근거입니다. 훌륭한 결과를 나열하는 데서 멈추지 말고, 질문 아래에서도 결정·대안·검증·한계를 설명할 수 있게 준비하세요.
 
 ## 라운드별 실수
 
@@ -80,7 +80,7 @@ flowchart TB
 
 - **뻔한 "why us."** 뿌리고 기도하는 signal. 조직마다 정직한 "저는 ___를 존경했습니다" 하나면 해결.
 - **연봉만 또는 남 탓하는 "why leave."** push가 아니라 pull(70%)로 프레이밍. → [HM 스크린](#/process/recruiter-hm).
-- **미공개 product 추측하기.** 특히 Apple(기밀 문화)에서 치명적.
+- **미공개 product·roadmap 추측하기.** 공개 JD와 공식 자료의 경계를 넘지 마세요.
 
 ## 전방위 behavioral & communication red flag
 
@@ -89,13 +89,13 @@ flowchart TB
 <dl class="kv">
 <dt>힌트에 대한 방어성</dt><dd>넛지에 맞서는 건 "같이 일하기 어려움"으로 읽힙니다. 힌트를 우아하게 받으세요 — 당신을 *돕는* 것입니다.</dd>
 <dt>허세</dt><dd>확신에 찬 오답은 인정보다 신뢰를 더 무너뜨립니다. dig-in이 어차피 폭로합니다.</dd>
-<dt>에고 / 무시</dt><dd>이전 팀원, baseline, "뻔한" 질문을 깎아내리기. Low-ego 협업은 명시적으로 중시됩니다 (Meta, Mistral, NVIDIA).</dd>
+<dt>에고 / 무시</dt><dd>이전 팀원, baseline, "뻔한" 질문을 깎아내리기. 협업 방식과 판단의 신뢰를 약화합니다.</dd>
 <dt>안 듣기</dt><dd>물은 질문이 아니라 준비한 질문에 답하기, 면접관의 방향 조종을 놓치기.</dd>
 <dt>자기 논평</dt><dd>면접관/recruiter에게 "그 라운드 망친 것 같아요"는 부정적 해석을 유도하고, 당신은 자신에 대해 노이즈 많은 심판입니다.</dd>
 </dl>
 
-> [!WARNING] intellectual-honesty 시험은 항상 돌아가고 있습니다
-> NVIDIA가 명시적으로 이름 붙이지만 모든 패널이 가중합니다: 아는 것의 한계, 자기 논문의 한계, 선택한 접근의 한계를 인정하는 건 *긍정* signal입니다. 과대 주장은 research 면접을 잃는 가장 빠른 길입니다.
+> [!WARNING] intellectual honesty는 라운드를 가리지 않는 기본 원칙입니다
+> 정확한 rubric은 회사마다 다르지만, 아는 것·자기 연구·선택한 접근의 경계를 명확히 하면 검증 가능한 추론을 보여줄 수 있습니다. 모르는 부분은 확인 경로와 함께 인정하세요.
 
 ## PhD → 산업 번역 함정
 
@@ -143,7 +143,7 @@ flowchart TB
 
 | 실수 | 한 줄 해결책 |
 | --- | --- |
-| 처음부터 코딩 못 함 | attention / NMS / training loop을 맨몸으로 드릴, <30분 |
+| 처음부터 코딩 못 함 | attention / NMS / training loop을 제한된 환경과 시간 안에서 드릴 |
 | Breadth gap | foundations 맵 전반에 0점 없기 |
 | 자기 논문 방어 못 함 | baseline, ablation, 실패 사례 pre-mortem |
 | 기여를 가림 | 목표에는 "we", 모든 결정에는 "I" |

@@ -7,19 +7,19 @@
 
 ### A
 
-**A/B test** — Online experiment comparing a treatment against control on live traffic to measure causal effect on a business metric; the gold standard for deployment decisions.
+**A/B test** — Online experiment comparing randomly assigned treatment and control groups on live traffic to estimate a causal effect on a metric. It provides strong evidence for a deployment decision when the experimental unit, interference assumptions, guardrails, and statistical tests are sound.
 
 **Ablation** — Removing or swapping one component to isolate its contribution to performance; the core evidence unit in a research deep-dive.
 
 **Activation function** — Element-wise nonlinearity (ReLU, GELU, SwiGLU) that lets a network model non-linear functions.
 
-**AdamW** — Adam optimizer with *decoupled* weight decay; the default for training transformers.
+**AdamW** — Adam variant with *decoupled* weight decay, separate from a gradient-based L2 penalty; a common choice for training transformers.
 
-**AIMv2** — Autoregressive-pretrained vision encoder; an alternative to CLIP/SigLIP giving strong dense/localization features.
+**AIMv2** — Family of vision encoders pretrained with an autoregressive objective; evaluated in its paper as an alternative for dense and localization features on the reported tasks.
 
 **Alpha matte** — Per-pixel opacity map ($\alpha \in [0,1]$) separating foreground from background; the output of image matting (vs. a hard binary mask).
 
-**AnyRes / dynamic resolution** — Processing images at their native aspect ratio by tiling, producing a variable number of visual tokens; critical for OCR, documents, and video.
+**AnyRes / dynamic resolution** — A design that divides an image into tiles near its native aspect ratio and processes a variable number of visual tokens. Useful for balancing detail retention against token cost in OCR, documents, and long video.
 
 **ANN (approximate nearest neighbor)** — Sub-linear vector search (HNSW, IVF, ScaNN) trading exactness for speed; the retrieval backbone of RAG and embedding search.
 
@@ -41,7 +41,7 @@
 
 **Beam search** — Decoding that keeps the top-$k$ partial sequences at each step; higher likelihood than greedy, but can be bland.
 
-**BERT** — Bidirectional encoder pretrained with masked language modeling; the canonical encoder-only model for understanding tasks.
+**BERT** — Bidirectional encoder pretrained with masked language modeling; a representative reference point for the encoder-only language-model family.
 
 **Bias–variance tradeoff** — Decomposition of expected error into underfitting (bias) vs. sensitivity to data (variance); the lens for diagnosing over/underfitting.
 
@@ -55,7 +55,7 @@
 
 **Catastrophic forgetting** — A network losing previously learned tasks when trained on new ones; the central problem of continual learning (see ECLIPSE).
 
-**Chain-of-thought (CoT)** — Prompting or training a model to emit intermediate reasoning steps before the answer; the substrate of reasoning models.
+**Chain-of-thought (CoT)** — A technique—or the resulting rationale—in which prompting, training, or sampling makes a model generate intermediate reasoning tokens before a final answer. It does not imply that a model's internal reasoning is exposed verbatim, nor does it guarantee that a displayed explanation is faithful.
 
 **CLIP** — Contrastive Language–Image Pretraining: dual encoders aligned so matching image/text pairs have high cosine similarity; enables zero-shot classification and open-vocabulary tasks.
 
@@ -71,7 +71,7 @@
 
 **Cross-attention** — Attention where queries come from one stream and keys/values from another; the fusion mechanism between modalities in VLMs and encoder–decoder models.
 
-**Cross-entropy** — Loss measuring divergence between predicted and true distributions; the default classification objective.
+**Cross-entropy** — Expected negative log-probability of a predicted distribution $q$ under a target distribution $p$: $H(p,q)=H(p)+D_{KL}(p\|q)$. A proper loss widely used for classification.
 
 **Curriculum learning** — Ordering training from easy to hard examples to improve convergence or final quality.
 
@@ -83,11 +83,11 @@
 
 **DETR** — DEtection TRansformer: end-to-end detection as set prediction with bipartite (Hungarian) matching, removing anchors and NMS.
 
-**Dice loss** — Segmentation loss based on the Dice/F1 overlap coefficient; robust to foreground–background class imbalance.
+**Dice loss** — Segmentation loss based on the Dice/F1 overlap coefficient. Normalization by foreground size can reduce sensitivity to class imbalance, but small objects, empty masks, and calibration still require separate handling.
 
-**Diffusion model** — Generative model that learns to reverse a gradual noising process; SOTA for image/video/audio synthesis.
+**Diffusion model** — Family of generative models that learn a score or denoising field for reversing a gradual noising process. Widely used for image, video, and audio generation, with a design space that increasingly overlaps flow-matching methods.
 
-**DINO / DINOv2 / DINOv3** — Self-supervised ViT training via self-distillation; DINOv3 is a 7B backbone whose *frozen* features beat specialized dense-task models (Gram anchoring stabilizes long training).
+**DINO / DINOv2 / DINOv3** — Family of self-supervised vision representations that use self-distillation. DINOv3 reports backbones up to 7B parameters and Gram anchoring; claims about frozen-feature advantages apply to the tasks and protocols evaluated in the paper.
 
 **Distillation (knowledge)** — Training a small student to mimic a larger teacher's outputs/logits/features; compresses models for deployment.
 
@@ -107,7 +107,7 @@
 
 **EMA (exponential moving average)** — Slowly-updated running average of weights (teacher in self-distillation) or statistics; smooths and stabilizes.
 
-**Encoder / decoder** — Encoder maps input to a representation (understanding); decoder generates output autoregressively (generation). Architectures: encoder-only (BERT), decoder-only (GPT), encoder–decoder (T5).
+**Encoder / decoder** — An encoder maps input to a context-aware representation; a decoder produces a target representation or sequence. Some decoders, such as GPT, are autoregressive, but not every decoder is. Architectures include encoder-only (BERT), decoder-only (GPT), and encoder–decoder (T5).
 
 **Expert parallelism** — Sharding MoE experts across devices so each holds a subset; the parallelism dimension specific to MoE.
 
@@ -135,11 +135,11 @@
 
 **GAN** — Generative Adversarial Network: a generator and discriminator trained in a minimax game; prone to mode collapse and training instability.
 
-**GELU** — Gaussian Error Linear Unit; a smooth activation standard in transformers.
+**GELU** — Gaussian Error Linear Unit; a smooth activation used in many transformers such as BERT and ViT. Gated activations such as SwiGLU are also common in recent LLM feed-forward networks.
 
 **GEMM** — General matrix multiply; the dominant compute kernel in deep nets.
 
-**GQA (Grouped-Query Attention)** — Attention where several query heads share one key/value head; shrinks the KV cache with little quality loss (between MHA and MQA).
+**GQA (Grouped-Query Attention)** — Attention that maps query heads to a smaller number of key/value-head groups. It trades between MHA's expressivity and MQA's smaller KV cache; quality effects depend on the model and training recipe.
 
 **Gradient accumulation** — Summing gradients over several micro-batches before an update, to simulate a larger batch under memory limits.
 
@@ -149,9 +149,9 @@
 
 **Gram anchoring** — Regularizing the Gram matrix of dense features to prevent their degradation over long SSL training (DINOv3).
 
-**GRPO (Group Relative Policy Optimization)** — Critic-free RL that estimates advantages from a *group* of sampled completions instead of a value network; the de-facto RLVR algorithm.
+**GRPO (Group Relative Policy Optimization)** — Critic-free policy-optimization family that estimates advantages from a *group* of sampled completions instead of a separate value network; one of several choices for RLVR.
 
-**GSPO (Group Sequence Policy Optimization)** — GRPO variant moving the importance ratio to the *sequence* level for stable RL on MoE models.
+**GSPO (Group Sequence Policy Optimization)** — Group-relative policy-optimization variant that moves the importance ratio to the *sequence* level. Its proposal reports better MoE-RL stability than token-level alternatives.
 
 ### H
 
@@ -189,13 +189,13 @@
 
 ### L
 
-**Label smoothing** — Replacing hard one-hot targets with slightly softened ones to improve calibration and generalization.
+**Label smoothing** — Regularization that replaces hard one-hot targets with softened targets. It can help generalization, but does not always improve calibration.
 
-**LayerNorm / RMSNorm** — Normalizing activations across the feature dimension per token; RMSNorm drops the mean-centering for efficiency and is standard in modern LLMs.
+**LayerNorm / RMSNorm** — Usually normalize activation scale across the feature dimension for each sample or token. RMSNorm omits mean-centering and is common in modern LLMs.
 
 **Learning rate schedule** — How the LR evolves (warmup, cosine decay); a top determinant of training quality. See the [lr-schedule widget](#/foundations/optimization).
 
-**LoRA / QLoRA** — Low-Rank Adaptation: freeze base weights, train small low-rank update matrices; QLoRA adds 4-bit quantization of the base — the dominant parameter-efficient fine-tuning method.
+**LoRA / QLoRA** — Low-Rank Adaptation: freeze base weights and train small low-rank updates. QLoRA trains adapters over a quantized base model; both are widely used parameter-efficient fine-tuning methods.
 
 **Logits** — Pre-softmax raw scores output by a classifier or LM head.
 
@@ -241,7 +241,7 @@
 
 **Online vs offline evaluation** — Offline = held-out metrics before deployment; online = A/B / live KPIs after. Strong systems answers cover both.
 
-**ORM (Outcome Reward Model)** — Reward model scoring only the *final* answer; contrast with PRM (per-step).
+**ORM (Outcome Reward Model)** — Reward model that evaluates a completed response against the final outcome; contrast with a PRM, which evaluates intermediate steps.
 
 **Overfitting** — Model fits training noise, generalizing poorly; diagnosed by a train–val gap.
 
@@ -261,7 +261,7 @@
 
 **Positional encoding** — Injecting token order into the permutation-invariant transformer (sinusoidal, learned, or RoPE).
 
-**PPO (Proximal Policy Optimization)** — Clipped-objective actor–critic RL algorithm; the classic RLHF optimizer (needs a value network — the cost GRPO removes).
+**PPO (Proximal Policy Optimization)** — Policy-gradient family using a clipped surrogate objective to limit overly large policy updates. Classic RLHF typically uses it with a value critic, whereas GRPO-family methods avoid a separate learned critic.
 
 **PQ (Panoptic Quality)** — Panoptic metric = segmentation quality (mean IoU of matched segments) × recognition quality (F1 of segment matching).
 
@@ -295,9 +295,9 @@
 
 **RLAIF** — RL from AI Feedback: preferences generated by an AI critic instead of humans, to scale alignment data.
 
-**RLHF** — RL from Human Feedback: fit a reward model to human preferences, then optimize the policy against it (PPO); the classic alignment pipeline.
+**RLHF** — RL from Human Feedback: broad family of methods that derive reward or preference signals from human feedback and use them to improve a policy. The classic pipeline uses a reward model plus PPO, while deployed post-training can also use other online-RL and preference-optimization methods.
 
-**RLVR (RL with Verifiable Rewards)** — RL using a *deterministic verifier* (correct→1 else 0) instead of a learned reward model; robust to reward hacking but limited to checkable domains (math, code). Coined by Tülu 3.
+**RLVR (RL with Verifiable Rewards)** — RL that optimizes a policy using signals whose outcomes can be checked by tests, symbolic rules, or graders. The reward need not be binary or perfectly deterministic, and a verifier or harness can itself be gamed. Tülu 3 helped popularize the term.
 
 **RMSNorm** — See **LayerNorm / RMSNorm**.
 
@@ -323,9 +323,9 @@
 
 **Softmax** — Function mapping logits to a probability distribution; the normalizer in classification and attention.
 
-**Speculative decoding** — Drafting several tokens with a small model (or extra heads: Medusa/EAGLE/MTP) and verifying them in one large-model pass; now a default serving layer.
+**Speculative decoding** — A draft model or additional heads propose multiple tokens for parallel verification by a target model. It is a common serving option that can reduce latency when acceptance rates and workloads fit; preserving the target distribution requires correct rejection or residual sampling.
 
-**SwiGLU** — Gated activation (Swish × linear gate) standard in modern transformer FFNs.
+**SwiGLU** — Gated feed-forward activation that multiplies a Swish branch by a linear gate; a common choice in modern transformers.
 
 ### T
 
@@ -347,7 +347,7 @@
 
 ### U
 
-**U-Net** — Encoder–decoder CNN with skip connections; standard for segmentation and as the diffusion denoiser backbone.
+**U-Net** — Encoder–decoder CNN with skip connections; widely used for segmentation and early or latent-diffusion denoisers, while DiT-family backbones are also common in recent generative models.
 
 **Underfitting** — Model too simple to capture the signal (high bias); train and val error both high.
 
@@ -359,9 +359,9 @@
 
 **Vanishing / exploding gradients** — Gradients shrinking or growing across many layers/timesteps, stalling or destabilizing training; addressed by residuals, normalization, gating, clipping.
 
-**ViT (Vision Transformer)** — Applying a transformer to image patches as tokens; the dominant modern vision backbone.
+**ViT (Vision Transformer)** — Applies a transformer to image patches as tokens; a major backbone family in modern vision.
 
-**VLM (Vision-Language Model)** — Model jointly processing images (+video) and text (e.g. LLaVA, Qwen-VL, InternVL); frontier models pretrain the modalities jointly rather than gluing a frozen LLM to a vision encoder.
+**VLM (Vision-Language Model)** — Model that processes images or video together with text (e.g. LLaVA, Qwen-VL, InternVL). How the vision encoder, projector, and language model are connected—and how much is jointly trained—varies by model.
 
 **VLP (Vision-Language Pretraining)** — Large-scale pretraining aligning visual and textual representations (contrastive, captioning, masked objectives) before task fine-tuning.
 
@@ -371,7 +371,7 @@
 
 **Warmup** — Ramping the learning rate from ~0 over the first steps to stabilize early training.
 
-**Weight decay** — L2-style penalty shrinking weights each step; regularizes and, decoupled (AdamW), is standard for transformers.
+**Weight decay** — Regularization that shrinks parameter magnitudes on each update. With adaptive optimizers, adding an L2 penalty to the gradient and using decoupled AdamW do not produce the same trajectory.
 
 **World model** — A learned model of environment dynamics used to predict/plan; a proposed path to sample-efficient agents (cf. JEPA).
 
@@ -389,7 +389,7 @@
 
 **Zero-shot** — Performing a task with no task-specific training examples, relying on pretrained knowledge (e.g. CLIP zero-shot classification, ZIM zero-shot matting).
 
-**ZeRO** — Optimizer-state/gradient/parameter sharding (DeepSpeed) reducing per-GPU memory; ZeRO-3 is the basis of FSDP.
+**ZeRO** — DeepSpeed-family strategy that progressively shards optimizer state, gradients, and parameters to reduce per-device memory. ZeRO-3 and FSDP share the core idea of full sharding, but their implementations evolved independently.
 
 ---
 

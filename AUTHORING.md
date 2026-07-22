@@ -2,10 +2,11 @@
 
 This is the style contract for every chapter. The book is a client-side Markdown SPA:
 content lives in `content/**.md`, the table of contents in `assets/book.js`. To add a
-chapter: write the `.md`, then add one line to the right part in `assets/book.js`.
+chapter: write and review the `.ko.md`, synchronize its `.md` sibling, then add one line
+to the right part in `assets/book.js`.
 
 ## Voice & language
-- **English-primary.** Technical terms, math, and code as usual.
+- **Korean-first editorial workflow, bilingual output.** Make substantive content changes in the Korean chapter first, review them, then synchronize the English sibling. Technical terms, math, and code stay in their conventional English notation.
 - Write for a **PhD-level research/applied-scientist candidate**. Assume ML maturity; the value is *interview-shaping* knowledge: crisp recall, structure, trade-offs, failure modes.
 - Be **honest about certainty.** Tag claims when useful: *(verifiable)*, *(defensible opinion)*, *(speculative / direction)*. Never invent benchmark numbers, dates, or model names. When citing 2025–2026 models, prefer capabilities/architecture over exact scores; hedge vendor-reported figures.
 - Concise and high-density. No filler. Every sentence should earn its place in an interview.
@@ -36,9 +37,35 @@ chapter: write the `.md`, then add one line to the right part in `assets/book.js
   **Deep:** ...
   </div></details>
   ```
+- **Resume-grounded answer card** — for personalized rehearsal answers, add the `answer-card`
+  class and keep the question itself short enough to work as an accessible label:
+  ```html
+  <details class="qa answer-card"><summary>What did you personally own?</summary>
+  <div class="qa-body">
+
+  **Sample answer · verify personally:** ...
+  </div></details>
+  ```
+  Separate facts visible in the resume/public record from placeholders that require the
+  candidate's confirmation. Never invent ownership, internal metrics, conflict, mentoring,
+  work authorization, or compensation details.
 - **Math**: inline `$…$` and display `$$…$$` (KaTeX). Also `\( … \)` / `\[ … \]`.
 - **Mermaid**: ```` ```mermaid ```` fenced blocks (flowchart/sequence/gantt/etc.).
 - **Code**: fenced with a language; auto-highlighted with a copy button.
+- **Conceptual pseudocode** — use short Python/PyTorch-shaped code when it makes tensor flow,
+  state transitions, train/inference boundaries, or gradient boundaries clearer than another
+  equation. State explicitly that it is conceptual rather than a production API. Keep a short
+  block inline; wrap a longer supporting block in:
+  ````html
+  <details class="concept-code"><summary>View conceptual code</summary>
+
+  ```python
+  # conceptual flow, intentionally incomplete
+  ```
+
+  </details>
+  ````
+  Pseudocode must still be syntactically valid Python. Do not duplicate the runnable code labs.
 - **Interactive widgets** (embed raw HTML): `<div class="widget" data-widget="NAME"></div>`.
   Available: `activation`, `gradient-descent`, `lr-schedule`, `metrics-threshold`, `attention`.
   Add new ones in `assets/widgets.js`.
@@ -56,25 +83,26 @@ chapter: write the `.md`, then add one line to the right part in `assets/book.js
 - Every conceptual chapter should have **at least one** diagram or widget.
 - Mermaid for flows/architectures/timelines; inline SVG for precise custom figures (loss curves, matrices, pipelines); widgets for anything the reader benefits from *manipulating*.
 
-## Translations (Korean)
+## Bilingual synchronization
 
-The book has a **한 / EN toggle** (default English). Each English chapter `content/<path>.md`
-may have a Korean sibling `content/<path>.ko.md`. In Korean mode the engine loads the `.ko.md`
-and **falls back to English** (with a small notice) when it's missing — so a partial translation
-never breaks the book.
+The book has a **한 / EN toggle**. Every manifest route must have both
+`content/<path>.ko.md` and `content/<path>.md`. The renderer retains a fallback so a draft never
+hard-fails, but a release is incomplete while either sibling is missing.
 
 To translate or update a chapter:
-- Copy the English file to `<name>.ko.md` and translate **prose only**. Keep **verbatim**: all
-  code, math (`$…$`/`$$…$$`), ```mermaid blocks, inline `<svg>`, widget divs, HTML tags/classes,
-  callout markers (`> [!TIP]`), `<details class="qa">` structure, link *targets* (`#/…`, URLs),
-  badges, and tags. Preserve blank-line layout exactly (the engine relies on it).
-- **Keep technical terms in English** (attention, transformer, RLVR, LoRA, mIoU, …) — Korean
-  particles attach naturally (`attention을`, `transformer는`). Translate only the visible link
-  *text*, not the target.
+- Finish the Korean source first; then translate its **visible prose** into the English sibling.
+  Preserve the semantic and structural contract: code and math behavior, Mermaid node IDs,
+  inline-SVG geometry, widget JSON, HTML tags/classes, callout types, `<details>` classes, link
+  *targets* (`#/…`, URLs), badges, and tags. Visible Mermaid/SVG labels and code comments should
+  be translated when doing so does not alter behavior.
+- **Keep technical terms in English** in Korean prose (attention, transformer, RLVR, LoRA,
+  mIoU, …), attaching Korean particles naturally. Translate visible link text, never its target.
 - Sidebar/UI labels: add `titleKo` on the part/chapter in `assets/book.js` for a Korean nav label;
   omit it to keep the English (technical) title. UI chrome strings live in the `I18N` object in
   `assets/app.js`.
-- After writing a `.ko.md`, sanity-check it renders (math/Mermaid intact) before committing.
+- Before release, compare each pair's heading, fence, Mermaid, widget, `<details>`, figure, and
+  script counts; parse Python fences and widget JSON; scan English prose for accidental Hangul;
+  and render both languages in the browser.
 
 ## Don'ts
 - Don't dump prose walls. Prefer tables, lists, and figures.

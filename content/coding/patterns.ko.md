@@ -1,7 +1,7 @@
 # The Core Patterns
 
 > [!TIP] The thesis
-> 문제를 암기하는 게 아닙니다 — **~15개의 재사용 가능한 pattern**을 체화하고, 각각 5~10문제씩 반복 연습한 다음, 처음 보는 문제 뒤에 숨은 pattern을 첫 1분 안에 알아보는 겁니다. 이게 NeetCode/Grokking의 베팅이고, 실제로 유효합니다: 거의 모든 면접 문제는 변장한 알려진 pattern입니다. 이 챕터가 **hub**입니다 — 여기서 시작해서 링크된 각 챕터를 반복 연습하세요.
+> 문제를 암기하는 게 아닙니다 — **자주 재사용되는 pattern**을 체화하고, 각 pattern을 여러 문제에 적용한 다음, 처음 보는 문제의 구조를 빠르게 분류하는 연습입니다. 많은 코딩 면접 문제가 이 패턴들의 조합이나 변형이지만, 억지로 끼워 맞추기 전에 입력 제약·불변식·복잡도부터 확인하세요. 이 챕터가 **hub**입니다 — 여기서 시작해서 링크된 각 챕터를 반복 연습하세요.
 
 테스트되는 능력은 *recognition*입니다. 문제가 주어지면 표면적인 **cue**("input is sorted", "top-k", "shortest path in an unweighted grid")에서 그것을 푸는 **pattern**으로 빠르게 매핑하고 싶어집니다. 아래는 그 lookup table, 그다음 각 pattern 챕터로 가는 card grid, 그리고 권장 연습 순서입니다.
 
@@ -26,6 +26,7 @@
 | **Dynamic connectivity**, "are these merged?", count components | Union-Find (DSU) | [Union-Find](#/coding/union-find) |
 | Tree traversal, **BST** property, LCA, path sums | DFS/BFS on trees | [Trees & BSTs](#/coding/trees-bst) |
 | **All permutations / subsets / combinations** | Backtracking | [Trees & BSTs](#/coding/trees-bst) |
+| Reverse/merge/remove in a **linked list** | Pointer rewiring + dummy sentinel | [Two Pointers](#/coding/two-pointers-sliding-window) |
 | **Count ways / min-max cost / can-you-reach**, overlapping subproblems | Dynamic programming | [Dynamic Programming](#/coding/dynamic-programming) |
 | **Overlapping / merge intervals**, meeting rooms | Sort + sweep | [Greedy & Intervals](#/coding/greedy-intervals) |
 | **Locally optimal → globally optimal**, "min number of…" | Greedy | [Greedy & Intervals](#/coding/greedy-intervals) |
@@ -39,7 +40,7 @@
 
 <div class="card-grid">
 <a class="card" href="#/coding/arrays-strings"><div class="card-emoji">🔢</div><div class="card-title">Arrays & Strings</div><div class="card-desc">In-place 조작, prefix product, reversal 트릭. 워밍업이자 모든 것의 토대.</div></a>
-<a class="card" href="#/coding/two-pointers-sliding-window"><div class="card-emoji">↔️</div><div class="card-title">Two Pointers & Sliding Window</div><div class="card-desc">양 끝에서 수렴하거나, window를 확장/축소. O(N²) 스캔을 O(N)으로 바꿉니다.</div></a>
+<a class="card" href="#/coding/two-pointers-sliding-window"><div class="card-emoji">↔️</div><div class="card-title">Two Pointers, Window & Linked List</div><div class="card-desc">양 끝 수렴, window 확장/축소, fast/slow와 pointer rewiring. 불변식으로 O(N)에 풉니다.</div></a>
 <a class="card" href="#/coding/hashing"><div class="card-emoji">🗂️</div><div class="card-title">Hashing</div><div class="card-desc">O(1) 조회를 사서 nested loop를 없앱니다. complement, frequency, prefix-sum count.</div></a>
 <a class="card" href="#/coding/stack-queue"><div class="card-emoji">🥞</div><div class="card-title">Stacks & Queues</div><div class="card-desc">nesting과 nearest-greater를 위한 LIFO; span과 window maxima를 위한 monotonic stack/deque.</div></a>
 <a class="card" href="#/coding/binary-search"><div class="card-emoji">🎯</div><div class="card-title">Binary Search</div><div class="card-desc">sorted array를 반으로 가르거나 — 임의의 monotone predicate에서 답을 binary-search.</div></a>
@@ -78,9 +79,9 @@ flowchart LR
 
 | Phase | Patterns | Why this order |
 | --- | --- | --- |
-| 1 · Foundations | [Arrays & Strings](#/coding/arrays-strings) → [Two Pointers & Sliding Window](#/coding/two-pointers-sliding-window) → [Hashing](#/coding/hashing) | 가장 빈도 높은 진입 pattern; 반사 신경을 되살립니다. |
+| 1 · Foundations | [Arrays & Strings](#/coding/arrays-strings) → [Two Pointers, Sliding Window & Linked List](#/coding/two-pointers-sliding-window) → [Hashing](#/coding/hashing) | 가장 빈도 높은 진입 pattern; 배열 불변식과 pointer 조작을 먼저 굳힙니다. |
 | 2 · Linear structures | [Stacks & Queues](#/coding/stack-queue) → [Binary Search](#/coding/binary-search) → [Heaps](#/coding/heap-priority-queue) | 핵심 자료구조; monotonic stack과 "search the answer"는 어디에나 나옵니다. |
-| 3 · Non-linear | [Trees & BSTs](#/coding/trees-bst) → [Graphs (BFS/DFS)](#/coding/graphs-bfs-dfs) → [Union-Find](#/coding/union-find) | tree에서 재귀를 먼저, 그다음 graph로 일반화. |
+| 3 · Non-linear | [Trees, BSTs & Backtracking](#/coding/trees-bst) → [Graphs (BFS/DFS)](#/coding/graphs-bfs-dfs) → [Union-Find](#/coding/union-find) | search tree에서 재귀·되돌리기를 굳힌 뒤 graph로 일반화. |
 | 4 · Optimization | [Dynamic Programming](#/coding/dynamic-programming) → [Greedy & Intervals](#/coding/greedy-intervals) | 가장 어려움; building block으로서 앞의 구조가 필요합니다. |
 
 > [!TIP] 반복 연습을 시작하기 전에
@@ -101,6 +102,8 @@ flowchart LR
 | shortest path, unweighted | BFS | O(V+E) |
 | prerequisites / ordering | topological sort | O(V+E) |
 | dynamic connectivity | union-find | ~O(α(N)) |
+| reverse/merge linked list | pointer rewiring + dummy | O(N) |
+| subsets/permutations | backtracking | O(N2^N) / O(N·N!) |
 | count ways / optimal cost | dynamic programming | O(states×transition) |
 | merge/overlap intervals | sort + sweep | O(N log N) |
 

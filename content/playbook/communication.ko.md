@@ -3,7 +3,7 @@
 <div class="tag-row"><span class="tag">think aloud</span><span class="tag">headline-first</span><span class="tag">driving vs driven</span><span class="tag">"I don't know"</span><span class="tag">time management</span></div>
 
 > [!TIP] 메타 규칙
-> 거의 모든 라운드에서 **당신이 어떻게 소통하는지는 당신이 무엇을 아는지만큼 무겁게 채점됩니다.** Meta는 *완벽한* 해답이라도 그들이 원한 사고 과정을 보여주지 않으면 no-hire가 될 수 있다고 명시합니다. 당신이 할 일은 자신의 추론을 *읽을 수 있고 방향을 조종할 수 있게* 만드는 것입니다. 구조를 내레이션하고, 답부터 말하고, 끌려가는 대신 대화를 주도하세요.
+> 대부분의 라운드에서 정답뿐 아니라 문제를 구조화하고 협업하는 과정도 중요한 signal입니다. 정확한 rubric은 회사와 라운드마다 다르므로 recruiter의 prep guide를 우선하되, 자신의 추론을 *읽을 수 있고 방향을 조종할 수 있게* 만드세요. 구조를 내레이션하고, 답부터 말하고, 대화를 함께 이끌어갑니다.
 
 이 챕터는 라운드를 가리지 않는 전달 기술입니다. coding, ML depth, system design, [job talk](#/research/job-talk), [behavioral](#/behavioral/star)에 모두 적용됩니다.
 
@@ -45,7 +45,7 @@ flowchart LR
 | --- | --- | --- |
 | "BatchNorm이 왜 도움이 되나요?" | "음, 우선 loss surface를 보고, gradient를 보고…" | "**loss landscape를 매끄럽게 만들어서** 더 높은 learning rate를 쓸 수 있게 합니다. 세 가지 메커니즘: …" |
 | "이걸 어떻게 설계하시겠어요?" | "그러니까 data가 있고, 그다음 모델이 있고…" | "**two-stage retrieve-then-rank 시스템으로 프레이밍하겠습니다.** 가정부터 말하고, data → model → serving 순으로 짚겠습니다." |
-| "갈등 경험을 말해보세요." | "그러니까 배경은…" | "**ZIM에서 serving 엔지니어와 품질 vs. latency로 의견이 갈렸고, 공유 eval set으로 해결했습니다.** 어떻게 했냐면…" |
+| "갈등 경험을 말해보세요." | "그러니까 배경은…" | "**프로젝트에서 모델 품질과 latency 우선순위가 충돌했고, 공유 eval 기준으로 결정했습니다.** 어떻게 했냐면…" |
 
 > [!TIP] "signpost" 요령
 > 내용 전에 형태를 예고하세요. *"여기 세 가지 trade-off가 있는데, 순서대로 짚겠습니다."* 이제 면접관이 당신을 따라오고, 정확한 지점에서 끼어들 수 있으며, 당신은 생각하는 와중에도 정돈된 사람으로 들립니다.
@@ -64,7 +64,7 @@ flowchart LR
 
 ## "I don't know" 다루기
 
-이건 실패가 아니라 *스킬*입니다. NVIDIA와 MSR은 우아한 "모르겠습니다, 하지만 이렇게 알아내겠습니다"에 명시적으로 보상합니다. 후보를 가라앉히는 건 허세입니다. 확신에 찬 틀린 답은 신뢰를 즉시 무너뜨립니다.
+이건 실패가 아니라 *스킬*입니다. 정확한 평가 방식은 조직마다 다르지만, 모르는 것을 숨기기보다 경계를 밝히고 확인 경로를 제시하는 편이 추론과 신뢰를 보여주기 쉽습니다. 확신에 찬 추측은 뒤의 follow-up에서 신뢰를 무너뜨릴 수 있습니다.
 
 ```mermaid
 flowchart TB
@@ -111,7 +111,7 @@ flowchart TB
 
 ## 비원어민 영어 화자를 위한 전달
 
-이 후보는 한국어 원어민이자 업무용 영어 구사자입니다. 기준은 **원어민 유창함이 아니라 들리는 구조**이고, 구조는 완전히 통제 가능합니다.
+비원어민 영어 화자의 목표는 원어민처럼 들리는 것이 아니라 **쉽게 따라갈 수 있는 구조와 정확한 의미 전달**입니다. 발음보다 문장 구조, 속도, signpost를 우선하세요.
 
 - 한 문장에 한 아이디어, relative-clause 사슬을 피할 것.
 - 공격적으로 signpost: *First / Second / The trade-off is / To summarize.*

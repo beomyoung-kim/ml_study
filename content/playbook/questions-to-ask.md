@@ -38,12 +38,12 @@ The HM owns the headcount and your trajectory. Ask about direction and what succ
 <dt>Direction</dt><dd>"Is the team's 12-month success defined by papers, product, or both?" · "Where do you want this team to be in two years, and what's the biggest gap to get there?"</dd>
 <dt>The role</dt><dd>"What would you want a new scientist to own in the first 6 months?" · "Is this a specific open problem, or would I help shape the agenda?"</dd>
 <dt>Growth</dt><dd>"How do ICs grow here without becoming managers?" · "What separates a strong from an exceptional scientist on this team?"</dd>
-<dt>Publication policy</dt><dd>"What does the publish / open-source policy look like *in practice*?" — critical for an RS with a paper record; especially sharp for Apple (secrecy) and ByteDance.</dd>
+<dt>Publication policy</dt><dd>"What does the publish / open-source policy look like *in practice*?" — if papers and public artifacts matter to your career goals, verify the target team's approval process and recent examples.</dd>
 </dl>
 
 ## Senior IC / bar-raiser — standards and the long view
 
-The "As Appropriate" (Microsoft), bar-raiser (Amazon-style), or a staff/principal from outside the team assesses long-term potential and org standards. Ask about the bar and the science.
+If the invitation includes a separate senior interviewer, calibration interviewer, or staff/principal conversation outside the team, ask the recruiter what perspective that person brings. If the round covers organization-wide standards and long-term perspective, ask about the bar and the science.
 
 | Ask | What it reveals |
 | --- | --- |
@@ -56,14 +56,14 @@ These questions also demonstrate *your* seniority — you're thinking about the 
 
 ## Cross-functional partners — how research actually ships
 
-For PM, serving/eng, or applied partners: probe the seam between research and product — the exact competency your CV is strong on (ZIM → CLOVA-X, foreground-API, on-device serving).
+For PM, serving/engineering, or applied partners, probe the seam between research and product. If research-to-product experience is one of your strengths, choose a concrete, verified example from the [resume deep-dive map](#/resume/overview) and connect it.
 
 - "How does a model go from a research result to something in front of users? Who owns each step?"
 - "What's the biggest friction between research and product today?"
 - "How are model quality and product KPIs reconciled when they conflict?" (mirrors your own [conflict story](#/behavioral/star))
 - "How much do scientists interact with customers / product data directly?"
 
-> [!NOTE] For customer-facing labs (Mistral)
+> [!NOTE] For customer-facing roles
 > Ask about the balance of customer-project work vs. internal foundation research: *"What's the ratio of client-facing time to internal model work for a scientist?"* It's a decision-relevant number and shows you understand their business model.
 
 ## Red flags to probe (and how to hear them)
@@ -80,7 +80,7 @@ flowchart LR
 | "Why is this role open?" | evasive; "the last person left" with no detail | churn / a burned-out seat |
 | "How long have you been on this team?" | everyone joined <6 months ago | high attrition or a just-reorged team |
 | "What's the team's runway / how stable is headcount?" | vague, defensive | reorg or funding risk (esp. startups, new labs) |
-| "How do you handle work-life balance during crunches?" | "we work hard here 😅" / laughs it off | normalized overwork (ByteDance "996" reputation) |
+| "How do you handle work-life balance during crunches?" | laughs it off without a concrete principle or recovery practice | possible normalized overwork; cross-check with another team member |
 | "How are priorities set — do they change often?" | "constantly, we're very agile" said wearily | thrash, no strategy, reactive leadership |
 | "What happened to the last big project?" | can't name a shipped/published outcome | research that doesn't land |
 
@@ -91,19 +91,9 @@ flowchart LR
 
 Process, timeline, level range, comp band, visa, team-matching mechanics, and which coding platform is used all belong to the **recruiter**, not your technical interviewers — see [Recruiter & HM Screens](#/process/recruiter-hm) and [Remote Setup](#/playbook/remote-setup). Spending an interviewer's Q&A on logistics wastes your best signal-sending opportunity.
 
-## Company-specific questions worth one slot
+## Company- and team-specific questions worth one slot
 
-Each targets a real, public characteristic of the org — asking it proves you did the reading (see [Company Playbooks](#/process/companies)).
-
-| Company | Ask | Why it lands |
-| --- | --- | --- |
-| **Meta / FAIR** | "How do you decide whether a project lives in FAIR vs. the product/GenAI orgs?" | shows you know the org split; clarifies publish-vs-ship expectations |
-| **Apple** | "Within the secrecy constraints, what *can* a scientist publish or open-source here?" | acknowledges the culture without prying into products |
-| **NVIDIA** | "How much do research projects lean on the latest hardware, and is GPU access a bottleneck?" | matches their systems/GPU identity |
-| **Adobe** | "How tight is the loop between a research result and a Firefly/Creative-Cloud feature?" | probes their research→product strength |
-| **ByteDance Seed** | "How are OKRs set for a research team, and how is a longer-horizon bet protected?" | surfaces the fast/OKR culture *and* whether deep research survives |
-| **Mistral** | "What's the split between customer-project work and internal foundation research for a scientist?" | decision-relevant given their business model |
-| **Microsoft / MSR** | "How does the 'As Appropriate' / cross-org collaboration actually shape a research agenda?" | shows you understand their structure |
+Use one question to target a characteristic you verified directly in the **target job description or current official material**. The template is: "I saw `{characteristic}` in your public material; how does `{decision process / time allocation / success criterion}` work on the actual team?" Do not assume a company-wide culture or process; record the research date and verification status in the [Company Playbooks](#/process/companies).
 
 ## Delivery tips
 
@@ -117,7 +107,7 @@ Each targets a real, public characteristic of the org — asking it proves you d
 <details class="qa"><summary>They asked "any questions?" and I honestly have none left — what do I say?</summary>
 <div class="qa-body">
 
-**Short:** Never say "no." Use the fallback that turns it back to them.
+**Short:** If possible, avoid ending with "no"; use one fallback question that turns the floor back to them.
 
 **Deep:** "You've actually covered what I came in wanting to know, which is a good sign. If I can ask one more — what's something about working here that surprised *you*?" This stays engaged, extracts a candid answer, and avoids the flat "nope" that reads as low interest.
 </div></details>
@@ -133,7 +123,7 @@ Each targets a real, public characteristic of the org — asking it proves you d
 <details class="qa"><summary>Is it okay to ask about compensation or level in a technical round?</summary>
 <div class="qa-body">
 
-**Short:** No — route all comp/level/logistics to the recruiter.
+**Short:** It is usually more accurate to ask the recruiter. Prioritize questions about the work and team for technical interviewers.
 
 **Deep:** Technical interviewers usually don't set comp and it makes the exchange transactional. Keep their Q&A about the work, the team, and the science. Comp strategy lives in [Offers & Negotiation](#/process/negotiation).
 </div></details>

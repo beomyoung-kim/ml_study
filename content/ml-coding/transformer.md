@@ -1,11 +1,45 @@
-# A Transformer Block
+# Implementing a Transformer Block
 
-> [!TIP] Say this first
-> "A pre-norm decoder block is two residual sub-layers: `x = x + Attn(Norm(x))` then `x = x + FFN(Norm(x))`. The residual stream is the backbone; every sub-layer reads a normalized copy and writes a delta back." Nail that sentence and the code writes itself.
+> [!NOTE] Goal of this chapter
+> Now assemble the attention from [Implementing Attention](#/ml-coding/attention) and the position machinery from [Positional Encoding & RoPE](#/ml-coding/positional-encoding-rope) into **one block**. A Transformer block is a Lego assembly of just four pieces—**attention + FFN + residual connections + normalization**. Stack this block $N$ times and you get GPTs, LLMs, and VLMs. This is exactly the block you will see when you open a real codebase.
 
-Builds on [Attention From Scratch](#/ml-coding/attention). Here you assemble the full block — multi-head attention + feed-forward network + residuals + normalization — add a causal mask, and explain the KV-cache. This is what you see when you open a real LLM/VLM codebase.
+## A block is an assembly of four pieces
 
-## Anatomy of a pre-norm decoder block
+It looks complicated, but one line captures it. A **residual stream**, or highway, carries the input `x` unchanged, while two side branches each add a small amount of information:
+
+$$
+x \leftarrow x + \text{Attn}(\text{Norm}(x)), \qquad x \leftarrow x + \text{FFN}(\text{Norm}(x))
+$$
+
+- **Attn:** mixes information across tokens—"Which other tokens should this token inspect?"
+- **FFN**, or feed-forward network: processes each token independently; much of the model's stored "knowledge" resides here.
+- **Residual connection:** *adds* the result back to the original `x`; the highway remains intact and each branch contributes only a delta.
+- **Norm:** stabilizes the scale of each branch's input. See [Normalization & Training Stability](#/foundations/normalization-stability).
+
+<figure>
+<svg viewBox="0 0 640 220" xmlns="http://www.w3.org/2000/svg" font-family="Inter, sans-serif" font-size="12">
+  <!-- residual highway -->
+  <line x1="40" y1="110" x2="600" y2="110" stroke="#0ea5e9" stroke-width="4"/>
+  <text x="70" y="100" fill="#0ea5e9" font-weight="700">residual stream (highway)</text>
+  <circle cx="40" cy="110" r="6" fill="#0ea5e9"/><text x="30" y="135" fill="currentColor">x</text>
+  <!-- attn branch -->
+  <path d="M200 110 v-45 h60" fill="none" stroke="#98a3b2" stroke-width="1.5"/>
+  <rect x="200" y="35" width="130" height="30" rx="6" fill="#6366f1"/><text x="265" y="55" text-anchor="middle" fill="#fff">Attn(Norm(x))</text>
+  <path d="M330 50 h30 v55" fill="none" stroke="#98a3b2" stroke-width="1.5"/>
+  <circle cx="360" cy="110" r="11" fill="none" stroke="#e0533f" stroke-width="2"/><text x="360" y="114" text-anchor="middle" fill="#e0533f">+</text>
+  <!-- ffn branch -->
+  <path d="M430 110 v-45 h20" fill="none" stroke="#98a3b2" stroke-width="1.5"/>
+  <rect x="430" y="35" width="110" height="30" rx="6" fill="#12a150"/><text x="485" y="55" text-anchor="middle" fill="#fff">FFN(Norm(x))</text>
+  <path d="M540 50 h20 v55" fill="none" stroke="#98a3b2" stroke-width="1.5"/>
+  <circle cx="560" cy="110" r="11" fill="none" stroke="#e0533f" stroke-width="2"/><text x="560" y="114" text-anchor="middle" fill="#e0533f">+</text>
+  <circle cx="600" cy="110" r="6" fill="#0ea5e9"/><text x="590" y="135" fill="currentColor">out</text>
+  <text x="320" y="185" text-anchor="middle" fill="#98a3b2">Each side branch computes a delta and adds it to the highway; the highway x is never cut.</text>
+  <text x="320" y="205" text-anchor="middle" fill="#98a3b2">That uninterrupted highway carries gradients through a deep stack—the point of residuals.</text>
+</svg>
+<figcaption>A Transformer block consists of the residual highway carrying the input and two side branches—attention and FFN—that add their deltas. Input and output shapes match, so the block can be stacked $N$ times.</figcaption>
+</figure>
+
+## Pre-norm block structure
 
 ```mermaid
 flowchart TB
@@ -20,12 +54,40 @@ flowchart TB
   R2 --> Y["out (B,T,D)"]
 ```
 
-**Pre-norm** (normalize *inside* each residual branch) is the modern default: the residual stream stays un-normalized end-to-end, so gradients flow cleanly through deep stacks. Post-norm (the original 2017 paper) needs learning-rate warmup to stay stable. See [Normalization & Stability](#/foundations/normalization-stability).
+**Pre-norm** normalizes *inside* each residual branch. It is the modern default: the residual stream remains unnormalized from beginning to end, giving gradients a clean path through a deep stack. Post-norm, used in the original 2017 paper, needs more care with learning-rate warmup for stability. See [Normalization & Training Stability](#/foundations/normalization-stability).
 
-## Full block in PyTorch
+> [!TIP] Interview one-liner
+> "A pre-norm decoder block has two residual sublayers: `x = x + Attn(Norm(x))`, followed by `x = x + FFN(Norm(x))`. The residual stream is the spine; every sublayer reads a normalized copy and writes back a delta." Make this sentence automatic and the code follows naturally.
+
+## A complete PyTorch block
+
+First inspect the form used in practice. The NumPy lab below then has you implement the central FFN component; the canonical LayerNorm implementation lives in the normalization chapter.
 
 ```python
 import torch, torch.nn as nn, torch.nn.functional as F
+
+
+def apply_rope(q, k, start_pos=0, base=10_000.0):
+    """Rotate Q/K pairs; q,k:(B,H,T,Dh), cached K is stored after rotation."""
+    rotary_dim = q.shape[-1] - q.shape[-1] % 2
+    if rotary_dim == 0:
+        return q, k
+    pos = torch.arange(start_pos, start_pos + q.shape[-2], device=q.device,
+                       dtype=torch.float32)
+    inv = base ** (-torch.arange(0, rotary_dim, 2, device=q.device,
+                                 dtype=torch.float32) / rotary_dim)
+    angle = pos[:, None] * inv[None, :]
+    cos = angle.cos().to(q.dtype)[None, None, :, :]
+    sin = angle.sin().to(q.dtype)[None, None, :, :]
+
+    def rotate(x):
+        out = x.clone()
+        even, odd = x[..., :rotary_dim:2], x[..., 1:rotary_dim:2]
+        out[..., :rotary_dim:2] = even * cos - odd * sin
+        out[..., 1:rotary_dim:2] = even * sin + odd * cos
+        return out
+
+    return rotate(q), rotate(k)
 
 
 class FeedForward(nn.Module):
@@ -53,15 +115,28 @@ class CausalSelfAttention(nn.Module):
         q, k, v = self.qkv(x).chunk(3, dim=-1)
         q, k, v = (t.view(B, T, self.h, self.dh).transpose(1, 2)
                    for t in (q, k, v))                 # (B,H,T,Dh)
+        past = 0
+        if kv_cache is not None and kv_cache.get("k") is not None:
+            past = kv_cache["k"].shape[2]
+        q, k = apply_rope(q, k, start_pos=past)
+
         if kv_cache is not None:                        # decode: append new K/V
-            if kv_cache.get("k") is not None:
+            if past:
                 k = torch.cat([kv_cache["k"], k], dim=2)
                 v = torch.cat([kv_cache["v"], v], dim=2)
             kv_cache["k"], kv_cache["v"] = k, v
-        # is_causal only for the prefill/training path (square attention)
-        causal = kv_cache is None
+
+        # A single-token decode query has no future token in this call. For a
+        # chunk after cached history, build an offset causal mask explicitly.
+        attn_mask = None
+        causal = kv_cache is None or past == 0
+        if past and T > 1:
+            q_pos = past + torch.arange(T, device=x.device)[:, None]
+            k_pos = torch.arange(past + T, device=x.device)[None, :]
+            attn_mask = k_pos <= q_pos
+            causal = False
         o = F.scaled_dot_product_attention(
-            q, k, v, is_causal=causal,
+            q, k, v, attn_mask=attn_mask, is_causal=causal,
             dropout_p=self.drop if self.training else 0.0)
         return self.proj(o.transpose(1, 2).reshape(B, T, D))
 
@@ -79,24 +154,15 @@ class DecoderBlock(nn.Module):
         return x
 ```
 
-**Shapes:** input/output are both `(B, T, D)` — a block is shape-preserving, which is why you can stack $N$ of them. **Complexity per block:** $O(T^2 d)$ for attention + $O(T d^2)$ for the FFN (the FFN dominates FLOPs at short context; attention dominates memory at long context).
+**Shape:** input and output are both `(B, T, D)`. The block preserves shape, so you can stack $N$ of them. **Complexity per block:** $O(T^2d)$ for attention plus $O(Td^2)$ for the FFN. The FFN dominates FLOPS at short context lengths; attention dominates memory at long ones.
 
-## LayerNorm from scratch
+## LayerNorm (summary)
 
-> [!TIP] Live code — implement, run, test
-> The NumPy blocks below are **live editors**. Fill in the body, hit **▶ Run tests**, and watch the cases pass. Stuck? Reveal the reference **Solution** — but attempt first; the struggle *is* the practice. The first Run downloads a small Python runtime and NumPy (~15 MB); later runs are instant.
-
-<div class="widget" data-widget="code">
-<script type="application/json" class="code-config">
-{"func":"layer_norm","packages":["numpy"],"approx":true,"starter":"import numpy as np\n\ndef layer_norm(x, gamma, beta, eps=1e-5):\n    # normalize over the LAST dim (per token): (x-mean)/sqrt(var+eps), then scale by gamma, shift by beta\n    pass","tests":[{"args":[[[1,2,3,4]],[1,1,1,1],[0,0,0,0]],"expect":[[-1.3416354199689269,-0.447211806656309,0.447211806656309,1.3416354199689269]]},{"args":[[[1,2,3,4],[10,10,10,10]],[1,1,1,1],[0,0,0,0]],"expect":[[-1.3416354199689269,-0.447211806656309,0.447211806656309,1.3416354199689269],[0.0,0.0,0.0,0.0]]},{"args":[[[2,4,6,8]],[2,2,2,2],[1,1,1,1]],"expect":[[-1.6832788897221995,0.10557370342593342,1.8944262965740666,3.6832788897221995]]}],"solution":"import numpy as np\n\ndef layer_norm(x, gamma, beta, eps=1e-5):\n    x, gamma, beta = np.asarray(x, float), np.asarray(gamma, float), np.asarray(beta, float)\n    mu = x.mean(-1, keepdims=True)\n    var = x.var(-1, keepdims=True)\n    return gamma * (x - mu) / np.sqrt(var + eps) + beta"}
-</script>
-</div>
-
-LayerNorm normalizes **per token over the feature dim**, so it's independent of batch size and sequence length — that's why Transformers use it instead of BatchNorm. RMSNorm (LLaMA) drops the mean-centering and $\beta$, keeping only the scale.
+The block's `nn.LayerNorm` normalizes **over the feature dimension independently for every token**: subtract the mean, divide by the standard deviation, then scale and shift with $\gamma,\beta$. It is independent of batch size and sequence length, which is why Transformers use it instead of BatchNorm. RMSNorm, used by LLaMA, drops mean-centering and $\beta$ and keeps only scaling. See the canonical [Normalization & Training Stability](#/foundations/normalization-stability) chapter for the from-scratch NumPy lab, backward pass, and derivation.
 
 ## Feed-forward network (NumPy)
 
-The position-wise FFN is $D\to 4D\to D$ with a GELU in between (here the tanh approximation). `feedforward` seeds its weights with `np.random.seed(0)` so the output is deterministic:
+The position-wise FFN is $D\to 4D\to D$ with GELU in the middle, using the tanh approximation here. `feedforward` seeds its weights with `np.random.seed(0)`, making the output deterministic:
 
 <div class="widget" data-widget="code">
 <script type="application/json" class="code-config">
@@ -106,18 +172,55 @@ The position-wise FFN is $D\to 4D\to D$ with a GELU in between (here the tanh ap
 
 ## Causal mask
 
-`is_causal=True` in `scaled_dot_product_attention` applies a lower-triangular mask for free. Manually it's `torch.triu(torch.full((T,T), -inf), diagonal=1)` added to the scores — position $t$ may attend to $\le t$ only, enforcing autoregression so training with teacher forcing matches inference.
+In `scaled_dot_product_attention`, `is_causal=True` applies a lower-triangular mask for square prefill or training. When a chunk of length $T>1$ follows cached history of length $P$, however, you cannot simply set `is_causal=False`. Query $i$ may see only key positions $\le P+i$, so you need an **offset causal mask**. Teacher forcing trains the same causal dependency used at inference, but a distribution gap remains: training sees a ground-truth prefix while generation sees the model's own prefix—exposure bias.
 
-## KV-cache (the inference optimization)
+## KV cache (inference optimization)
 
-> [!NOTE] Why it exists
-> During autoregressive generation, keys and values for past tokens **never change**. Recomputing them every step is $O(T^2)$ redundant work. The KV-cache stores past $K,V$ and appends only the new token's, making each decode step $O(T)$ instead of $O(T^2)$.
+> [!NOTE] Why it exists—intuition
+> Within one causal forward pass with a fixed model, adapter, prompt, and position scheme, you can reuse each layer's K/V values for tokens already processed. Change the model, adapter, position scheme, or prefix and the cache is invalid. A KV cache computes only the new token's Q/K/V and reduces per-step attention to linear work in context length. The educational `torch.cat` below copies the cache every time; real serving uses preallocated or paged caches.
+
+<figure>
+<svg viewBox="0 0 640 170" xmlns="http://www.w3.org/2000/svg" font-family="Inter, sans-serif" font-size="12">
+  <text x="20" y="20" fill="#98a3b2">The cache grows one cell at a time during generation; compute only the new token:</text>
+  <!-- growing cache cells appearing over time -->
+  <g>
+    <rect x="20" y="45" width="34" height="34" rx="4" fill="#0ea5e9" opacity="0.85"/>
+    <rect x="58" y="45" width="34" height="34" rx="4" fill="#0ea5e9" opacity="0"><animate attributeName="opacity" values="0;0;0.85;0.85;0.85" keyTimes="0;0.2;0.25;0.9;1" dur="4s" repeatCount="indefinite"/></rect>
+    <rect x="96" y="45" width="34" height="34" rx="4" fill="#0ea5e9" opacity="0"><animate attributeName="opacity" values="0;0;0;0.85;0.85" keyTimes="0;0.4;0.45;0.9;1" dur="4s" repeatCount="indefinite"/></rect>
+    <rect x="134" y="45" width="34" height="34" rx="4" fill="#0ea5e9" opacity="0"><animate attributeName="opacity" values="0;0;0;0;0.85;0.85" keyTimes="0;0.6;0.62;0.65;0.9;1" dur="4s" repeatCount="indefinite"/></rect>
+    <rect x="172" y="45" width="34" height="34" rx="4" fill="#e0533f" opacity="0"><animate attributeName="opacity" values="0;0;0;0;0;0.9;0.9" keyTimes="0;0.7;0.75;0.78;0.8;0.85;1" dur="4s" repeatCount="indefinite"/></rect>
+    <text x="113" y="105" text-anchor="middle" fill="#0ea5e9">cached past K/V (reused)</text>
+    <text x="189" y="128" text-anchor="middle" fill="#e0533f">compute new token only</text>
+  </g>
+  <line x1="330" y1="45" x2="330" y2="120" stroke="#98a3b2" stroke-dasharray="4 3"/>
+  <text x="350" y="60" fill="#98a3b2">Prefill: process the full prompt once (square attention)</text>
+  <text x="350" y="82" fill="#98a3b2">Decode: compute one Q/K/V per step → append to cache</text>
+  <text x="350" y="104" fill="#98a3b2">→ per-step cost O(T²) ⟶ O(T)</text>
+</svg>
+<figcaption>A KV cache reuses the blue cells, past K/V values, and computes only the red cell for the new token. At long context lengths, cache memory becomes a dominant serving cost, motivating GQA/MQA and paged or quantized KV.</figcaption>
+</figure>
 
 <dl class="kv">
-<dt>Prefill</dt><dd>Process the full prompt once (square, causal attention); cache all K/V.</dd>
-<dt>Decode</dt><dd>Each new token: compute its Q/K/V, append K/V to the cache, attend over the whole cache. Query length is 1, so no causal mask needed.</dd>
-<dt>Cost</dt><dd>Cache memory is $2 \cdot L \cdot B \cdot H \cdot T \cdot d_h$ (bytes ×2 for K and V) — the dominant memory at long context, and why <b>GQA/MQA</b> (fewer KV heads) and paged/quantized KV caches matter.</dd>
+<dt>Prefill</dt><dd>Process the full prompt at once with square causal attention and cache every K/V.</dd>
+<dt>Decode</dt><dd>For each new token, compute Q/K/V, append K/V to the cache, and attend over the full cache. Query length is 1, so no causal mask is necessary.</dd>
+<dt>Cost</dt><dd>The number of elements is $2LBT H_{kv}d_h$; multiply by bytes per dtype plus scales and metadata to obtain memory bytes. GQA/MQA reduce $H_{kv}$, not the number of query heads.</dd>
 </dl>
+
+> **PyTorch-style pseudocode—model-level prefill → decode**
+
+```python
+model.eval()
+with torch.inference_mode():
+    logits, cache = model(prompt_ids, use_cache=True)  # prefill: [B,T]
+    next_id = sample(logits[:, -1])                    # use the final position only
+    generated = [next_id]
+
+    while not all_finished(generated):
+        pos = cache.sequence_length                    # RoPE/position offset
+        logits, cache = model(next_id[:, None], past=cache, position=pos)
+        next_id = sample(logits[:, -1])                # decode input is [B,1]
+        generated.append(next_id)                      # mask rows that emitted EOS separately
+```
 
 ## Sanity check
 
@@ -141,51 +244,52 @@ if __name__ == "__main__":
 ```
 
 > [!DANGER] Common bugs interviewers watch for
-> Applying norm to the residual path instead of the branch input (breaks pre-norm); adding the residual *before* the sub-layer; LayerNorm over the batch/token axis instead of the feature axis; forgetting `is_causal` (leaks the future); off-by-one so the cache double-counts the current token; not switching off the causal mask during single-token decode.
+> Applying normalization to the residual path instead of the branch input, which breaks pre-norm; adding the residual *before* the sublayer; applying LayerNorm across batch or token axes instead of features; forgetting `is_causal`, leaking the future; an off-by-one that computes the current token twice in the cache; and failing to disable a causal mask during single-token decode.
 
 ## Q&A
 
-<details class="qa"><summary>Why residual connections — what breaks without them?</summary>
+<details class="qa"><summary>Why residual connections—what breaks without them?</summary>
 <div class="qa-body">
 
-**Short:** residuals give gradients an identity path, so deep stacks train without vanishing gradients, and each block only has to learn a *delta* to the running representation.
+**Short:** A residual gives gradients an identity path through a deep stack, reducing vanishing-gradient problems, and lets every block learn only a *delta* to the running representation.
 
-**Deep:** the derivative of $x + f(x)$ w.r.t. $x$ is $1 + f'(x)$ — the $1$ guarantees gradient flow even when $f'$ is tiny. Conceptually the residual stream is a shared bus that every block reads from and writes small updates to; the norm before each sub-layer keeps the inputs well-scaled. Remove residuals and a 12+ layer Transformer effectively won't train.
+**Deep:** The Jacobian of $x+f(x)$ contains an identity term, which improves gradient flow. It does not guarantee lossless transmission: the other term can cancel it, scales can be poor, and projections can intervene. The defensible claim is that residuals and normalization make deep-model optimization far easier, not that training becomes absolutely impossible beyond some depth without them.
 </div></details>
 
-<details class="qa"><summary>Why does the FFN expand to 4×?</summary>
+<details class="qa"><summary>Why does the FFN expand by 4×?</summary>
 <div class="qa-body">
 
-**Short:** attention mixes information *across* tokens but is (per token) a weighted average — largely linear; the FFN is the per-token nonlinear compute where most parameters and "knowledge" live, and the wide hidden layer gives it capacity.
+**Short:** Attention mixes information *across* tokens but is mostly a weighted linear combination per token. The FFN supplies token-wise nonlinear computation, contains most parameters and much of the model's stored "knowledge," and the wide hidden layer provides capacity.
 
-**Deep:** the two-layer FFN $D\to 4D\to D$ with GELU is applied identically at every position. The 4× ratio is an empirical sweet spot. Modern LLMs use gated variants (SwiGLU: $\text{Swish}(xW_1)\odot(xW_2)$ then $W_3$), often with a ~$\frac{8}{3}D$ hidden dim to keep parameter count matched. FFN layers hold the majority of a Transformer's parameters.
+**Deep:** The two-layer GELU FFN $D\to 4D\to D$ applies the same function at every position. The 4× ratio is an empirical sweet spot. Modern LLMs use gated variants such as SwiGLU—$\text{Swish}(xW_1)\odot(xW_2)$ followed by $W_3$—often with hidden dimension around $\frac{8}{3}D$ to match parameter count. FFN layers contain most Transformer parameters.
 </div></details>
 
 <details class="qa"><summary>How does this block differ inside a VLM?</summary>
 <div class="qa-body">
 
-**Short:** structurally identical — vision tokens (from a ViT encoder + projector) are inserted into the same sequence and the decoder self-attends over text + image tokens jointly.
+**Short:** Structurally it is the same. Vision tokens produced by a ViT encoder and projector enter the same sequence, and the decoder self-attends jointly over text and image tokens.
 
-**Deep:** a decoder-only VLM (LLaVA/Qwen-VL style) doesn't change the block at all: an image becomes a set of embeddings occupying sequence positions, sometimes with a modality-specific position scheme, and the causal mask lets text attend back to image tokens. Cross-attention VLMs (Flamingo) instead add gated cross-attention layers that read image K/V. See [VLM Implementation Details](#/vlm/practical).
+**Deep:** A decoder-only VLM in the LLaVA/Qwen-VL family need not change the block: images become a set of embeddings occupying sequence positions, sometimes with a modality-specific position scheme, and the causal mask lets later text attend back to image tokens. A cross-attention VLM such as Flamingo instead adds gated cross-attention layers that read image K/V. See [VLM Implementation Details](#/vlm/practical).
 </div></details>
 
 ### Follow-ups
-- **Pre-norm vs post-norm?** Pre-norm trains stably without warmup; post-norm can give slightly better final quality but is finicky. Modern default: pre-norm.
-- **RMSNorm vs LayerNorm?** RMSNorm skips mean-centering — cheaper, comparable quality (LLaMA).
-- **Weight tying?** Share the token-embedding and LM-head matrix to save parameters and couple input/output spaces.
-- **RoPE?** Inject relative position by rotating Q/K per position; extrapolate with NTK/YaRN scaling.
+
+- **Pre-norm vs. post-norm?** Pre-norm is generally more stable, although large-scale recipes still often use warmup. Quality and stability differences for post-norm depend on depth and initialization.
+- **RMSNorm vs. LayerNorm?** RMSNorm skips mean-centering. It is cheaper and often similar in quality; LLaMA uses it.
+- **Weight tying?** Share the token-embedding and LM-head matrices to save parameters and couple the input and output spaces.
+- **RoPE?** Rotate Q/K at every position, using `start_pos=past_length` during decode. Length scaling can extend context, but it does not guarantee quality beyond the training length.
 
 ## Cheat-sheet
 
 | Item | Value |
 | --- | --- |
 | Block | `x += Attn(Norm(x)); x += FFN(Norm(x))` (pre-norm) |
-| Shape | `(B,T,D)` in and out — stackable |
-| LayerNorm axis | last (feature) dim, per token |
-| FFN | $D\to 4D\to D$, GELU (or SwiGLU $\sim\frac83 D$) |
-| Causal mask | lower-triangular, apply before softmax |
-| Complexity | $O(T^2 d)$ attn + $O(T d^2)$ FFN per block |
-| KV-cache | store past K/V; decode step $O(T^2)\to O(T)$ |
-| KV-cache shrink | GQA/MQA, quantized/paged KV |
+| Shape | `(B,T,D)` input/output—stackable |
+| LayerNorm axis | final feature dimension, independently per token |
+| FFN | $D\to 4D\to D$, GELU—or SwiGLU at roughly $\frac83 D$ |
+| Causal mask | lower triangular, applied before softmax |
+| Complexity | $O(T^2 d)$ attention + $O(T d^2)$ FFN per block |
+| KV cache | store past K/V; decode-step work $O(T^2)\to O(T)$ |
+| Shrinking KV cache | GQA/MQA, quantized or paged KV |
 
-**Cross-links:** [Attention From Scratch](#/ml-coding/attention) · [CNNs, RNNs & Transformers](#/foundations/architectures) · [Normalization & Stability](#/foundations/normalization-stability) · [LLM Fundamentals](#/llm/fundamentals) · [VLM Implementation Details](#/vlm/practical)
+**Next:** [Implementing Attention](#/ml-coding/attention) · [Positional Encoding & RoPE](#/ml-coding/positional-encoding-rope) · [CNNs, RNNs & Transformers](#/foundations/architectures) · [Normalization & Training Stability](#/foundations/normalization-stability) · [LLM Fundamentals](#/llm/fundamentals) · [VLM Implementation Details](#/vlm/practical)

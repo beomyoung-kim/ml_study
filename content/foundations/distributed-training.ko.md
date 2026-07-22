@@ -2,7 +2,10 @@
 
 <div class="tag-row"><span class="tag">DDP</span><span class="tag">FSDP2</span><span class="tag">ZeRO</span><span class="tag">tensor/pipeline parallel</span><span class="tag">context parallel</span><span class="tag">3D parallelism</span></div>
 
-> [!TIP] 이것부터 말하세요
+> [!NOTE] 이 챕터는 심화입니다 — 처음이면 건너뛰어도 됩니다
+> **한 줄 직관:** 모델이 너무 크거나 데이터가 너무 많아 GPU 하나로 감당이 안 되면, 여러 GPU에 **일을 나눠서(parallelism, 병렬화)** 학습합니다. 나누는 방식마다 트레이드오프는 똑같습니다 — **메모리를 아끼는 대신 GPU끼리 통신(communication)이 늘어납니다.** 아래는 "무엇을 나누는가"에 따른 전략들입니다. 처음 배우는 단계라면 [Optimization](#/foundations/optimization)까지만 소화하고 이 챕터는 나중에 봐도 충분합니다.
+
+> [!TIP] 면접 한 줄
 > 핵심 문장: *"모든 parallelism 전략은 메모리를 communication과 맞바꿉니다 — 저는 모델을 맞추면서 GPU를 바쁘게 유지하는 가장 싼 전략을 고릅니다."* 면접관은 당신이 만져본 가장 큰 클러스터보다, 증상(OOM, hang, low MFU)을 올바른 레버에 매핑할 수 있는지 — 그리고 스케일에 대해 정직한지를 더 봅니다.
 
 ## The parallelism zoo
@@ -23,7 +26,7 @@ flowchart TB
 
 | 전략 | 무엇을 나눔 | Communication | 사용 시점 |
 | --- | --- | --- | --- |
-| **DDP** | data (model 복제) | grad all-reduce (step당 1회) | 모델이 GPU 하나에 맞음 |
+| **DDP** | data (model 복제) | backward 중 grad bucket별 all-reduce | 모델이 GPU 하나에 맞음 |
 | **FSDP / ZeRO-3** | data + params/grads/opt state | all-gather + reduce-scatter | 모델이 안 맞음 |
 | **Tensor (TP)** | layer 내 matrix | layer당 all-reduce | 거대 layer, intra-node (NVLink) |
 | **Pipeline (PP)** | layer들을 stage로 | stage 간 activation | 매우 깊음, cross-node |
@@ -34,13 +37,38 @@ flowchart TB
 
 ## Data parallel & DDP
 
-각 rank는 서로 다른 micro-batch로 forward/backward를 돌린 뒤 **gradient를 all-reduce(평균)**해서 모든 replica가 동일한 update를 적용합니다 — 사실상 하나의 large-batch step입니다:
+각 rank는 서로 다른 micro-batch로 forward/backward를 돌린 뒤 **gradient를 all-reduce(평균)해서** 모든 replica가 동일한 update를 적용합니다 — 사실상 하나의 large-batch step입니다:
 
 $$
 B_{\text{eff}}=B_{\text{local}}\times N_{\text{GPU}}\times N_{\text{accum}}
 $$
 
-Ring all-reduce는 bandwidth 최적이며, **gradient bucketing**을 통해 backward와 겹칩니다(뒤쪽 layer가 아직 계산 중일 때 먼저 계산된 grad를 reduce). 고전적 버그: `DistributedSampler` 누락(데이터 중복), effective batch에 맞춰 LR을 안 키움, 혹은 param을 freeze해서 reduce를 놓침.
+Ring all-reduce는 큰 메시지에서 bandwidth 효율적인 대표 구현이며, **gradient bucketing**을 통해 backward와 겹칠 수 있습니다(앞선 bucket의 grad가 준비되면 남은 backward 계산과 collective를 겹침). 고전적 버그: `DistributedSampler` 누락(데이터 중복), global-batch 변화 뒤 LR·warmup을 다시 검증하지 않음, 또는 rank마다 다른 제어 흐름으로 collective 순서를 어긋나게 함. Batch 증가에 따른 선형 LR scaling은 출발점인 휴리스틱이지 반드시 적용해야 하는 법칙이 아닙니다.
+
+<details class="concept-code"><summary>개념 코드로 보기</summary>
+
+> **PyTorch식 pseudocode — DDP + gradient accumulation**
+
+```python
+optimizer.zero_grad(set_to_none=True)
+for epoch in range(num_epochs):
+    sampler.set_epoch(epoch)                    # 모든 rank가 다른 shard를 섞음
+    assert len(loader) % accum_steps == 0       # 예시는 partial window를 배제
+    for micro_step, (x, y) in enumerate(loader):
+        last = (micro_step + 1) % accum_steps == 0
+        sync_context = nullcontext() if last else ddp_model.no_sync()
+
+        with sync_context:                      # 중간 backward의 all-reduce 억제
+            logits = ddp_model(x)               # rank별 local batch
+            loss = criterion(logits, y) / accum_steps
+            loss.backward()
+
+        if last:                                # 모든 rank가 같은 분기로 들어와야 함
+            optimizer.step()
+            optimizer.zero_grad(set_to_none=True)
+```
+
+</details>
 
 <details class="qa"><summary>DDP는 어떻게 communication과 computation을 겹치고, 왜 중요한가요?</summary>
 <div class="qa-body">
@@ -61,7 +89,7 @@ Ring all-reduce는 bandwidth 최적이며, **gradient bucketing**을 통해 back
 | 2 | + gradients | ↓↓ | ++ |
 | 3 | + parameters | ~1/N | all-gather each layer |
 
-PyTorch **FSDP**는 ZeRO 스타일 sharding을 구현합니다. `FULL_SHARD` ≈ ZeRO-3, `SHARD_GRAD_OP` ≈ ZeRO-2. **FSDP2**(DTensor 기반 재작성, `fully_shard`)는 FSDP1의 FlatParameter를 대체했습니다: parameter별 `DTensor` sharding으로 더 결정론적인 메모리, TP/`torch.compile`과 더 깔끔한 조합성, 더 단순한 distributed checkpointing을 제공합니다. 핵심 노브: `reshard_after_forward` — `True`는 forward 후 param을 해제(메모리 절약, backward에서 재수집 → comm 증가), `False`는 유지(ZeRO-2 유사). 2D `DeviceMesh`는 **hybrid shard**(node 내부는 shard, node 간엔 replicate)를 가능하게 합니다.
+PyTorch **FSDP**는 ZeRO 스타일 sharding을 구현합니다. FSDP1의 `FULL_SHARD`는 개념적으로 ZeRO-3에, `SHARD_GRAD_OP`는 ZeRO-2에 가깝습니다. **FSDP2**(DTensor 기반 `fully_shard`)는 FlatParameter 대신 원래 parameter 구조를 보존하는 `DTensor` shard를 사용해 TP·`torch.compile`·Distributed Checkpoint와 조합하기 쉽게 설계됐습니다. 핵심 노브인 `reshard_after_forward=True`는 forward 후 unsharded parameter를 해제하고 backward 전에 다시 all-gather합니다(메모리 절약, 통신 증가). `False`는 backward까지 unsharded parameter를 보존해 두 번째 gather를 피하지만 peak memory가 늘어납니다. 기본값도 root와 non-root module이 다르므로 단순히 “FSDP2 전체에 True/False 하나”로 설명하면 안 됩니다. 2D `DeviceMesh`는 한 축에서 replicate하고 다른 축에서 shard하는 **hybrid sharding**을 지원합니다.
 
 > [!NOTE] 메모리는 communication으로 산다
 > 모델이 GPU 하나에 맞으면 **보통 DDP가 FSDP보다 빠릅니다**. 꼭 필요할 때만 shard하세요. 그다음, sharded DP조차 communication-bound이거나 단일 layer가 너무 클 때 tensor/pipeline parallel로 갑니다.
@@ -71,35 +99,35 @@ PyTorch **FSDP**는 ZeRO 스타일 sharding을 구현합니다. `FULL_SHARD` ≈
 
 **짧게:** ZeRO-3/`FULL_SHARD`는 매 layer마다 parameter를 재수집하므로 communication-bound입니다. 이미 맞는 모델이면 DDP(또는 ZeRO-1/2)가 더 빠릅니다.
 
-**깊게:** 메모리 절약은 실제적(rank당 ~1/N)이지만, 이제 모든 forward·backward layer가 그 layer weight의 all-gather와 grad의 reduce-scatter를 필요로 합니다. 느린 inter-node 링크에서는 이것이 step time을 지배합니다. Decision tree: DDP로 맞나? → DDP. ZeRO-1/2(opt/grads만 shard)로 맞나? → 그렇게. param만 안 맞나? → ZeRO-3, 그리고 gather가 intra-node에 머물도록 TP 고려. **후속 질문:** *CPU/NVMe offload?* — ZeRO-Infinity / FSDP offload는 메모리를 더 줄이지만 PCIe bandwidth에 병목됩니다.
+**깊게:** 지속적으로 보관하는 sharded model state는 이상적으로 rank당 약 $1/N$까지 줄지만, 실행 중인 layer의 unsharded parameter·activation·통신 buffer 때문에 peak 전체 메모리가 정확히 $1/N$이 되지는 않습니다. 각 parameter group은 forward 전에 all-gather되고 gradient는 reduce-scatter되며, forward 뒤 reshard하면 backward 전에 한 번 더 gather합니다. 느린 inter-node 링크에서는 이것이 step time을 지배합니다. Decision tree: DDP로 맞나? → DDP. optimizer/gradient만 shard해도 맞나? → ZeRO-1/2 계열. parameter까지 shard해야 하나? → ZeRO-3/FSDP 계열, 그다음 topology에 맞춘 hybrid shard·TP를 비교. **후속 질문:** *CPU/NVMe offload?* — 메모리를 더 줄이지만 PCIe·storage bandwidth와 transfer overlap에 병목될 수 있습니다.
 </div></details>
 
 ## Tensor, pipeline, sequence & context parallelism
 
 <dl class="kv">
 <dt>Tensor parallel (TP)</dt><dd>Weight matrix를 GPU에 걸쳐 분할(column/row partition). layer당 all-reduce가 필요하므로 NVLink 위의 <b>intra-node</b>로 유지. Megatron 스타일.</dd>
-<dt>Pipeline parallel (PP)</dt><dd>Layer 범위를 stage에 할당하고 micro-batch를 흘려보냄. <b>bubble</b>(fill/drain 시 idle 시간)을 도입 ≈ $P$ stage, $M$ micro-batch에 대해 $(P-1)/(M+P-1)$ — 그래서 많은 micro-batch와 interleaved 스케줄(1F1B)을 사용.</dd>
+<dt>Pipeline parallel (PP)</dt><dd>Layer 범위를 stage에 할당하고 micro-batch를 흘려보냄. 단순 non-interleaved schedule의 <b>bubble</b>(fill/drain idle)은 대략 $P$ stage, $M$ micro-batch에 대해 $(P-1)/(M+P-1)$ — 그래서 micro-batch 수를 늘리고 1F1B 또는 interleaved 1F1B 같은 schedule을 사용.</dd>
 <dt>Sequence parallel (SP)</dt><dd>LayerNorm/Dropout activation만 seq 축을 따라 shard해 TP를 보완하고 activation 메모리를 줄임.</dd>
 <dt>Context parallel (CP)</dt><dd>long-context 학습을 위해 <b>모든</b> activation을 seq 차원을 따라 shard. ring/all-gather attention이 rank 간 K/V를 교환. 이것이 long-context를 가능케 함.</dd>
 </dl>
 
 > [!IMPORTANT] SP vs CP (2026년 단골 주제)
-> **Sequence parallelism**은 *norm/dropout* activation만 shard합니다(tensor parallelism의 add-on). **Context parallelism**은 seq 축을 따라 *모든* activation을 shard해서 단일 GPU가 전체 시퀀스를 갖지 않게 합니다 — 이것이 100K–1M-token 학습을 가능하게 합니다. Megatron-Core와 long-context 학습 스택은 CP에 의존합니다. *(메커니즘은 verifiable. 정확한 API는 현재 Megatron-Core 문서로 확인할 것.)*
+> **Sequence parallelism**은 Megatron 계열에서 TP가 otherwise 복제하는 *norm/dropout 영역의 activation*을 seq 축으로 shard하는 add-on입니다. **Context parallelism**은 입력과 layer activation을 seq 축으로 계속 분할하고, attention에서만 global context를 위해 K/V 등을 교환합니다. 그래서 rank당 activation memory를 CP degree에 따라 줄일 수 있지만, 사용할 수 있는 최대 context는 attention kernel·통신·총 GPU 메모리에도 달렸습니다. 정확한 지원 모델과 `p2p`/`all_gather`/`a2a` 같은 통신 방식은 사용 중인 Megatron-Core 버전의 문서를 확인하세요.
 
 <details class="qa"><summary>시퀀스가 GPU 하나에 안 맞는 1M-token-context 모델을 어떻게 학습하나요?</summary>
 <div class="qa-body">
 
 **짧게:** **context parallelism**을 씁니다 — activation을 seq 차원을 따라 GPU에 걸쳐 shard하고 K/V에 대한 ring/all-gather로 attention을 계산 — weight엔 FSDP, activation checkpointing을 결합합니다.
 
-**깊게:** activation 메모리는 시퀀스 길이에 비례하므로 작은 모델조차 1M-token 시퀀스를 담을 수 없습니다. CP는 시퀀스를 CP group에 걸쳐 나눕니다. 각 rank는 query의 한 chunk를 소유하고 key/value를 교환(ring attention)해서 모든 query가 여전히 global하게 attend하며, rank당 $O(n)$ 메모리입니다. FSDP(weight), layer가 크면 TP, activation checkpointing(backward에서 recompute)을 얹습니다. Sequence parallelism은 추가로 TP가 복제된 채 남긴 norm/dropout activation을 shard합니다. **후속 질문:** *비용?* — attention layer당 추가 K/V communication. 이를 compute와 겹치고 CP group을 빠른 링크에 둡니다.
+**깊게:** 저장해야 할 transformer activation은 시퀀스 길이에 대체로 비례하고, 순진하게 materialize한 attention score는 제곱으로 커집니다. CP는 시퀀스를 CP group에 걸쳐 나눕니다. 각 rank는 query chunk를 소유하고 K/V를 ring·all-gather·all-to-all 방식으로 교환해 global attention을 계산합니다. Flash/online attention을 함께 쓰면 score matrix를 저장하지 않으면서 rank당 sequence-shaped activation을 대략 CP degree만큼 줄일 수 있습니다. FSDP(weight), layer가 크면 TP, activation checkpointing(backward recompute)을 조합합니다. **후속 질문:** *비용?* — attention layer마다 K/V 계열 통신이 추가되며, 통신 방식과 topology에 따라 overlap 가능성이 다릅니다.
 </div></details>
 
 ## Expert parallelism & MoE <span class="badge badge-2026">2026</span>
 
-거의 모든 2025–2026 프론티어 모델이 Mixture-of-Experts이므로, **expert parallelism (EP)**은 이제 1급 차원입니다. 각 token은 몇 개의 expert로 라우팅(top-k)되고, expert들은 GPU에 분산되므로 forward pass는 token을 해당 expert로 보내는 **all-to-all**과 결과를 모으는 또 하나의 all-to-all이 필요합니다.
+Mixture-of-Experts 모델에서는 **expert parallelism (EP)이** 중요한 병렬화 축입니다. 각 token은 몇 개의 expert로 라우팅(top-k)되고, expert들은 GPU에 분산되므로 forward pass는 token을 해당 expert로 보내는 **all-to-all**과 결과를 모으는 또 하나의 all-to-all이 필요합니다.
 
 <dl class="kv">
-<dt>Load balancing</dt><dd>불균등한 라우팅은 일부 expert를 과부하시키고 다른 것을 굶깁니다 → straggler. Auxiliary load-balancing loss(또는 aux-loss-free bias 트릭) + <b>capacity factor</b>(overflow token drop/pad)로 균등하게 유지.</dd>
+<dt>Load balancing</dt><dd>불균등한 라우팅은 일부 expert를 과부하시키고 다른 것을 굶깁니다 → straggler. Auxiliary load-balancing loss(또는 aux-loss-free bias 트릭)를 쓰고, 구현에 따라 <b>capacity factor</b>로 overflow token을 drop/pad하거나 dropless routing으로 부하를 감당.</dd>
 <dt>All-to-all cost</dt><dd>라우팅 all-to-all이 MoE 특유의 병목. EP group을 빠른 intra-node 링크에 두고 dispatch를 compute와 겹침.</dd>
 <dt>Composition</dt><dd>EP는 DP/TP/PP와 곱해짐 — 4D 레이아웃. <b>Megatron-Core</b>는 대규모에서 TP + PP + DP + EP 결합의 레퍼런스 구현. DeepSpeed와 FSDP2는 PyTorch-native 중간 지대를 커버.</dd>
 </dl>
@@ -148,7 +176,7 @@ PyTorch **FSDP**는 ZeRO 스타일 sharding을 구현합니다. `FULL_SHARD` ≈
 | --- | --- |
 | DDP | 모델 복제, data shard, grad all-reduce. effective batch = local × GPUs × accum. |
 | ZeRO 1/2/3 | optimizer → +grads → +params shard. 메모리 줄이려 comm 늘림. |
-| FSDP2 | DTensor `fully_shard`. `FULL_SHARD`≈ZeRO-3. `reshard_after_forward` = memory↔comm 노브. |
+| FSDP2 | DTensor `fully_shard`로 params/grads/optimizer를 shard. `reshard_after_forward` = peak memory↔추가 gather 노브. |
 | TP vs PP | TP는 matrix 분할(intra-node, layer당 all-reduce). PP는 layer 분할(bubble ∝ stage 수). |
 | SP vs CP | SP는 norm/dropout activation shard. CP는 seq 축의 *모든* activation shard → long context. |
 | 3D parallelism | TP intra-node × PP across nodes × DP/FSDP 나머지 (+ MoE엔 EP). |

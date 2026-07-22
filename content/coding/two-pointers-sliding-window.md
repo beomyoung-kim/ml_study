@@ -129,6 +129,94 @@ Smallest substring of `s` containing all characters of `t` (with multiplicity).
 - **Fast & slow pointers**: Linked List Cycle, Find the Duplicate Number, and finding a list's midpoint all use a 1×/2× speed pair with O(1) space.
 - **ML dressing**: "longest run of frames with confidence ≥ threshold" is a fixed-constraint window.
 
+## Canonical linked-list patterns—never lose a pointer
+
+Linked-list problems are about the connections among **node objects**, not just their values. Save the original next node before overwriting `next`; when an operation can change the head, use a dummy sentinel to eliminate special-case branches.
+
+```python
+class ListNode:
+    def __init__(self, val=0, next=None):
+        self.val = val
+        self.next = next
+
+
+def reverse_list(head):
+    """O(N) time, O(1) extra space; rewire existing nodes in place."""
+    prev, cur = None, head
+    while cur is not None:
+        nxt = cur.next          # 1. preserve the remaining list before cutting
+        cur.next = prev         # 2. reverse the current edge
+        prev, cur = cur, nxt    # 3. advance both pointers
+    return prev
+
+
+def merge_sorted(a, b):
+    """Merge two sorted acyclic lists by reusing their existing nodes."""
+    dummy = tail = ListNode()
+    while a is not None and b is not None:
+        if a.val <= b.val:      # an explicit tie rule makes output deterministic
+            tail.next, a = a, a.next
+        else:
+            tail.next, b = b, b.next
+        tail = tail.next
+    tail.next = a if a is not None else b
+    return dummy.next
+
+
+def middle_node(head):
+    """For even length, return the second of the two middle nodes."""
+    slow = fast = head
+    while fast is not None and fast.next is not None:
+        slow = slow.next
+        fast = fast.next.next
+    return slow
+
+
+def cycle_start(head):
+    """Cycle entrance, or None. Floyd: O(N) time, O(1) space."""
+    slow = fast = head
+    while fast is not None and fast.next is not None:
+        slow = slow.next
+        fast = fast.next.next
+        if slow is fast:        # node identity, not equal values
+            break
+    else:
+        return None
+
+    slow = head
+    while slow is not fast:
+        slow = slow.next
+        fast = fast.next
+    return slow
+
+
+def remove_nth_from_end(head, n):
+    """Remove the 1-indexed n-th node from the end; invalid n raises ValueError."""
+    if n <= 0:
+        raise ValueError("n must be positive")
+    dummy = ListNode(0, head)
+    fast = dummy
+    for _ in range(n):
+        fast = fast.next
+        if fast is None:
+            raise ValueError("n is larger than the list length")
+    slow = dummy
+    while fast.next is not None:
+        fast, slow = fast.next, slow.next
+    slow.next = slow.next.next
+    return dummy.next
+```
+
+Remember the invariants and there is less code to memorize:
+
+- `reverse_list`: `prev` is the head of the reversed prefix; `cur` is the head of the unprocessed suffix.
+- `merge_sorted`: `dummy.next ... tail` is the completed sorted prefix; `a` and `b` are the unused suffixes.
+- `middle_node`: fast advances two nodes whenever slow advances one. If an even-length list should return the first middle instead, state and adjust the loop condition.
+- `remove_nth_from_end`: advance fast by `n` first and preserve that gap. The dummy makes deletion of the original head an ordinary case.
+
+> [!WARNING] Linked-list traps
+> If `cur = cur.next` comes after `cur.next = prev` without saving `nxt`, the remainder of the list is lost. Detect a cycle with `slow is fast`, not `slow.val == fast.val`, because identity matters. Before coding, also state whether merge or reverse **mutates existing nodes** or creates a new list.
+
 ## Pitfalls
 
 > [!WARNING] Window bugs to rehearse against
@@ -150,7 +238,7 @@ Smallest substring of `s` containing all characters of `t` (with multiplicity).
 
 **Short:** Two pointers: O(N) time, O(1) space, one pass.
 
-**Deep:** You *could* fix each element and binary-search its complement for O(N log N). Two pointers is strictly better here because each comparison discards one candidate from one end — an O(N) linear convergence. Binary search wins only when you're querying many independent targets against a static sorted array (amortize the sort, then O(log N) per query). State the trade-off; it's a common probe.
+**Deep:** fixing each element and binary-searching its complement takes O(N log N) for one target. Two pointers discards one endpoint candidate on every comparison and finishes in O(N). Even with many target queries on a static array, **the full Two Sum query does not automatically become O(log N)**—do not confuse it with one O(log N) membership lookup. Truly accelerating many Two Sum queries needs a different time–memory trade-off, such as O(N²) pair-sum preprocessing.
 </div></details>
 
 <details class="qa"><summary>Follow-ups</summary>
@@ -158,7 +246,7 @@ Smallest substring of `s` containing all characters of `t` (with multiplicity).
 
 - **"3Sum / 4Sum?"** → sort, fix outer indices, two-pointer the rest; skip duplicates carefully. O(N²)/O(N³).
 - **"Subarrays with exactly k distinct integers?"** → the at-most-k trick.
-- **"Detect the *start* of a linked-list cycle?"** → Floyd's: after meeting, reset one pointer to head, advance both by 1; they meet at the entrance.
+- <strong>“Detect the start of a linked-list cycle?”</strong> → Floyd's: after meeting, reset one pointer to head, advance both by 1; they meet at the entrance.
 </div></details>
 
 ## Cheat-sheet
@@ -173,5 +261,8 @@ Smallest substring of `s` containing all characters of `t` (with multiplicity).
 | Min window substring | window + need/missing | O(N) | O(1) |
 | Exactly k distinct | atMost(k)−atMost(k−1) | O(N) | O(k) |
 | Cycle detection | fast & slow (Floyd) | O(N) | O(1) |
+| Reverse linked list | save `next`, reverse edge | O(N) | O(1) |
+| Merge sorted lists | dummy + tail | O(N+M) | O(1) |
+| Remove n-th from end | dummy + fixed pointer gap | O(N) | O(1) |
 
 **Related:** [Arrays & Strings](#/coding/arrays-strings) · [Hashing](#/coding/hashing) · [Binary Search](#/coding/binary-search) · [Patterns hub](#/coding/patterns)

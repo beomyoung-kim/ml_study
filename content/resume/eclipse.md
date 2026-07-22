@@ -3,17 +3,17 @@
 <div class="tag-row"><span class="tag">CVPR 2024</span><span class="tag">continual learning</span><span class="tag">panoptic</span><span class="tag">visual prompt tuning</span><span class="tag">distillation-free</span><span class="tag">first author</span></div>
 
 > [!TIP] 30-second pitch
-> ECLIPSE does **continual (class-incremental) panoptic segmentation** without distillation or replay. After step 1, it **freezes the entire Mask2Former** and, for each new class group, learns only a small set of **visual prompts + an MLP head** (~1.3% of parameters). Freezing structurally eliminates catastrophic forgetting; a **logit-manipulation** rule fixes the no-object semantic drift and error propagation that pure freezing would cause. Distillation-free, it reaches SOTA on ADE20K continual panoptic.
+> ECLIPSE addresses <strong>continual (class-incremental) panoptic segmentation</strong> without distillation or replay. After step 1, it <strong>freezes Mask2Former parameters</strong> and learns only a small **visual-prompt set + MLP head** for each new class group—about 1.3% of all parameters. Freezing prevents drift in existing parameters and reduces forgetting, while <strong>logit manipulation</strong> corrects the changing meaning of no-object and error propagation across steps. The paper reports results that were strong at the time under ADE20K continual-panoptic protocols.
 
 **Public references:** [paper (arXiv 2403.20126)](https://arxiv.org/abs/2403.20126) · [code](https://github.com/clovaai/ECLIPSE). Backing chapter: [Continual Learning](#/cv/continual-learning).
 
 ## Problem & motivation
 
-Real deployments keep adding categories, but you rarely get to retrain on all old data (storage, privacy, cost). **Continual panoptic** is the hardest flavor of this:
+Real deployments keep adding categories, but you rarely get to retrain on all old data (storage, privacy, cost). <strong>Continual panoptic</strong> is one of the hardest versions of this problem:
 
-- **Panoptic > semantic in difficulty:** you must handle *things* (instance matching), *stuff*, and a *no-object/background* label whose meaning shifts every step. PQ = SQ × RQ is sensitive to recognition failures, and ADE20K has many instances per image.
-- **Prior art (MiB, PLOP, CoMFormer):** lean on **knowledge distillation + pseudo-labeling**. That means a doubled forward pass, sensitivity to distillation weights / thresholds, and poor scaling as steps grow.
-- Continual **panoptic** specifically was under-studied vs semantic.
+- **Additional difficulty beyond semantic segmentation:** you must handle instance matching for *things*, *stuff*, and a *no-object/background* label whose meaning shifts every step. PQ = SQ × RQ is also sensitive to recognition failures.
+- **Prior art (MiB, PLOP, CoMFormer):** lean on <strong>knowledge distillation + pseudo-labeling</strong>. That means a doubled forward pass, sensitivity to distillation weights / thresholds, and poor scaling as steps grow.
+- Continual <strong>panoptic</strong> specifically was under-studied vs semantic.
 
 ## Method
 
@@ -28,7 +28,7 @@ The no-object score for a step-$t$ token, and why sigmoid (not softmax):
 
 $$s^{\varnothing}_t=\delta\sum_{k\neq t} s^{\mathcal{C}^k}_t \qquad (\delta=0.5,\ \text{post-hoc})$$
 
-Intuition: *"if this token scores high on classes that belong to other steps, it's probably not one of my step's objects."* Classification uses **sigmoid** (independent per-class scores) because a relative **softmax** is ill-defined when the class set keeps changing across steps.
+Intuition: *"if this token scores high on classes that belong to other steps, it's probably not one of my step's objects."* Classification uses **sigmoid** (independent per-class scores) because a relative <strong>softmax</strong> is ill-defined when the class set keeps changing across steps.
 
 ```mermaid
 flowchart LR
@@ -55,7 +55,7 @@ flowchart LR
 ## SSUL — the prequel (NeurIPS 2021, co-first author)
 
 > [!NOTE] Storyboard: SSUL → ECLIPSE
-> **SSUL** (*Semantic Segmentation with Unknown Label for Exemplar-based Class-Incremental Learning*, [arXiv 2106.11562](https://arxiv.org/abs/2106.11562), [code](https://github.com/clovaai/SSUL)) tackled **continual semantic** segmentation. Its idea: model an explicit **"unknown" class** (so future/background pixels aren't force-fit into known classes) plus tiny exemplar memory, using saliency to bootstrap plasticity. ECLIPSE is the panoptic, distillation-free, replay-free evolution: prompt **isolation** replaces the unknown-label + exemplar machinery, and it stays competitive on semantic *without* saliency. Say it as one research line: *"I kept the continual-seg problem but removed its crutches — first the label ambiguity, then the distillation and the replay."*
+> **SSUL** (*Semantic Segmentation with Unknown Label for Exemplar-based Class-Incremental Learning*, [arXiv 2106.11562](https://arxiv.org/abs/2106.11562), [code](https://github.com/clovaai/SSUL)) tackled **continual semantic** segmentation. Its idea: model an explicit <strong>"unknown" class</strong> (so future/background pixels aren't force-fit into known classes) plus tiny exemplar memory, using saliency to bootstrap plasticity. ECLIPSE is the panoptic, distillation-free, replay-free evolution: prompt <strong>isolation</strong> replaces the unknown-label + exemplar machinery, and it stays competitive on semantic *without* saliency. Say it as one research line: *"I kept the continual-seg problem but removed its crutches — first the label ambiguity, then the distillation and the replay."*
 
 ## Predicted deep-dive Q&A
 
@@ -64,13 +64,13 @@ flowchart LR
 
 **Short:** You simultaneously do instance matching (things), stuff, and a no-object label whose meaning drifts each step; PQ punishes recognition errors hard.
 
-**Deep:** In semantic seg, background is a single (if shifting) class. In panoptic, "no-object" means background **+ past classes + future classes**, and that set changes every step, so any *fixed* no-object classifier becomes miscalibrated. Plus PQ = SQ × RQ collapses when recognition (RQ) fails, and ADE20K's many-instances-per-image amplifies this.
+**Deep:** In semantic seg, background is a single (if shifting) class. In panoptic, "no-object" means background <strong>+ past classes + future classes</strong>, and that set changes every step, so any *fixed* no-object classifier becomes miscalibrated. Plus PQ = SQ × RQ collapses when recognition (RQ) fails, and ADE20K's many-instances-per-image amplifies this.
 </div></details>
 
 <details class="qa"><summary>How does freezing prevent forgetting, and what does it cost?</summary>
 <div class="qa-body">
 
-**Short:** Old weights never move, so old knowledge is exactly preserved; the cost is **error propagation** and reduced plasticity.
+**Short:** Preventing updates to existing parameters reduces representation drift, but it does not preserve old knowledge or final outputs exactly. New prompts and aggregation can still introduce <strong>error propagation</strong>, and plasticity is reduced.
 
 **Deep:** If step 1 confidently mislabels a bus as a car, freezing locks that in. Logit manipulation mitigates it by letting later steps' class evidence suppress the wrong no-object decision. Reduced plasticity is real: new-class PQ trails a joint-training oracle. I recover plasticity with **deep** prompts (new-PQ 18.8 vs shallow 14.0 on 100-10, ~+100K params) and a stronger frozen init (Swin-L / COCO). Position: *"stability-first, with cheap levers for plasticity."*
 </div></details>
@@ -92,9 +92,9 @@ Softmax normalizes over a fixed class set — but the set grows every step, so a
 <details class="qa"><summary>Distillation/replay can be stronger. Why avoid them?</summary>
 <div class="qa-body">
 
-**Short:** Lower training complexity and memory, fewer fragile hyperparameters, and no need to store raw old data (privacy).
+**Short:** Lower training complexity and memory, fewer distillation hyperparameters, and no need for old-data replay. Not retaining original data can be a privacy benefit depending on policy and the rest of the pipeline.
 
-**Deep:** KD/replay methods double the forward pass and are sensitive to distillation weight and pseudo-label thresholds; they scale awkwardly. ECLIPSE trades that for prompt **isolation** — ~1.3% params, ~5.6× less train memory. The trade-off I'll name honestly: inference runs multiple prompt groups, so cost grows with steps, and very large class counts stress the prompt-set size. That's future work, but total FLOP growth is mild because the frozen trunk is shared.
+**Deep:** KD/replay methods double the forward pass and are sensitive to distillation weight and pseudo-label thresholds; they scale awkwardly. ECLIPSE trades that for prompt <strong>isolation</strong> — ~1.3% params, ~5.6× less train memory. The trade-off I'll name honestly: inference runs multiple prompt groups, so cost grows with steps, and very large class counts stress the prompt-set size. That's future work, but total FLOP growth is mild because the frozen trunk is shared.
 </div></details>
 
 ### Hard follow-ups
@@ -114,7 +114,7 @@ The **query/prompt isolation + frozen trunk** idea ports naturally to DETR-famil
 <details class="qa"><summary>Product story?</summary>
 <div class="qa-body">
 
-Adding a new category to a deployed segmentation API without full retraining or keeping old data: ship a small **adapter (prompts + MLP)**. That maps to privacy-friendly, incremental on-device or API updates — the narrative Apple/Meta-style teams care about.
+One possible product mapping is to add a small <strong>adapter (prompts + MLP)</strong> for a new category without full retraining or old-data replay. The paper alone does not establish actual deployment, on-device suitability, or privacy compliance. Connect it as a hypothesis when the JD has such requirements.
 </div></details>
 
 ## Honest limitations
@@ -125,12 +125,12 @@ Adding a new category to a deployed segmentation API without full retraining or 
 
 ## Which JD this connects to
 
-| Company | Connection |
+| JD signal | Evidence to connect |
 | --- | --- |
-| Apple | Efficient adaptation; privacy-friendly, replay-free model updates |
-| Meta | Long-lived foundation models specialized incrementally |
-| NVIDIA | Continual perception for robotics (classes appear over time) |
-| Microsoft | Scalable, low-cost model-update pipelines |
+| Continual / class-incremental perception | Prompt isolation, changing no-object semantics, long-sequence limits |
+| Parameter-efficient adaptation | About 1.3% trainable parameters per step, frozen trunk |
+| Restricted old-data storage | Replay-free training; verify privacy effects against the whole pipeline and policy |
+| Model-update systems | Adapter-level updates versus inference cost that grows with the number of steps |
 
 ## Cheat-sheet
 

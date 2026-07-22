@@ -1,72 +1,94 @@
-# The ML Coding Round
+# ML Coding Round (From Scratch)
 
-> [!TIP] Say this first
-> "ML-from-scratch" is a *finite* syllabus and the highest-leverage differentiator in a research/applied loop. Ten or so canonical problems cover the vast majority of what's asked. Memorize the shapes, the numerical-stability tricks, and the narration — then you never freeze.
+> [!NOTE] Goal of this chapter
+> This part turns what you learned **conceptually** in [What Is Machine Learning?](#/foundations/what-is-ml) and [Neural Networks: A First Pass](#/foundations/neural-networks-basics) into implementations you write **by hand**. This opening chapter maps what from-scratch implementation demands and how to approach it. It is fine if your coding syntax is still rusty—read the [NumPy & Broadcasting Primer](#/ml-coding/numpy-primer) first and the rest of this part will be much easier.
 
-This round is not LeetCode. The interviewer wants to see that you can turn **math into vectorized array code**, reason about **shapes and complexity**, and know the **failure modes** that separate someone who has trained models from someone who has only read about them. Code that runs is table stakes; the signal is in *how you get there*.
+## What "from-scratch implementation" means—and why it matters
 
-## What it actually tests
+ML coding here is different from **LeetCode algorithm puzzles**. Instead of calling a one-line library operation such as `torch.nn.Conv2d`, you use **NumPy to build the computation happening inside it**. Why is this important?
+
+- **Proof of understanding.** Implement convolution yourself and "the kernel slides, multiplies, and sums" becomes physical intuition. It clearly separates you from someone who has only called a library.
+- **Debugging ability.** When training behaves strangely, only someone who understands the internals can spot that "softmax is reducing over the wrong axis."
+- **A core interview signal.** These exercises appear often in research/applied interviews, and the syllabus is **finite**. Roughly a dozen canonical problems below cover most of it.
+
+> [!TIP] Interview one-liner
+> "ML from scratch has a finite syllabus, so it offers unusually high preparation leverage. Internalize the shape discipline, numerical-stability tricks, and explanation order, and you will not freeze under pressure." Working code is only the baseline; the real signal is *how you reach it*.
+
+## The five things interviewers actually evaluate
 
 <dl class="kv">
-<dt>Math → code fluency</dt><dd>Can you go from $\text{softmax}(x)_i = e^{x_i}/\sum_j e^{x_j}$ to a stable, batched NumPy line without hesitating?</dd>
-<dt>Vectorization mindset</dt><dd>Do you reach for broadcasting and matmul instead of Python loops? Loops are for the *first* correct version; the follow-up is always "now vectorize it."</dd>
-<dt>Shape discipline</dt><dd>Every tensor should have an annotated shape in your head and (ideally) a comment. Most bugs are shape/axis bugs.</dd>
-<dt>Numerical stability</dt><dd>Do you subtract the max before `exp`? Use log-sum-exp? Clamp before `log`? This is the single most common tell.</dd>
-<dt>Edge cases & tests</dt><dd>Empty inputs, zero-area boxes, single-element batches, ties. Write a `__main__` sanity check unprompted.</dd>
+<dt>Equation → code fluency</dt><dd>Can you translate an equation such as $\text{softmax}(x)_i = e^{x_i}/\sum_j e^{x_j}$ into stable NumPy code without hesitation?</dd>
+<dt>Vectorized thinking</dt><dd>Do you reach for Python <code>for</code> loops, or for <b>broadcasting</b> and <b>matrix multiplication</b>? Loops are acceptable for a <i>first correct answer</i>; the follow-up is almost always, "Now vectorize it."</dd>
+<dt>Shape discipline</dt><dd>Do you track every array's shape in your head and in comments? Most bugs are shape or axis mistakes.</dd>
+<dt>Numerical stability</dt><dd>Do you subtract the maximum before <code>exp</code>? Clamp before <code>log</code>? These are common differentiators.</dd>
+<dt>Edge cases & tests</dt><dd>Empty input, zero-area boxes, a one-element batch, ties. Add a sanity check under <code>__main__</code> without being asked.</dd>
 </dl>
 
-## The canonical question list
+## Core concept: vectorization means "replace loops with array operations"
 
-<div class="card-grid">
-  <a class="card" href="#/ml-coding/nms-iou"><div class="card-emoji">📦</div><div class="card-title">IoU & NMS</div><div class="card-desc">Pairwise IoU by broadcasting; greedy + Soft-NMS. The detection classic.</div></a>
-  <a class="card" href="#/ml-coding/conv-pooling"><div class="card-emoji">🔲</div><div class="card-title">Conv & Pooling</div><div class="card-desc">Naive loops → im2col + GEMM; max/avg pool. Do you understand cuDNN's path?</div></a>
-  <a class="card" href="#/ml-coding/attention"><div class="card-emoji">🎯</div><div class="card-title">Attention</div><div class="card-desc">Scaled dot-product + multi-head, masks, stable softmax. The VLM/LLM core.</div></a>
-  <a class="card" href="#/ml-coding/transformer"><div class="card-emoji">🧱</div><div class="card-title">Transformer Block</div><div class="card-desc">MHA + FFN + residual + norm, causal mask, KV-cache.</div></a>
-  <a class="card" href="#/ml-coding/kmeans"><div class="card-emoji">🌀</div><div class="card-title">K-Means</div><div class="card-desc">Lloyd + k-means++, vectorized distances, empty-cluster handling.</div></a>
-  <a class="card" href="#/ml-coding/dataloader-augmentation"><div class="card-emoji">🔀</div><div class="card-title">Dataloader & Aug</div><div class="card-desc">Batch/shuffle/collate + label-synced augmentation. Interface design.</div></a>
-  <a class="card" href="#/ml-coding/losses-gradients"><div class="card-emoji">📉</div><div class="card-title">Losses & Gradients</div><div class="card-desc">MSE/CE/BCE/focal, softmax-CE gradient, autograd-free backward.</div></a>
-  <a class="card" href="#/ml-coding/metrics-map-miou"><div class="card-emoji">📊</div><div class="card-title">mAP & mIoU</div><div class="card-desc">Confusion-matrix mIoU; per-image greedy matching + PR integration.</div></a>
-</div>
+Ninety percent of from-scratch implementation is replacing explicit loops with array operations. The most important tool is **broadcasting**—the rule that automatically aligns arrays with different shapes. For example, it can compute every pairwise distance between $N$ points and $M$ points without a nested loop:
 
-## How to narrate
+<figure>
+<svg viewBox="0 0 640 210" xmlns="http://www.w3.org/2000/svg" font-family="Inter, sans-serif" font-size="12">
+  <!-- A: (N,1,D) -->
+  <rect x="30" y="60" width="40" height="110" rx="6" fill="none" stroke="#0ea5e9" stroke-width="1.8"/>
+  <line x1="30" y1="97" x2="70" y2="97" stroke="#0ea5e9"/><line x1="30" y1="134" x2="70" y2="134" stroke="#0ea5e9"/>
+  <text x="50" y="50" text-anchor="middle" fill="#0ea5e9">A</text>
+  <text x="50" y="192" text-anchor="middle" fill="#98a3b2">(N,1,D)</text>
+  <text x="95" y="120" text-anchor="middle" font-size="18" fill="currentColor">+</text>
+  <!-- B: (1,M,D) -->
+  <rect x="120" y="90" width="120" height="40" rx="6" fill="none" stroke="#e0533f" stroke-width="1.8"/>
+  <line x1="160" y1="90" x2="160" y2="130" stroke="#e0533f"/><line x1="200" y1="90" x2="200" y2="130" stroke="#e0533f"/>
+  <text x="180" y="80" text-anchor="middle" fill="#e0533f">B</text>
+  <text x="180" y="150" text-anchor="middle" fill="#98a3b2">(1,M,D)</text>
+  <text x="270" y="120" text-anchor="middle" font-size="18" fill="currentColor">→</text>
+  <!-- result grid (N,M,D) -->
+  <text x="470" y="40" text-anchor="middle" fill="#12a150">broadcasting fills the (N,M,D) grid</text>
+  <g stroke="#12a150" stroke-width="1.5" fill="rgba(18,161,80,.12)">
+    <rect x="330" y="60" width="30" height="30"/><rect x="360" y="60" width="30" height="30"/><rect x="390" y="60" width="30" height="30"/><rect x="420" y="60" width="30" height="30"/>
+    <rect x="330" y="90" width="30" height="30"/><rect x="360" y="90" width="30" height="30"/><rect x="390" y="90" width="30" height="30"/><rect x="420" y="90" width="30" height="30"/>
+    <rect x="330" y="120" width="30" height="30"/><rect x="360" y="120" width="30" height="30"/><rect x="390" y="120" width="30" height="30"/><rect x="420" y="120" width="30" height="30"/>
+  </g>
+  <text x="315" y="80" text-anchor="end" fill="#0ea5e9">N rows ↓</text>
+  <text x="390" y="170" text-anchor="middle" fill="#e0533f">M columns →</text>
+</svg>
+<figcaption>One line—<code>A[:,None,:] + B[None,:,:]</code>—computes all N×M pairs without loops. Inserting a length-one axis with <code>None</code> to align shapes is the central vectorization habit. See the <a href="#/ml-coding/numpy-primer">NumPy Primer</a> for the full rules.</figcaption>
+</figure>
 
-The interviewer scores your process, not just the artifact. Follow a visible loop:
+Four moves cover roughly 90% of cases:
+
+| Tool | When to use it | Example |
+| --- | --- | --- |
+| **Broadcasting** | pairwise / outer operations | `a[:,None,:] - b[None,:,:]` → `(N,M,D)` distances |
+| **matmul / einsum** | dot products, projections | `q @ k.T`, `np.einsum('nd,md->nm', a, b)` |
+| **Fancy/Boolean indexing** | gather, mask, scatter | `probs[np.arange(N), targets]` |
+| **`reshape`/`transpose`** | split/merge heads, im2col | `.reshape(B,T,H,Dh).transpose(0,2,1,3)` |
+
+## How to solve the problem (your explanation is part of the score)
+
+Interviewers evaluate the **process**, not just the artifact. Follow a visible loop:
 
 ```mermaid
 flowchart LR
-  A["Clarify<br/>I/O, shapes, dtype"] --> B["State math<br/>+ complexity"]
-  B --> C["Correct version<br/>loops OK"]
-  C --> D["Vectorize<br/>broadcasting/matmul"]
-  D --> E["Test<br/>edge cases + assert"]
-  E --> F["Follow-ups<br/>memory, batch, stability"]
+  A["① Clarify<br/>I/O, shape, dtype"] --> B["② Equation + complexity<br/>say it first"]
+  B --> C["③ Correct version<br/>loops are OK"]
+  C --> D["④ Vectorize<br/>broadcasting/matmul"]
+  D --> E["⑤ Test<br/>edge cases + assert"]
+  E --> F["⑥ Follow-ups<br/>memory · batch · stability"]
 ```
 
-1. **Clarify the contract.** "Boxes are `[x1,y1,x2,y2]`, float, `(N,4)`? Scores `(N,)`? Do I return indices or filtered boxes?" One good clarifying question buys trust.
-2. **State the math and the complexity out loud** before typing. "IoU is intersection over union; pairwise is $O(NM)$ and I'll materialize an $(N,M)$ matrix."
-3. **Get a correct version first**, loops allowed. Then say "let me vectorize" and do it. Showing both is *more* signal than jumping straight to the clever version.
-4. **Annotate shapes** in comments as you go. `# (B, H, T, Dh)`.
-5. **Test unprompted.** A three-line `__main__` with an `assert` says "I ship working code."
+1. **Clarify the contract.** "Are boxes float arrays of shape `(N,4)` in `[x1,y1,x2,y2]` order? Should I return indices or filtered boxes?" One good question buys trust.
+2. **Say the equation and complexity aloud** before typing. "IoU is intersection over union, pairwise computation is $O(NM)$, and I will build an `(N,M)` matrix."
+3. Build a **correct version first**, loops allowed. Then say "I will vectorize this" and do it. Showing both gives a stronger signal than jumping directly to a clever implementation.
+4. Track **shapes in comments** as you work: `# (B, H, T, Dh)`.
+5. **Test without being prompted.** A three-line `__main__` with one `assert` says, "I ship working code."
 
-> [!WARNING] The freeze trap
-> If you blank, retreat to the naive triple-loop and *say so*: "Here's the obviously-correct version; I'll vectorize next." A slow-correct answer with clear narration beats a stalled clever one every time.
-
-## The vectorization mindset
-
-Replace explicit loops over data with array ops. The three moves that cover ~90% of cases:
-
-| Move | When | Example |
-| --- | --- | --- |
-| **Broadcasting** | pairwise / outer ops | `a[:,None,:] - b[None,:,:]` → `(N,M,D)` distances |
-| **matmul / einsum** | inner products, projections | `q @ k.T`, `np.einsum('nd,md->nm', a, b)` |
-| **Fancy/boolean indexing** | gather, mask, scatter | `probs[np.arange(N), targets]` |
-| **`reshape`/`transpose`** | split/merge heads, im2col | `.reshape(B,T,H,Dh).transpose(0,2,1,3)` |
-
-> [!NOTE] The `[:, None]` reflex
-> Inserting a length-1 axis (`None`/`np.newaxis`/`unsqueeze`) to line tensors up for broadcasting is the single most useful habit. Whenever you'd write a nested loop over two collections, ask "can I add axes and let broadcasting do it?"
+> [!WARNING] When you freeze
+> If your mind goes blank, fall back to the naive triple loop and *say so*: "I will establish an obviously correct version first, then vectorize it." A slow, clearly explained correct answer beats a clever answer that never materializes.
 
 ## Numerical-stability checklist
 
-Interviewers actively look for these. Internalize the four:
+Interviewers actively look for these four items. **Log-sum-exp (LSE)** is the trick that stabilizes `log(sum(exp(x)))`: direct evaluation can overflow in `exp`, so pull the maximum outside.
 
 $$
 \text{softmax}(x)_i = \frac{e^{x_i - \max_k x_k}}{\sum_j e^{x_j - \max_k x_k}}
@@ -74,64 +96,81 @@ $$
 \text{LSE}(x) = \max_k x_k + \log\!\sum_j e^{x_j - \max_k x_k}
 $$
 
-- **Stable softmax:** subtract `max` along the axis before `exp`. The result is identical mathematically but avoids `inf`. *(verifiable)*
-- **Log-sum-exp:** never compute `log(sum(exp(x)))` directly — factor out the max. Cross-entropy from logits uses this implicitly.
-- **Clamp before `log`:** `np.log(np.clip(p, 1e-12, 1.0))` to avoid `log(0) = -inf`.
-- **Guard divisions:** `x / np.maximum(denom, eps)` for IoU unions, softmax denominators, Dice.
-- **Prefer `log1p`/`expm1`/`logaddexp`/`logsigmoid`** for BCE and focal loss instead of composing `log` and `exp` yourself.
+- **Stable softmax:** subtract the maximum along the reduction axis before `exp`. The result is unchanged, but you avoid `inf`.
+- **Log-sum-exp:** never compute `log(sum(exp(x)))` directly; pull out the maximum. Cross-entropy from logits uses this implicitly.
+- **Clamp before `log`:** use `np.log(np.clip(p, 1e-12, 1.0))` to avoid `log(0) = -inf`.
+- **Guard division:** for IoU unions, softmax denominators, and Dice, use `x / np.maximum(denom, eps)`.
 
 > [!DANGER] Common bugs interviewers watch for
-> `argsort` gives ascending order (use `[::-1]` or `argsort(-x)` for scores); NumPy views alias memory (`.copy()` before in-place edits); integer division in the conv output-size formula; forgetting `keepdims=True` so a reduction broadcasts back; softmax over the wrong axis; off-by-one in causal masks.
+> `argsort` is ascending, so scores need `argsort(-x)`; NumPy views share memory, so call `.copy()` before in-place edits; integer division in convolution output-size formulas; forgetting `keepdims=True`, so a reduction cannot broadcast back; applying softmax over the wrong axis; and off-by-one errors in causal masks.
 
-<details class="qa"><summary>Why do interviewers love the "now vectorize it" follow-up?</summary>
-<div class="qa-body">
+## Canonical problem list
 
-**Short:** it separates people who *use* frameworks from people who *understand* the array model underneath them.
+You will implement each of these across this part and the computer-vision part. Every chapter includes an **executable code editor**.
 
-**Deep:** a vectorized solution forces you to reason about the exact shape of every intermediate, where broadcasting happens, and the memory cost of materializing an intermediate (e.g., the $(N,M)$ IoU matrix or the $O(T^2)$ attention matrix). That reasoning is exactly what you need when you later profile a slow training loop or decide whether FlashAttention is worth it. It's a proxy for real engineering maturity.
-</div></details>
+<div class="card-grid">
+  <a class="card" href="#/ml-coding/losses-gradients"><div class="card-emoji">📉</div><div class="card-title">Losses & Gradients</div><div class="card-desc">MSE/CE/BCE/focal, softmax-CE gradient, backward without autograd.</div></a>
+  <a class="card" href="#/ml-coding/conv-pooling"><div class="card-emoji">🔲</div><div class="card-title">Convolution & Pooling</div><div class="card-desc">Naive loops → im2col + GEMM; max/average pooling.</div></a>
+  <a class="card" href="#/ml-coding/attention"><div class="card-emoji">🎯</div><div class="card-title">Attention</div><div class="card-desc">Scaled dot-product + multi-head, masking, stable softmax.</div></a>
+  <a class="card" href="#/ml-coding/transformer"><div class="card-emoji">🧱</div><div class="card-title">Transformer Block</div><div class="card-desc">MHA + FFN + residual + norm, causal mask, KV cache.</div></a>
+  <a class="card" href="#/ml-coding/kmeans"><div class="card-emoji">🌀</div><div class="card-title">K-Means</div><div class="card-desc">Lloyd + k-means++, vectorized distances, empty-cluster handling.</div></a>
+  <a class="card" href="#/ml-coding/dataloader-augmentation"><div class="card-emoji">🔀</div><div class="card-title">Dataloader & Augmentation</div><div class="card-desc">Batch/shuffle/collate + label-synchronized augmentation.</div></a>
+  <a class="card" href="#/ml-coding/nms-iou"><div class="card-emoji">📦</div><div class="card-title">IoU & NMS</div><div class="card-desc">Broadcasting pairwise IoU; greedy + Soft-NMS. (Computer-vision part)</div></a>
+  <a class="card" href="#/ml-coding/metrics-map-miou"><div class="card-emoji">📊</div><div class="card-title">mAP & mIoU</div><div class="card-desc">Confusion-matrix mIoU; greedy matching + PR. (Computer-vision part)</div></a>
+</div>
 
-<details class="qa"><summary>NumPy or PyTorch — which should I write in?</summary>
-<div class="qa-body">
+> [!NOTE] Reading order
+> **IoU/NMS and mAP/mIoU** now live in the **computer-vision part**, where they sit next to detection and segmentation; their file paths and links remain unchanged. Here, you implement the central neural-network blocks—losses, convolution, attention, and the Transformer—beside their theory chapter, [CNNs, RNNs & Transformers](#/foundations/architectures).
 
-**Short:** default to NumPy for the algorithm, mention the framework one-liner.
+## Allocating 35 minutes
 
-**Deep:** NumPy from-scratch proves you understand the operation; then name the production path (`torchvision.ops.nms`, `F.scaled_dot_product_attention`, `F.cross_entropy`). If the problem is explicitly about autograd or GPU tensors (a Transformer block, a custom backward), write PyTorch. Match the interviewer's framing, and always state "in production I'd use X" so they know you're not reinventing wheels by ignorance.
-</div></details>
+A typical ML coding slot lasts about 35–45 minutes. Leave room for follow-ups, which carry as much signal as the code:
 
-### Follow-ups you should expect on *every* problem
-- **"What's the time and memory complexity?"** — have the answer ready before they ask.
-- **"How would you batch this?"** — usually fold a dimension into the batch axis or broadcast one more axis.
-- **"Where does this break numerically?"** — point at the `exp`, the `log`, or the division.
-- **"How would you test it?"** — numerical gradient check for losses; a known closed-form case for IoU; a degenerate/empty input everywhere.
-
-## Budget your 35 minutes
-
-A typical ML-coding slot is ~35–45 minutes. A rough allocation that leaves room for the follow-ups (which carry as much signal as the code):
-
-| Phase | Time | What you're doing |
+| Stage | Time | What to do |
 | --- | --- | --- |
-| Clarify | 2–3 min | pin down I/O, shapes, dtype, return type |
-| Math + plan | 3–4 min | state the formula and complexity out loud |
+| Clarify | 2–3 min | lock down I/O, shape, dtype, and return type |
+| Equation + plan | 3–4 min | state the formula and complexity aloud |
 | Correct version | 10–12 min | loops allowed; narrate shapes |
-| Vectorize | 6–8 min | broadcasting / matmul; keep it running |
-| Test | 4–5 min | `__main__` with an `assert` on a known case |
-| Follow-ups | remaining | memory, batching, stability, production path |
+| Vectorize | 6–8 min | broadcasting/matmul; keep it runnable |
+| Test | 4–5 min | `__main__` with a known-case `assert` |
+| Follow-ups | remaining time | memory, batching, stability, production path |
 
-> [!EXAMPLE] What "good" sounds like on IoU
-> "Boxes are `(N,4)` xyxy floats — I'll return an `(N,M)` matrix. Intersection is `max` of the top-lefts, `min` of the bottom-rights, clamped at zero; union is $A+B-I$ with an epsilon guard. It's $O(NM)$ time and memory. Here's the broadcasted version…" — then code, then a closed-form assert. That single opening sentence already banks most of the process signal.
+## Q&A
+
+<details class="qa"><summary>Why do interviewers like asking, "Now vectorize it"?</summary>
+<div class="qa-body">
+
+**Short:** It separates someone who can *use* a library from someone who understands the array model underneath it.
+
+**Deep:** A vectorized solution forces you to reason about every intermediate shape, where broadcasting occurs, and the memory cost of actually materializing intermediate arrays—for example an $(N,M)$ IoU matrix or an $O(T^2)$ attention matrix. The same reasoning is later required to profile a slow training loop or understand why FlashAttention matters.
+</div></details>
+
+<details class="qa"><summary>Should I use NumPy or PyTorch?</summary>
+<div class="qa-body">
+
+**Short:** Default to NumPy for the algorithm, and name the one-line framework equivalent.
+
+**Deep:** A from-scratch NumPy implementation demonstrates the operation itself; then name the production path—`torchvision.ops.nms`, `F.scaled_dot_product_attention`, or `F.cross_entropy`. Use PyTorch when autograd or GPU tensors are central, such as a Transformer block or custom backward. Always add, "In production I would use X," so it is clear that you are rebuilding the wheel to demonstrate understanding, not from ignorance.
+</div></details>
+
+### Follow-ups to expect on every problem
+
+- **"What are the time and memory complexities?"** Prepare them before being asked.
+- **"How would you batch this?"** Usually fold one axis into the batch or add one more broadcasting axis.
+- **"Where does this fail numerically?"** Point to `exp`, `log`, and division.
+- **"How would you test it?"** Use numerical gradient checks for losses, closed-form cases for IoU, and degenerate/empty inputs everywhere.
 
 ## Cheat-sheet
 
-| Problem | Core trick | Complexity | Stability watch-out |
+| Problem | Core trick | Complexity | Stability concern |
 | --- | --- | --- | --- |
-| IoU / NMS | broadcast lt/rb, `max(0, rb-lt)` | $O(NM)$ / greedy loop | `eps` in union |
-| Conv | im2col → GEMM | $O(N C_o C_i K^2 HW)$ | output-size integer div |
-| Attention | `qkᵀ/√d`, stable softmax | $O(T^2 d)$ | subtract max, mask with $-\infty$ |
-| Transformer block | pre-norm, residual, causal mask | $O(T^2 d + T d^2)$ | LN eps, mask before softmax |
-| K-Means | $\lVert x-c\rVert^2 = \lVert x\rVert^2+\lVert c\rVert^2-2x\!\cdot\!c$ | $O(NKD)$/iter | clamp dist $\ge 0$, empty clusters |
-| Dataloader | shuffle idx, batch, collate | $O(N)$ | `drop_last`, `.copy()` on aug |
-| Losses | `p - onehot(y)` is the CE grad | $O(NC)$ | stable softmax, clamp log, logsigmoid |
-| mAP / mIoU | confusion via `bincount`; PR integral | $O(HW)$ / $O(P\log P)$ | per-image greedy matching |
+| Losses & gradients | `p - onehot(y)` is the CE gradient | $O(NC)$ | stable softmax, log clamp |
+| Convolution | im2col → GEMM | $O(N C_o C_i K^2 HW)$ | integer division in output size |
+| Attention | `qkᵀ/√d`, stable softmax | $O(T^2 d)$ | subtract max, $-\infty$ mask |
+| Transformer block | pre-norm, residual, causal mask | $O(T^2 d + T d^2)$ | layer-norm eps, mask before softmax |
+| K-Means | $\lVert x-c\rVert^2=\lVert x\rVert^2+\lVert c\rVert^2-2x\!\cdot\!c$ | $O(NKD)$/iter | clamp distance $\ge 0$, empty cluster |
+| Dataloader | shuffle→batch→collate | $O(N)$ | `drop_last`, `.copy()` before augmentation |
+| IoU / NMS | broadcast lt/rb, `max(0, rb-lt)` | $O(NM)$/greedy | union `eps` |
+| mAP / mIoU | `bincount` confusion; PR integration | $O(HW)$/$O(P\log P)$ | per-image greedy matching |
 
-**Cross-links:** [Attention](#/foundations/architectures) · [Detection](#/cv/detection) · [Segmentation](#/cv/segmentation) · [Optimization](#/foundations/optimization) · [Evaluation Metrics](#/foundations/evaluation-metrics) · [Normalization & Stability](#/foundations/normalization-stability)
+**Next:** [NumPy Primer](#/ml-coding/numpy-primer) · [Losses & Gradients](#/ml-coding/losses-gradients) · [CNNs, RNNs & Transformers](#/foundations/architectures) · [Detection](#/cv/detection) · [Optimization](#/foundations/optimization)

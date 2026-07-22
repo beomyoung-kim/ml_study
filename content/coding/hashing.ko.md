@@ -1,7 +1,7 @@
 # Hashing
 
 > [!TIP] The cue
-> brute force가 loop 안에서 **membership, complement, frequency, "이거 전에 본 적 있나?"** 조회를 반복할 때마다, hash map/set은 각각에 **average O(1)**을 사주고 nested loop를 O(N)으로 무너뜨립니다. 뭔가를 *찾기* 위해 inner loop를 쓰고 있다는 걸 알아차리면, hash를 꺼내세요.
+> brute force가 loop 안에서 **membership, complement, frequency, "이거 전에 본 적 있나?" 조회를** 반복할 때마다, hash map/set은 각각에 **average O(1)을** 사주고 nested loop를 O(N)으로 무너뜨립니다. 뭔가를 *찾기* 위해 inner loop를 쓰고 있다는 걸 알아차리면, hash를 꺼내세요.
 
 거래는 time을 space와 바꾸는 것입니다: 본 것을 기억하는 데 O(N) 메모리를 씁니다 — 값, 그 index, 그 count, 또는 prefix aggregate. 고전적인 업그레이드는 **complement lookup**(Two Sum), **prefix-sum + hash**(음수가 있어도 subarray count), **canonical-key grouping**(anagram — [Arrays & Strings](#/coding/arrays-strings) 참고)입니다.
 
@@ -129,7 +129,7 @@ class LRUCache:
 ## Pitfalls
 
 > [!WARNING] Hashing gotchas
-> - hash 연산은 worst-case가 아니라 **"average O(1)"**이라고 말하세요 — adversarial key는 O(N)으로 나빠집니다.
+> - hash 연산은 worst-case가 아니라 **"average O(1)"이라고** 말하세요 — adversarial key는 O(N)으로 나빠집니다.
 > - key는 **hashable**해야 합니다: `list`가 아니라 `tuple`을 쓰세요(예: anagram용 frozen count vector).
 > - `defaultdict`는 read 시 없는 key를 생성합니다 — 그게 조용히 map을 부풀릴 수 있습니다; insertion을 원치 않으면 `.get(k, default)`를 쓰세요.
 > - 객체를 identity로 저장하느냐 value로 저장하느냐 — `__hash__`/`__eq__`를 일관되게 정의하거나, primitive signature를 key로 하세요.

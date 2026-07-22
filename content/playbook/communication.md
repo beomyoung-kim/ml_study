@@ -3,7 +3,7 @@
 <div class="tag-row"><span class="tag">think aloud</span><span class="tag">headline-first</span><span class="tag">driving vs driven</span><span class="tag">"I don't know"</span><span class="tag">time management</span></div>
 
 > [!TIP] The meta-rule
-> In almost every round, **how you communicate is scored as heavily as what you know.** Meta explicitly notes a *perfect* solution can be a no-hire if you didn't show the thinking they wanted. Your job is to make your reasoning *legible and steerable* — narrate the structure, lead with the answer, and drive the conversation instead of waiting to be driven.
+> In most rounds, not only the answer but also how you structure the problem and collaborate is an important signal. The exact rubric varies by company and round, so prioritize the recruiter's prep guide; make your reasoning *legible and steerable*, narrate the structure, lead with the answer, and help drive the conversation.
 
 This chapter is round-agnostic delivery: it applies to coding, ML depth, system design, the [job talk](#/research/job-talk), and [behavioral](#/behavioral/star).
 
@@ -45,7 +45,7 @@ flowchart LR
 | --- | --- | --- |
 | "Why does BatchNorm help?" | "Well, first consider the loss surface, and gradients, and…" | "**It smooths the loss landscape**, which lets you use higher learning rates. Three mechanisms: …" |
 | "How would you design this?" | "So there's data, and then models, and…" | "**I'd frame it as a two-stage retrieve-then-rank system.** Let me state assumptions, then walk data → model → serving." |
-| "Tell me about a conflict." | "So the background is…" | "**I disagreed with a serving engineer on ZIM about quality vs. latency, and we resolved it with a shared eval set.** Here's how…" |
+| "Tell me about a conflict." | "So the background is…" | "**On a project, model quality and latency priorities conflicted, and we decided using shared evaluation criteria.** Here's how…" |
 
 > [!TIP] The "signpost" trick
 > Announce the shape before the content: *"There are three trade-offs here — let me take them in order."* Now the interviewer can track you, interrupt precisely, and you sound organized even while thinking.
@@ -64,7 +64,7 @@ The balance: **you own the structure; they own the priorities.** When they redir
 
 ## Handling "I don't know"
 
-This is a *skill*, not a failure. NVIDIA and MSR explicitly reward a graceful "I don't know, but here's how I'd find out." What sinks candidates is bluffing — confident wrong answers destroy trust instantly.
+This is a *skill*, not a failure. Exact evaluation practices differ by organization, but stating the boundary of your knowledge and giving a verification path usually demonstrates reasoning and trustworthiness better than hiding what you do not know. A confident guess can undermine trust in the follow-up.
 
 ```mermaid
 flowchart TB
@@ -111,7 +111,7 @@ Running out of time with nothing working is the worst outcome; a clean partial w
 
 ## Delivery for a non-native English speaker
 
-The candidate is a Korean native with professional English. The bar is **audible structure, not native fluency** — and structure is fully controllable.
+For a non-native English speaker, the goal is not to sound native; it is **easy-to-follow structure and precise meaning**. Prioritize sentence structure, pace, and signposts over accent.
 
 - One idea per sentence; avoid relative-clause chains.
 - Signpost aggressively: *First / Second / The trade-off is / To summarize.*

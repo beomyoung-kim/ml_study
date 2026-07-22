@@ -1,7 +1,7 @@
 # Graphs (BFS / DFS)
 
 > [!TIP] 이 말부터 시작하세요
-> "거의 모든 graph 문제는 `adjacency list + visited`입니다. BFS는 **unweighted** graph에서 최단 경로를 주고, DFS는 연결성, 사이클, topological order를 줍니다. priority queue를 더하면 Dijkstra가 됩니다." 표현 방식과 traversal 선택을 먼저 언급하는 것이 신호의 절반입니다.
+> "많은 기본 graph 문제는 `adjacency list + visited`에서 시작합니다. BFS는 **unweighted** graph의 최단 edge 수를 구하고, DFS는 연결성·사이클·위상정렬의 재료가 됩니다. non-negative weighted shortest path라면 priority queue를 쓰는 Dijkstra를 고려합니다." 표현 방식과 traversal 선택을 먼저 언급하는 것이 신호의 절반입니다.
 
 Grid, dependency DAG, social graph는 같은 추상화입니다. 면접 스킬은 traversal을 고르고, `visited`를 정확히 추적하고, 네 가지 확장을 아는 것입니다: BFS → Dijkstra (가중치), DFS → topo-sort / cycle 감지, 컴포넌트 union → [Union-Find](#/coding/union-find).
 

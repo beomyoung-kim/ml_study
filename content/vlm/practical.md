@@ -2,7 +2,52 @@
 
 <div class="tag-row"><span class="tag">image tokens</span><span class="tag">chat templates</span><span class="tag">AnyRes tiling</span><span class="tag">dynamic resolution</span><span class="tag">token budget</span><span class="tag">SFT masking</span><span class="tag">debugging</span></div>
 
-> [!TIP] Why this chapter wins interviews
+> [!NOTE] Goal of this chapter
+> If [VLM 101](#/vlm/vlm-101) supplied the picture of how an image becomes tokens, this chapter covers the <strong>plumbing you touch when actually running it</strong>: how one `<image>` placeholder expands into multiple visual embeddings inserted among text tokens, and how chat templates, resolution, token budgets, and loss masks work. The emphasis is on where implementations break, not on another conceptual overview.
+
+## What & why
+
+"LLaVA glues CLIP to an LLM" is easy to say. But **actually training or running inference** requires a substantial layer of plumbing in between. An image is not text: it must become **visual tokens** the model can consume, inserted in the text sequence with the **exact slot count**. A mismatch of even one slot can crash training immediately.
+
+Keep one picture in mind: **visual tokens are simply mixed into the text-token sequence.** To the LLM, an image is part of one token stream.
+
+<figure>
+<svg viewBox="0 0 660 190" xmlns="http://www.w3.org/2000/svg" font-family="Inter, sans-serif" font-size="12">
+  <!-- image -->
+  <text x="52" y="26" text-anchor="middle" fill="#98a3b2">Image</text>
+  <g stroke="#0ea5e9" stroke-width="1.2" fill="none">
+    <rect x="24" y="34" width="56" height="56" rx="4"/>
+    <line x1="43" y1="34" x2="43" y2="90"/><line x1="61" y1="34" x2="61" y2="90"/>
+    <line x1="24" y1="52" x2="80" y2="52"/><line x1="24" y1="72" x2="80" y2="72"/>
+  </g>
+  <text x="52" y="106" text-anchor="middle" fill="#98a3b2" font-size="10">→ patches</text>
+  <path d="M84 62 H120" stroke="#98a3b2" stroke-width="1.4" marker-end="url(#a)"/>
+  <rect x="122" y="46" width="70" height="32" rx="7" fill="#6366f1"/>
+  <text x="157" y="66" text-anchor="middle" fill="#fff" font-size="10">Encoder+proj.</text>
+  <path d="M192 62 H224" stroke="#98a3b2" stroke-width="1.4" marker-end="url(#a)"/>
+  <!-- token stream -->
+  <text x="440" y="26" text-anchor="middle" fill="#98a3b2">Token sequence entering the LLM</text>
+  <g font-size="10" text-anchor="middle">
+    <rect x="230" y="46" width="40" height="30" rx="4" fill="none" stroke="#98a3b2"/><text x="250" y="65" fill="currentColor">This</text>
+    <rect x="272" y="46" width="40" height="30" rx="4" fill="none" stroke="#98a3b2"/><text x="292" y="65" fill="currentColor">photo</text>
+    <rect x="316" y="46" width="30" height="30" rx="4" fill="#e0533f"/><text x="331" y="65" fill="#fff">🖼</text>
+    <rect x="348" y="46" width="30" height="30" rx="4" fill="#e0533f"/><text x="363" y="65" fill="#fff">🖼</text>
+    <rect x="380" y="46" width="30" height="30" rx="4" fill="#e0533f"/><text x="395" y="65" fill="#fff">🖼</text>
+    <rect x="412" y="46" width="30" height="30" rx="4" fill="#e0533f"/><text x="427" y="65" fill="#fff">🖼</text>
+    <rect x="444" y="46" width="44" height="30" rx="4" fill="none" stroke="#98a3b2"/><text x="466" y="65" fill="currentColor">what?</text>
+  </g>
+  <text x="360" y="100" text-anchor="middle" fill="#e0533f" font-size="10">Red = M visual tokens (one &lt;image&gt; expands to M slots)</text>
+  <path d="M224 62 C 260 62, 280 62, 316 62" stroke="#0ea5e9" stroke-width="1.4" fill="none" marker-end="url(#b)"/>
+  <text x="330" y="150" text-anchor="middle" fill="#98a3b2">Text (gray) + visual tokens (red) → one LLM input sequence (projector fusion)</text>
+  <defs>
+    <marker id="a" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0 0 L6 3 L0 6" fill="#98a3b2"/></marker>
+    <marker id="b" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0 0 L6 3 L0 6" fill="#0ea5e9"/></marker>
+  </defs>
+</svg>
+<figcaption>Image → patches → encoder/projector → M visual tokens. Those M slots are inserted exactly at the text's <code>&lt;image&gt;</code> placeholder. "Exactly M" is this chapter's central obsession.</figcaption>
+</figure>
+
+> [!TIP] One interview line
 > Anyone can say "LLaVA glues CLIP to an LLM." The signal that you have *actually trained a VLM* is fluency in the plumbing: how one `<image>` token becomes N visual embeddings, how AnyRes tiling changes the token count, which tokens get a loss, and which bug produces which symptom. This chapter is that plumbing.
 
 ## What a VLM forward pass actually does
@@ -21,7 +66,7 @@ flowchart LR
   LLM --> LOG["logits (B×T×V)"]
 ```
 
-**The core idea:** a block of visual tokens is spliced *into the middle* of the text token sequence at the image-placeholder positions. To the LLM, the image is just part of one token stream (early / projector fusion).
+This is the textual version of the figure above. The **encoder** turns the image into patch features, the **projector**—usually a small MLP—maps them into the LLM's dimension, and the resulting M visual tokens are **scattered** into placeholder positions in the text-embedding sequence.
 
 ## 1 · Special tokens & the image placeholder
 
@@ -34,7 +79,7 @@ flowchart LR
 | Reserved | `<\|reserved_special_token_0\|>` | future expansion |
 
 > [!WARNING] The two-places rule
-> A special token must exist in **both** the tokenizer config **and** the model embedding matrix. If you add one, call `resize_token_embeddings(len(tokenizer))` or every forward pass indexes garbage. New rows are typically init'd to the *mean* embedding, not random, to avoid a loss spike.
+> If the architecture receives a special token as an actual `input_id`, keep the tokenizer and embedding/LM-head sizes aligned; after `resize_token_embeddings`, verify weight tying and checkpoint saving. By contrast, an implementation whose processor removes or expands the placeholder before LM input may use a separate virtual token. Mean initialization for a new row is one option, not a universal optimum; encode→decode and ID-range tests matter more.
 
 ### One `<image>`, many embeddings
 
@@ -71,7 +116,7 @@ prompt = processor.apply_chat_template(messages, tokenize=False,
 ```
 
 > [!DANGER] Template mismatch = silent quality collapse
-> If you train with Llama's `[INST]…[/INST]` but infer with ChatML `<|im_start|>`, the model produces fluent garbage — no error, just wrong. **Train-time and inference-time templates must be byte-identical.** This is the first thing to check when a fine-tune "works in training but is bad in the demo."
+> Training and inference must share the **token sequence and semantic contract** created by roles, special tokens, image position, and generation prompt. Different source bytes may tokenize identically, while one whitespace character can change the tokens; the right standard is pinned processor/tokenizer versions and a token-ID round-trip test, not byte identity alone.
 
 ## 3 · Dynamic resolution & AnyRes tiling
 
@@ -104,11 +149,11 @@ flowchart TB
 - Token count can explode on huge images → needs a budget cap.
 </div></div>
 
-**[VERIFIED] anchor:** *Qwen2.5-VL* (arXiv 2502.13923) trains a native dynamic-resolution ViT from scratch with window attention and uses absolute-time mRoPE; *LLaVA-NeXT / InternVL* use AnyRes tiling on a fixed encoder. For dense OCR/documents, native-resolution generally wins; tiling is the pragmatic path when reusing an off-the-shelf encoder.
+**Concrete example:** [Qwen2.5-VL](https://arxiv.org/abs/2502.13923) uses dynamic resolution, window attention, multimodal RoPE, and absolute-time alignment. The LLaVA-NeXT and InternVL families use tiling. `Native` does not necessarily mean the entire model was trained from random initialization, and OCR/document superiority should be compared at matched resolution budgets, encoders, and training data.
 
 ## 3½ · Extreme inputs: tiny objects, 1:100 aspect ratios, giant images
 
-The scenario interviewers love: *"find the small defect / read the tiny label in a 12000×800 or 8K image."* **Fixed square resize (e.g. 224²) is exactly what breaks here** — it (a) shrinks a small object below the patch size so it vanishes, and (b) squashes an extreme aspect ratio so text/structure distorts. Quantified: resize a 4000-px-wide image to 224 and a 40-px object becomes ~2 px — smaller than one 14-px patch, i.e. **information-theoretically gone**. No downstream trick recovers it.
+For example, 12000×800 is **15:1**; a 1:100 panorama is a separate, still more extreme case. A fixed 224² resize can shrink small objects to a few pixels and distort the aspect ratio. Resizing a 4000-pixel width to 224 turns a 40-pixel object into about 2.24 pixels. A sub-patch signal may still contribute to the patch embedding, so it is too strong to call it "information-theoretically gone," but resampling aliasing and background mixing make detection or OCR extremely difficult.
 
 **What actually works (escalating toolkit):**
 - **Native / dynamic resolution** (Qwen2.5/3-VL): feed the true aspect ratio, let patch count vary — no squashing. First thing to reach for.
@@ -139,14 +184,14 @@ A 1024×1024 image at patch-14 is ~5.3k patches *per image* before any compressi
 
 ## 5 · SFT loss masking
 
-Only **assistant** tokens get a loss. Everything else — system, user, image placeholders, pad — is `-100` (ignored by cross-entropy).
+In chat SFT, it is common to apply loss only to **assistant-response** tokens and mask system, user, image-placeholder, and padding tokens with `-100`. Not every pretraining or SFT objective follows this rule, so determine the data objective first.
 
 ```python
 labels = input_ids.clone()
-labels[input_ids == pad_token_id]   = -100   # padding
-labels[input_ids == image_token_id] = -100   # visual slots (no text target)
-labels[:, :assistant_start]         = -100   # system + user turn
-# loss only on the assistant response tokens
+labels[attention_mask == 0]         = -100   # padding
+labels[input_ids == image_token_id] = -100   # visual slots (pre-expanded style)
+labels[~assistant_mask]             = -100   # (B,T), template boundary per sample/turn
+# Do not use one scalar assistant_start for a multi-turn, variable-length batch.
 ```
 
 **Why:** you are modeling $P(\text{response}\mid\text{prompt}, \text{image})$. The prompt and image are *conditioning*, not prediction targets. Loss on the image tokens is meaningless (they aren't in the vocabulary), and loss on the user turn teaches the model to ask questions instead of answer them.
@@ -180,15 +225,15 @@ model = get_peft_model(model, cfg)   # QLoRA: load base in 4-bit (bitsandbytes)
 | OOM | visual token budget: resolution, tiles, frames, batch, no grad-checkpointing |
 | Good in train, bad in demo | `model.eval()` / `use_cache` / template / image preprocessing (resize+normalize) drift |
 | Language ability regressed | full-FT LLM without text-data mixing (catastrophic forgetting) |
-| Non-English text mangled | tokenizer doesn't cover the script; check subword splits |
+| Non-English quality/cost degrades | check `[UNK]`, byte fallback, excessive subword fragmentation, and normalization |
 
 ### Shape trace (memorize this)
 
 ```
 pixel_values:    (B, 3, H, W)          # or packed patches for native-res
 vision hidden:   (B, N, D_v)           # N = f(H, W, patch)
-after projector: (M, D_llm)            # M ≤ N (compression)
-input_ids:       (B, T)                # T includes M image-placeholder slots
+after projector: (B, M, D_llm)         # or packed (sum_i M_i, D); M may vary by image
+input_ids:       (B, T)                # pre-expand has M slots; virtual/scatter may keep one marker
 merged embeds:   (B, T, D_llm)
 logits:          (B, T, V)
 ```
@@ -208,27 +253,27 @@ logits:          (B, T, V)
 
 **Short:** Native dynamic resolution, if you can afford an encoder trained for it. Documents have fine text at true aspect ratios; tiling introduces seams that split lines and a thumbnail that wastes tokens.
 
-**Deep:** Tiling reuses a fixed-res encoder (pragmatic, encoder-agnostic) but must reconcile per-tile features and handle objects/text straddling seams; you also pay for a redundant global thumbnail. Native-res ViT (Qwen2.5/3-VL) sees the whole page at its real aspect ratio, so thin strokes and small fonts survive, and 2D-aware mRoPE keeps layout. The cost is a bespoke encoder and a variable, potentially large token count — so you cap it with pixel-shuffle merging or a max-pixel budget. For OCR/charts/documents the native path is the 2026 default.
+**Deep:** Tiling reuses a fixed-resolution encoder but introduces seams, a redundant thumbnail, and tile-ordering issues. A dynamic-resolution ViT can preserve aspect ratio and use a 2D positional method such as mRoPE, but layout preservation is not automatic. Compare OCR accuracy, small-text and long-document slices, and latency under the same token cap.
 </div></details>
 
 **Follow-ups**
 
 - "Why mask image tokens in the loss?" (Not in the vocab; nothing to predict.)
 - "How does the token count change if I double image resolution?" (~4× patches at fixed patch size — quadratic in linear resolution.)
-- "Training uses `use_cache=False` — why, and what flips at inference?" (KV cache off in training to save memory/allow grad-checkpointing; on at inference for O(T) decoding.)
+- "Training uses `use_cache=False` — why, and what changes at inference?" (Training processes the full sequence in parallel and does not need the cache; it can conflict with gradient checkpointing. At inference, caching avoids recomputing past hidden/KV states, but each new token still attends linearly over the past and the cache consumes memory.)
 - "Your fine-tune got great VQA but the model can't do plain text anymore — diagnose." (Catastrophic forgetting; add text-only data, reduce LR, use LoRA.)
 
 ## Cheat-sheet
 
 | Item | Must-know |
 | --- | --- |
-| Image → tokens | 1 `<image>` expands to M visual tokens; M must equal # placeholders |
+| Image → tokens | pre-expand requires M slots to match M visual tokens; virtual/prefix/packed implementations have different contracts |
 | resize_token_embeddings | required after adding any special token; init new row to mean |
-| Chat template | train == infer, byte-identical, or silent quality collapse |
-| AnyRes vs native-res | tiling = reuse fixed encoder; native = true aspect, best OCR, needs mRoPE |
+| Chat template | match the train/inference token, role, and image contract and processor version |
+| AnyRes vs dynamic-res | tiling reuses an encoder; dynamic can preserve aspect ratio and needs a positional method, token cap, and task evaluation |
 | Token budget | patches ≈ (H/p)(W/p); high-res/video OOMs; compress or cap |
 | SFT mask | loss on assistant tokens only; system/user/image/pad = -100 |
 | Freeze schedule | align (projector) → SFT (LLM/LoRA) → late ViT unfreeze; layer-wise LR |
 | Debug first | shape mismatch → dynamic-res count; garbage → template; OOM → token budget |
 
-**Related:** [Vision-Language Pretraining](#/vlm/pretraining) · [Instruction Tuning & Decoding](#/vlm/instruction-tuning) · [Grounding & Region Reasoning](#/vlm/grounding) · [Video-Language Models](#/vlm/video) · [Attention From Scratch](#/ml-coding/attention)
+**Next:** [VLM 101](#/vlm/vlm-101) · [Vision-Language Pretraining](#/vlm/pretraining) · [Instruction Tuning & Decoding](#/vlm/instruction-tuning) · [Grounding & Region Reasoning](#/vlm/grounding) · [Video-Language Models](#/vlm/video)

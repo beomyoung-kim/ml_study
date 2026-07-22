@@ -2,16 +2,47 @@
 
 <div class="tag-row"><span class="tag">alpha matte</span><span class="tag">trimap-free</span><span class="tag">SAM-guided</span><span class="tag">SAD / Grad / Conn</span><span class="tag">ZIM</span><span class="tag">BiRefNet</span></div>
 
-> [!TIP] Why this chapter matters
-> Matting is the candidate's strongest **research × product** intersection: **ZIM** (ICCV 2025 Highlight), WSSHM (weakly-semi human matting), a foreground-segmentation API beating commercial ones, and CLOVA-X Image Editing. The interview lever is articulating *why segmentation is not matting* and *why naively fine-tuning SAM on matting data destroys its zero-shot ability*.
+> [!NOTE] One-line intuition
+> **Matting** estimates a real-valued $\alpha$ (opacity/coverage) between 0 and 1 that controls the foreground's contribution in the compositing equation. Alpha is not “the probability of foreground” or semantic membership. At the boundary of an opaque object it may represent sub-pixel coverage; for a translucent object it may represent opacity. Compared with a hard segmentation mask, it enables more natural composites around **hair, fur, motion blur, and translucent regions**.
 
-## The problem
+The simplest picture is a magnified hair boundary, where foreground and background can both cover part of one pixel footprint. Cutting that value to 0 or 1 creates stair-stepping and, when combined with an incorrectly estimated foreground color, a **halo**. Continuous $\alpha$ represents the transition, although clean compositing also depends on foreground-color estimation and color decontamination.
 
-Decompose an observed image $I$ into foreground $F$, background $B$, and a per-pixel opacity (alpha matte) $\alpha \in [0,1]$:
+<figure>
+<svg viewBox="0 0 640 210" xmlns="http://www.w3.org/2000/svg" font-family="Inter, sans-serif" font-size="11">
+  <!-- hard mask row -->
+  <text x="20" y="40" fill="#e0533f" font-weight="700">Hard mask (0/1)</text>
+  <g>
+    <rect x="20" y="50" width="36" height="36" fill="#e0533f"/><rect x="56" y="50" width="36" height="36" fill="#e0533f"/><rect x="92" y="50" width="36" height="36" fill="#e0533f"/>
+    <rect x="128" y="50" width="36" height="36" fill="none" stroke="#98a3b2"/><rect x="164" y="50" width="36" height="36" fill="none" stroke="#98a3b2"/><rect x="200" y="50" width="36" height="36" fill="none" stroke="#98a3b2"/>
+    <text x="38" y="72" text-anchor="middle" fill="#fff">1</text><text x="74" y="72" text-anchor="middle" fill="#fff">1</text><text x="110" y="72" text-anchor="middle" fill="#fff">1</text>
+    <text x="146" y="72" text-anchor="middle" fill="#98a3b2">0</text><text x="182" y="72" text-anchor="middle" fill="#98a3b2">0</text><text x="218" y="72" text-anchor="middle" fill="#98a3b2">0</text>
+  </g>
+  <text x="130" y="108" text-anchor="middle" fill="#6b7686">abrupt edge → stair-steps and halos</text>
+  <!-- soft alpha row -->
+  <text x="20" y="150" fill="#12a150" font-weight="700">Soft α (matting, 0~1)</text>
+  <g>
+    <rect x="20" y="158" width="36" height="36" fill="#12a150" fill-opacity="1.0"/><rect x="56" y="158" width="36" height="36" fill="#12a150" fill-opacity="0.85"/><rect x="92" y="158" width="36" height="36" fill="#12a150" fill-opacity="0.6"/>
+    <rect x="128" y="158" width="36" height="36" fill="#12a150" fill-opacity="0.35"/><rect x="164" y="158" width="36" height="36" fill="#12a150" fill-opacity="0.15"/><rect x="200" y="158" width="36" height="36" fill="#12a150" fill-opacity="0.03"/>
+    <text x="38" y="180" text-anchor="middle" fill="#fff">1.0</text><text x="74" y="180" text-anchor="middle" fill="#fff">.85</text><text x="110" y="180" text-anchor="middle" fill="#fff">.6</text>
+    <text x="146" y="180" text-anchor="middle" fill="currentColor">.35</text><text x="182" y="180" text-anchor="middle" fill="currentColor">.15</text><text x="218" y="180" text-anchor="middle" fill="currentColor">0</text>
+  </g>
+  <text x="440" y="120" text-anchor="middle" fill="#6b7686">Same edge, same pixels—</text>
+  <text x="440" y="138" text-anchor="middle" fill="#6b7686">soft α represents opacity / coverage</text>
+  <text x="440" y="156" text-anchor="middle" fill="#6b7686">for a smoother composite.</text>
+</svg>
+<figcaption>A magnified boundary. The hard mask above is cut to 1 or 0; the soft alpha below retains continuous opacity or coverage such as 0.85, 0.6, and 0.35. It is a compositing coefficient, not a class probability.</figcaption>
+</figure>
+
+> [!TIP] Interview one-liner
+> Matting is the candidate's strongest **research × product** intersection: **ZIM** (ICCV 2025 Highlight), WSSHM (weakly-semi human matting), a foreground-segmentation API that beats commercial products, and CLOVA-X Image Editing. The interview lever is articulating *why segmentation is not matting* and *why naively fine-tuning SAM on matting data destroys its zero-shot ability*.
+
+## The problem—and why it is difficult
+
+Decompose an observed image $I$ into foreground $F$, background $B$, and a per-pixel opacity $\alpha \in [0,1]$. This **compositing equation** is the foundation of matting:
 
 $$I_i = \alpha_i F_i + (1-\alpha_i) B_i$$
 
-Per pixel there are 7 unknowns ($F_i, B_i \in \mathbb{R}^3$, $\alpha_i$) and 3 observations — the problem is **massively under-constrained**. Priors come from a trimap, a coarse mask/prompt, or a learned foundation model.
+Per pixel there are seven unknowns ($F_i, B_i \in \mathbb{R}^3$, $\alpha_i$) but only three RGB observations, so the problem is **massively under-constrained**. The missing information—a **prior**—comes from a trimap, a coarse mask or prompt, or a learned foundation model.
 
 ```mermaid
 flowchart LR
@@ -32,7 +63,7 @@ flowchart LR
 | Data | relatively abundant | high-quality mattes are rare & expensive |
 | Resolution need | moderate | high — sub-pixel edges |
 
-The composition equation is the whole reason $\alpha$ must be continuous: at a hair strand a pixel is *partly* foreground. A thresholded segmentation mask cannot represent partial coverage, so compositing it leaves **halos, color spill, and jagged edges**.
+The compositing equation shows why $\alpha$ must be continuous. A thresholded segmentation mask cannot represent partial coverage or opacity. Halos and color spill, however, can arise not only from alpha error but also from background color retained in foreground RGB or from a mismatched premultiplication convention.
 
 > [!QUESTION] "Why can't I just evaluate matting with IoU?"
 > IoU thresholds $\alpha$ to a binary mask, discarding exactly the soft-transition information matting exists to model. A model that nails the torso but smears every hair strand can still post a high IoU. You must use SAD/MSE for magnitude and **Grad/Conn** for boundary structure.
@@ -74,7 +105,7 @@ flowchart TB
   end
 ```
 
-1. SAM's **pixel decoder** is a shallow stride-4 upsampler (two transposed convs) → checkerboard artifacts, no fine structure.
+1. SAM's **pixel decoder** is a shallow stride-4 upsampler (two transposed convolutions) → checkerboard artifacts and little fine structure. For the underlying operation, see [Upsampling & U-Net](#/cv/upsampling-unet).
 2. SAM was trained toward **hard-ish masks** on coarse SA-1B labels.
 3. Fine-tuning SAM on the small pool of *public* matting datasets (mostly whole-object "macro") makes it **overfit to macro** — it loses SAM's micro/part-level promptability. Zero-shot breaks.
 
@@ -92,16 +123,30 @@ ZIM keeps SAM's promptable interface but outputs soft $\alpha$, and it *retains*
 $$\mathcal{L} = \mathcal{L}_{\ell_1} + \lambda\,\mathcal{L}_{\text{grad}}, \qquad \mathcal{L}_{\text{grad}} = \|\nabla_x \hat\alpha - \nabla_x \alpha\|_1 + \|\nabla_y \hat\alpha - \nabla_y \alpha\|_1$$
 
 - $\ell_1$ fixes magnitude; the **gradient term** enforces edge structure (ZIM uses $\lambda = 10$).
-- Composition loss ($\|\hat\alpha F + (1-\hat\alpha)B - I\|$) ties $\alpha$ back to appearance.
+- Composition loss ($\|\hat\alpha F + (1-\hat\alpha)B - I\|$) ties alpha back to appearance when ground-truth or estimated $F,B$ are available during training. Given $I$ alone, $F,B,\alpha$ are not jointly identifiable.
 - Laplacian/pyramid losses for multi-scale detail; perceptual (LPIPS) or adversarial terms can sharpen but add instability/pipeline cost.
-- Segmentation **Dice** is a poor fit for soft targets — it assumes near-binary masks.
+- **Soft Dice** is well-defined for soft targets, so it is too strong to call it inherently unsuitable for matting. It normalizes region overlap, however, and does not fully represent absolute alpha, gradient, or connectivity error. Pair it with L1/MSE, gradient or composition terms, and task-specific metrics. See [Losses & Gradients](#/ml-coding/losses-gradients).
+
+> **PyTorch-style pseudocode—the alpha remains continuous through compositing**
+
+```python
+alpha = matting_net(image, guidance).sigmoid()  # [B,1,H,W], keep continuous
+loss_alpha = l1(alpha, alpha_gt)
+loss_grad = l1(spatial_grad(alpha), spatial_grad(alpha_gt))
+
+# Composition loss is defined only when F/B are available in the training set.
+recon = alpha * foreground + (1.0 - alpha) * background
+loss_comp = l1(recon, image)                    # broadcasts over RGB [B,3,H,W]
+loss = loss_alpha + lambda_grad * loss_grad + lambda_comp * loss_comp
+loss.backward()                                 # do not threshold into a hard mask
+```
 
 ## 7 · The 2025–2026 landscape
 
-- **BiRefNet** — high-resolution *dichotomous image segmentation* with bilateral reference; strong at fine structure and popular as a background-removal/matting-adjacent backbone (dynamic-resolution variants up to ~2K).
+- **BiRefNet** — a high-resolution *dichotomous image segmentation* model. Its fine-boundary foreground masks are useful for background removal, but its evaluation target differs from that of a matting model that recovers continuous alpha and foreground color from the compositing equation. Do not mistake hard-mask performance for alpha quality on a matting benchmark.
 - **Matting Anything (MAM)** — SAM-guided universal matting: SAM mask as guidance to an alpha head. The archetype ZIM critiques for zero-shot fragility.
 - **ZIM** — promptable zero-shot *matting* foundation (ICCV 2025 Highlight); Grounded-ZIM = Grounding DINO text→box→ZIM for text-driven matting.
-- **SAM 3** provides sharper promptable masks/tracking that upstream a matting stage; matte quality still needs a dedicated soft-alpha head. See [Vision Foundation Models](#/cv/foundation-models).
+- **The SAM 3 family** can obtain concept masks and video tracks from text or exemplars, providing initial prompts or coarse masks for matting. A binary or soft segmentation mask is not automatically an alpha matte, however; hair and translucent regions still require dedicated soft-alpha estimation and evaluation. See [Vision Foundation Models](#/cv/foundation-models).
 - **Diffusion editing coupling** — precise $\alpha$ is a strong conditioning signal for inpainting / generative fill / video object editing (the [2026 landscape](#/start/landscape-2026) editing wave: FLUX Kontext, Nano-Banana). A clean matte in, fewer artifacts out.
 
 > [!NOTE] Video & temporal consistency
@@ -121,7 +166,7 @@ $$\mathcal{L} = \mathcal{L}_{\ell_1} + \lambda\,\mathcal{L}_{\text{grad}}, \qqua
   <text x="520" y="72" fill="#6b7686">different downstream</text>
   <text x="520" y="89" fill="#6b7686">artifact budget.</text>
 </svg>
-<figcaption>The composition equation forces a continuous α at semi-transparent edges; a thresholded mask cannot represent partial coverage, so it leaves visible artifacts when composited.</figcaption>
+<figcaption>The compositing equation permits continuous alpha for partial coverage and opacity. A thresholded mask cannot represent them, while actual composite quality also depends on foreground-color estimation and correct premultiplication handling.</figcaption>
 </figure>
 
 ## 8 · Human matting & label efficiency (WSSHM)

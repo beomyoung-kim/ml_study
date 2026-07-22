@@ -1,12 +1,12 @@
-# Curated Open-Source Resources
+# Curated Public Learning Resources
 
 <div class="tag-row"><span class="tag">free</span><span class="tag">open-source</span><span class="tag">coding</span><span class="tag">ML depth</span><span class="tag">system design</span><span class="tag">LLM/GenAI</span><span class="tag">behavioral</span><span class="tag">mock</span></div>
 
 > [!TIP] How to use this page
-> This is an *annotated* directory, not a link dump. For each resource you get **what it's best for** and **the single best idea to steal** — the reusable framework or packaging trick, not just the content. The meta-lesson across every top resource: **organize by reusable pattern, not by random question dumps.** NeetCode, sean-prashad, Chip Huyen, and alirezadir all win because they hand you a small, memorable taxonomy that generalizes to unseen problems. This whole book is built on that principle.
+> This is an *annotated* directory, not a link dump. It explains where each resource is useful and which reusable learning structure to borrow. Some entries are freely available rather than open source, or combine free and paid features, so check each site's license and paywall. The common lesson is to **organize around reusable patterns, not random question dumps.**
 
-> [!NOTE] On star counts and links
-> Star counts below are approximate as of mid-2026 — verify at the source. All external links open in a new tab. Prefer the primary source over mirrors.
+> [!NOTE] Link status
+> This list was last reviewed on **2026-07-21**. URLs, prices, licenses, and course scope can change. Fast-moving numbers unrelated to learning value, such as GitHub star counts, are intentionally omitted; prefer the author's or institution's primary source over mirrors.
 
 ## If you only use 5 resources
 
@@ -14,10 +14,10 @@ For a PhD-level Applied/Research-Scientist loop (CV / VLM / visual agents), this
 
 | # | Resource | Why it's on the shortlist |
 | --- | --- | --- |
-| 1 | [Chip Huyen — Introduction to ML Interviews](https://huyenchip.com/ml-interviews-book/) | Best overall structure; the *career half* (RS vs RE, process, offers) that competitors omit + 200+ Qs. |
+| 1 | [Chip Huyen — Introduction to ML Interviews](https://huyenchip.com/ml-interviews-book/) | A public book that covers technical questions and career/process guidance for ML interviews in one flow. Check the current edition and contents rather than relying on an exact question count. |
 | 2 | [alirezadir/Machine-Learning-Interviews](https://github.com/alirezadir/machine-learning-interviews) | The **9-step ML system-design framework** and the 4-pillar loop that scaffolds an entire interview. |
-| 3 | [NeetCode roadmap + 150](https://neetcode.io/roadmap) | The 18-topic DSA ontology and the dependency-graph learning path — the de-facto coding standard. |
-| 4 | [Amidi Stanford CS229 / CS230 cheatsheets](https://stanford.edu/~shervine/teaching/cs-229/) | One-page, formula-dense recall sheets — the gold standard for last-mile review. |
+| 3 | [NeetCode roadmap + 150](https://neetcode.io/roadmap) | A widely used DSA-topic roadmap with a dependency-based learning path. Check the current split between free and paid material. |
+| 4 | [Amidi Stanford CS229 / CS230 cheatsheets](https://stanford.edu/~shervine/teaching/cs-229/) | Formula-dense, one-page recall sheets useful for final review. |
 | 5 | [aishwaryanr/awesome-generative-ai-guide](https://github.com/aishwaryanr/awesome-generative-ai-guide) | Role-based prep + the multimodal/embeddings question taxonomy that maps 1:1 to a VLM reader. |
 
 Everything below expands on these and fills the gaps (behavioral, mocks, company tracking).
@@ -27,28 +27,28 @@ Everything below expands on these and fills the gaps (behavioral, mocks, company
 <details class="qa"><summary>Do PhD candidates really need the coding grind?</summary>
 <div class="qa-body">
 
-**Short:** yes, but scoped. Research-scientist loops usually include 1–2 coding rounds; you don't need 500 problems, you need ~15–20 *patterns* solid enough to solve unseen ones under time pressure. Optimize for pattern coverage, not problem count.
+**Short:** if the actual loop includes coding, practice within a narrow scope. Round count and difficulty vary by role, so confirm them with the recruiter and prioritize recurring-pattern coverage plus explanation and verification habits over raw problem count.
 
 **Deep:** the entire value proposition of NeetCode/Grokking/sean-prashad is that the space of interview problems collapses onto a small set of recurring shapes. Internalize the shapes, do 5–10 problems each, and you generalize. See [Coding Strategy](#/coding/strategy) and [Patterns](#/coding/patterns).
 </div></details>
 
 | Resource | Author | Link | Best for | Steal this |
 | --- | --- | --- | --- | --- |
-| **NeetCode** (Blind 75 → 150 → 250) | Navdeep Singh (ex-Google) | [neetcode.io](https://neetcode.io) · [roadmap](https://neetcode.io/roadmap) | The de-facto coding standard; free video walkthrough for every problem | **Roadmap as a dependency graph** — topics unlock prerequisites. The 18-category taxonomy is the cleanest DSA ontology available. |
-| **Tech Interview Handbook + Grind75** | Yangshun Tay (ex-Meta) | [techinterviewhandbook.org](https://www.techinterviewhandbook.org) · [grind75](https://www.techinterviewhandbook.org/grind75) · [repo (~140k★)](https://github.com/yangshun/tech-interview-handbook) | "Cracking the Coding Interview, but concise" + behavioral, resume, negotiation | The **configurable study planner** — input hours/week + weeks, get an ordered, difficulty-ramped plan. The interactivity, not the list, made it famous. |
-| **Blind 75** | Yangshun (orig. teamblind) | via [NeetCode](https://neetcode.io) | The canonical minimal 75-problem list across 10 categories | The distribution signal: **Trees + DP are ~1/3 of the list** → weight your prep toward high-payoff topics. |
-| **sean-prashad/leetcode-patterns** | Sean Prashad | [site](https://seanprashad.com/leetcode-patterns/) · [repo (~10k★)](https://github.com/seanprashad/leetcode-patterns) | ~179 problems grouped by pattern, with company + difficulty filters | The **"cue → pattern" decision cheat sheet** ("input sorted → binary search / two pointers"; "top-K → heap"; "all permutations → backtracking"). We build a CV/ML analogue in [Patterns](#/coding/patterns). |
+| **NeetCode** (Blind 75 → 150 → 250) | Navdeep Singh | [neetcode.io](https://neetcode.io) · [roadmap](https://neetcode.io/roadmap) | Pattern-organized problem roadmap and explanations; check the current free/paid split on the site | **Roadmap as a dependency graph** — reuse its topic prerequisites and pattern-specific practice lists in your study plan. |
+| **Tech Interview Handbook + Grind75** | Yangshun Tay | [techinterviewhandbook.org](https://www.techinterviewhandbook.org) · [grind75](https://www.techinterviewhandbook.org/grind75) · [repo](https://github.com/yangshun/tech-interview-handbook) | Concise guidance on coding, behavioral interviews, résumés, and negotiation | The **configurable study planner** — adjust problem order and difficulty to your weekly time and preparation window. |
+| **Blind 75** | Community list originating in an anonymous Blind post | via [NeetCode](https://neetcode.io) | A frequently reused 75-problem shortlist | Use it as a quick pattern-coverage baseline, not as evidence of the question distribution at a target company. |
+| **sean-prashad/leetcode-patterns** | Sean Prashad | [site](https://seanprashad.com/leetcode-patterns/) · [repo](https://github.com/seanprashad/leetcode-patterns) | Problems and difficulty filters organized by pattern | The **"cue → pattern" decision cheat sheet** ("input sorted → binary search / two pointers"; "top-K → heap"; "all permutations → backtracking"). We build the corresponding structure in [Patterns](#/coding/patterns). |
 | **Grokking the Coding Interview (14 patterns)** | Design Gurus / Fahim ul Haq | [free article](https://hackernoon.com/14-patterns-to-ace-any-coding-interview-question-c5bb3357f6ed) | The viral "14 patterns" mental model (course is paid; the framework is free-famous) | The **"N patterns to ace any X"** packaging — the most repeatable framing in the space. |
-| **jwasham/coding-interview-university** | John Washam | [repo (~337k★)](https://github.com/jwasham/coding-interview-university) | An exhaustive, multi-month CS syllabus with checkboxes | The **trackable-curriculum format** — "here is the whole syllabus, in order, with progress checkboxes." |
+| **jwasham/coding-interview-university** | John Washam | [repo](https://github.com/jwasham/coding-interview-university) | An exhaustive, multi-month CS syllabus with checkboxes | The **trackable-curriculum format** — "here is the whole syllabus, in order, with progress checkboxes." |
 
 ## ML / DL question banks
 
 | Resource | Author | Link | Best for | Steal this |
 | --- | --- | --- | --- | --- |
 | **Introduction to ML Interviews (MLIB)** | Chip Huyen | [free book](https://huyenchip.com/ml-interviews-book/) · [repo](https://github.com/chiphuyen/ml-interviews-book) | The gold standard; 200+ knowledge Qs + 30 open-ended judgment Qs | The **career-half + question-half split**, and disaggregating **Research Scientist vs Research Engineer** expectations — directly on-target for this reader. |
-| **alirezadir/Machine-Learning-Interviews** | alirezadir (ex-Amazon/Google) | [repo (~10k★)](https://github.com/alirezadir/machine-learning-interviews) | Best single all-in-one MLE repo | The **4-pillar loop** decomposition: coding / ML depth / ML system design / behavioral — the spine of this book. |
-| **khangich/machine-learning-interview** | Khang Pham | [repo](https://github.com/khangich/machine-learning-interview) · [mlengineer.io](https://mlengineer.io) | Real FAANG questions built from actual offers (Snapchat, Coupang, Stitchfix) | **Questions attributed to specific companies** — credible and matches the target-company list. Mine `design.md`, `appliedml.md`, `how.md`. |
-| **interviews.ai — Deep Learning Interviews** | Shlomo Kashani (BoltzmannEntropy) | [repo](https://github.com/BoltzmannEntropy/interviews.ai) · [arXiv 2201.00650](https://arxiv.org/abs/2201.00650) | Free PDF; hundreds of **fully-solved, exam-style, PhD-level** problems | The rigorous **derivation-not-one-liner** register — the right depth for a research-scientist audience. |
+| **alirezadir/Machine-Learning-Interviews** | alirezadir | [repo](https://github.com/alirezadir/machine-learning-interviews) | Broad MLE interview repository | The **4-pillar loop** decomposition: coding / ML depth / ML system design / behavioral. |
+| **khangich/machine-learning-interview** | Khang Pham | [repo](https://github.com/khangich/machine-learning-interview) · [mlengineer.io](https://mlengineer.io) | Community guide based on the author's interview experience | Treat company-attributed questions as low-confidence practice prompts because of timing, team, and recall bias; use the structure of `design.md`, `appliedml.md`, and `how.md`. |
+| **interviews.ai — Deep Learning Interviews** | Shlomo Kashani (BoltzmannEntropy) | [repo](https://github.com/BoltzmannEntropy/interviews.ai) · [arXiv 2201.00650](https://arxiv.org/abs/2201.00650) | Public PDF and collection of deep-learning interview questions and solutions | Use it to practice derivations and follow-ups rather than short definitions, while independently checking difficulty labels and answers. |
 | **andrewekhalel/MLQuestions** | Andrew Ekhalel | [repo](https://github.com/andrewekhalel/MLQuestions) | Concise Q&A with an explicit **Computer Vision** slant | One of the few banks with a CV lean — a good seed list for CV depth (detection/segmentation specifics). |
 | **zafstojano/ml-interview Q&A** | community | [repo](https://github.com/zafstojano/ml-interview-questions-and-answers) | Community solutions to Chip Huyen's MLIB | Use as an answer key / sanity check against MLIB. |
 
@@ -69,12 +69,12 @@ The most learnable-by-framework round. Every case study in this book follows the
 
 | Resource | Author | Link | Best for | Steal this |
 | --- | --- | --- | --- | --- |
-| **mlabonne/llm-course** | Maxime Labonne | [repo (~80k★)](https://github.com/mlabonne/llm-course) | The best free LLM curriculum; roadmaps + Colab notebooks | The **LLM Scientist vs LLM Engineer track split** — perfect for a research book that must also cover applied deployment. |
-| **awesome-generative-ai-guide** | Aishwarya Naresh Reganti | [repo](https://github.com/aishwaryanr/awesome-generative-ai-guide) | Best free GenAI hub; **role-based** prep + research updates + "60 GenAI questions" | The **role-based folder** ("pick your role → overview → rounds → bank → plan") and the **Multimodal + Embeddings** sections that map 1:1 to VLMs. |
+| **mlabonne/llm-course** | Maxime Labonne | [repo](https://github.com/mlabonne/llm-course) | Public LLM curriculum with roadmaps and notebooks | The **LLM Scientist vs LLM Engineer track split** — a way to separate research and deployment learning goals. |
+| **awesome-generative-ai-guide** | Aishwarya Naresh Reganti | [repo](https://github.com/aishwaryanr/awesome-generative-ai-guide) | Community hub collecting role-based preparation, research updates, and questions | Use its role-based folders and Multimodal/Embeddings sections as routing references, then verify freshness at the primary sources. |
 | **llmgenai/LLMInterviewQuestions** | llmgenai | [repo](https://github.com/llmgenai/LLMInterviewQuestions) | 100+ Qs, 16-category **applied/production** taxonomy (RAG, vector DB, agents) | The **vector-DB + advanced-search + agent** categories competitors omit — relevant to "visual agents." |
 | **aman.ai primers** | Aman Chadha | [primers](https://aman.ai/primers/ai/) · [interview Qs](https://aman.ai/primers/ai/interview/) | Extremely deep, frequently-updated DL/NLP primers + 100+ interview Qs | The **"pros and cons" comparison format** for models, and the transformer/attention deep-dive as a depth reference. |
-| **microsoft/generative-ai-for-beginners** | Microsoft | [repo (~90k★)](https://github.com/microsoft/generative-ai-for-beginners) | A credible free foundation (21-lesson course) | More teaching than interview prep — point beginners here; not a source to copy. |
-| **KalyanKS-NLP LLM-Interview Hub** | Kalyan KS | [repo](https://github.com/KalyanKS-NLP/llm-engineer-toolkit) | Supplementary 100+ LLM Q&A | A quick complementary bank for LLM breadth. |
+| **microsoft/generative-ai-for-beginners** | Microsoft | [repo](https://github.com/microsoft/generative-ai-for-beginners) | Public introductory course | Use it for foundation review; it is closer to a course than an interview question bank. |
+| **KalyanKS-NLP LLM Engineer Toolkit** | Kalyan KS | [repo](https://github.com/KalyanKS-NLP/llm-engineer-toolkit) | Curated toolkit grouping LLM-engineering libraries and tools by category | This is for stack discovery, not a Q&A bank. Recheck the current official documentation, license, and maintenance status of any library you select. |
 
 ## Cheat sheets
 
@@ -82,16 +82,16 @@ The Amidi Stanford VIP sheets are the format to emulate: **one page, formula-den
 
 - **CS229 (ML)** — [stanford.edu/~shervine/teaching/cs-229](https://stanford.edu/~shervine/teaching/cs-229/) · [repo](https://github.com/afshinea/stanford-cs-229-machine-learning). Sheets: supervised, unsupervised, deep learning, tips & tricks (metrics, bias/variance), + prob/stats and linear-algebra refreshers. Translated into 10+ languages.
 - **CS230 (Deep Learning)** — [stanford.edu/~shervine/teaching/cs-230](https://stanford.edu/~shervine/teaching/cs-230/) · [repo](https://github.com/afshinea/stanford-cs-230-deep-learning). Sheets: CNNs (filter arithmetic, architectures), RNNs (LSTM/GRU, attention, embeddings), DL tips & tricks.
-- **CS231n (CV) course notes** — [cs231n.github.io](https://cs231n.github.io/). Canonical CV depth foundation (CNNs, backprop, detection).
-- **CS224n (NLP)** — [web.stanford.edu/class/cs224n](http://web.stanford.edu/class/cs224n/). The NLP/transformer counterpart.
+- **CS231n (CV) course notes** — [cs231n.github.io](https://cs231n.github.io/). A widely used CV foundation (CNNs, backprop, detection).
+- **CS224n (NLP)** — [web.stanford.edu/class/cs224n](https://web.stanford.edu/class/cs224n/). The NLP/transformer counterpart.
 - **d2l.ai — Dive into Deep Learning** — [d2l.ai](https://d2l.ai/). Runnable-code textbook; great for filling derivation gaps.
 
 ## Visual, animated & interactive explainers
 
-Concepts that click faster when you *see them move*. All links verified live (2026-07).
+Concepts that click faster when you *see them move*. The URLs below were reviewed at the list level on 2026-07-21, but external-site availability is not guaranteed.
 
 **Convolution / CNN**
-- [conv_arithmetic](https://github.com/vdumoulin/conv_arithmetic) — Dumoulin & Visin. The canonical animated GIFs of conv / transposed / dilated convolution (blue=input, cyan=output).
+- [conv_arithmetic](https://github.com/vdumoulin/conv_arithmetic) — Dumoulin & Visin. Representative animated GIFs comparing convolution, transposed convolution, and dilated convolution.
 - [CNN Explainer](https://poloclub.github.io/cnn-explainer/) — Georgia Tech (Polo Chau). Click through a live CNN layer-by-layer with real activations.
 - [Animated AI](https://animatedai.github.io/) — clean animations of stride, padding, and grouped/depthwise-separable convolution.
 
@@ -130,17 +130,17 @@ Concepts that click faster when you *see them move*. All links verified live (20
 ## Behavioral & research-scientist-specific
 
 > [!WARNING] The under-served category
-> Research-scientist interviewing — the **job talk, research deep-dive, and paper-impact storytelling** — is the weakest area in open-source resources (mostly generic career-services pages). This book's [Behavioral & Research](#/process/pipeline) coverage is a deliberate differentiation. Treat the links below as scaffolding, then go beyond them.
+> Public resources often cover the **job talk, research deep-dive, and paper-impact storytelling** less systematically than coding and ML question banks. Use the resources below as a starting point, then supplement them with the actual role's rubric and mock-interview feedback.
 
-- **STAR / STAR-L method** — [MIT CAPD worksheet](https://capd.mit.edu/resources/the-star-method-for-behavioral-interviews/). Situation → Task → Action → Result (+ **Learning**, apt for scientists). Rules to adopt: time-allocation (Action ~50–60%), use **"I" not "we"**, and a **story-bank matrix** (rows = competencies, columns = STAR-L slots) pre-filled from your own research.
+- **STAR / STAR-L method** — the [MIT CAPD worksheet](https://capd.mit.edu/resources/the-star-method-for-behavioral-interviews/) provides the basic STAR structure. This book adds **Learning**, uses a larger Action share as a starting heuristic for a 2–3 minute answer, and distinguishes "I" from "we." These are not fixed MIT rules.
 - **PhD → industry transition** — Rutgers "From Bench to Offer", NIH OITE blog, Cheeky Scientist. Key reframe: *academia rewards nuance and caveats; interviews reward clear decisions and measurable outcomes.* Translate research into **decision + measurable impact** language.
 - **The research job talk** — confirm format with the recruiter; lead with problem significance and deliverables; demonstrate science communication + depth; anticipate deep Q&A; tailor framing to the team's product.
 
 ## Mock interviews
 
-- **[Pramp](https://www.pramp.com/)** — free peer-to-peer mock interviews (coding + some behavioral). Best for reps and calibration.
+- **[Pramp](https://www.pramp.com/)** — peer-to-peer mock-interview service. Check the current free/paid split and available categories before booking.
 - **[interviewing.io](https://interviewing.io/)** — anonymous mocks with senior engineers; recorded, with a large free technical-talk / question library.
-- **Your network** — the highest-signal option. Ask KAIST MLAI / SIIT alumni and NAVER Cloud colleagues who are now at big tech for a real research-depth mock. Nothing simulates the loop like someone who runs one.
+- **Trusted peers and alumni** — ask someone who understands the target role for a research-depth mock. Do not request leaked questions or company-confidential information; ask only for feedback on the evaluation rubric and your delivery.
 
 ## Track the frontier (company blogs & leaderboards)
 
@@ -168,17 +168,17 @@ Interviewers calibrate you against the *current* frontier. Skim these before any
 
 ## Interview-experience sources (real questions)
 
-Use these to find company- and role-attributed questions — the highest-credibility signal for what a specific loop will ask.
+Use these as secondary sources for company- and role-specific experiences. Anonymous posts have substantial sampling, timing, region, and team bias, so rank them below current recruiter guidance and official preparation pages.
 
 - [Glassdoor Interview Questions](https://www.glassdoor.com/Interview/index.htm) — search "Meta Research Scientist interview", etc.
 - [Blind (teamblind.com)](https://www.teamblind.com/) — anonymous big-tech employee reports.
 - [1point3acres](https://www.1point3acres.com/bbs/) — strong for MSRA and China-office loops.
 - [LeetCode Discuss — Interview Experience](https://leetcode.com/discuss/interview-experience) — company-tagged real coding tests.
-- [levels.fyi](https://www.levels.fyi/) — level/comp context for offer negotiation.
+- [levels.fyi](https://www.levels.fyi/) — reference distribution of self-reported levels and compensation. Check the sample, currency, equity price, region, and date; do not use it as the sole basis for offer or tax decisions.
 
-## Your own research assets (use as evidence)
+## Personal research assets (interview packet)
 
-The strongest "source" in a research interview is *your own work*. Keep these ready to cite in the [research deep-dive](#/process/pipeline) and to seed your STAR-L story bank.
+This section alone is candidate-specific. Use public papers, code, and talks as evidence in the [research deep-dive](#/research/job-talk) and the STAR-L story bank; refresh citation counts and profile details immediately before applying.
 
 <dl class="kv">
 <dt>Google Scholar</dt><dd><a href="https://scholar.google.co.kr/citations?user=n_TR1LcAAAAJ">All publications</a> — citation context for impact stories.</dd>
@@ -186,7 +186,7 @@ The strongest "source" in a research interview is *your own work*. Keep these re
 <dt>ZIM</dt><dd>Zero-shot Image Matting — <a href="https://naver-ai.github.io/ZIM/">project</a> · <a href="https://arxiv.org/pdf/2411.00626">paper</a>. Ties directly to SAM / alpha-matte / promptable segmentation talking points.</dd>
 <dt>ECLIPSE</dt><dd>Panoptic segmentation — <a href="https://arxiv.org/abs/2403.20126">arXiv 2403.20126</a>. Continual / catastrophic-forgetting narrative.</dd>
 <dt>PointWSSIS</dt><dd>Weakly-supervised instance segmentation — <a href="https://arxiv.org/abs/2303.15062">arXiv 2303.15062</a>. Label-efficiency story.</dd>
-<dt>BESTIE</dt><dd>Weakly-supervised semantic segmentation — <a href="https://arxiv.org/abs/2109.09477">arXiv 2109.09477</a>. Foundational segmentation depth.</dd>
+<dt>BESTIE</dt><dd>Weakly-supervised instance segmentation — <a href="https://arxiv.org/abs/2109.09477">arXiv 2109.09477</a>. Example of image-level supervision and pseudo-instance refinement.</dd>
 </dl>
 
 ## Cheat-sheet

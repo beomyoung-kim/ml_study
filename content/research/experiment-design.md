@@ -3,7 +3,7 @@
 <div class="tag-row"><span class="tag">hypothesis-driven</span><span class="tag">ablation discipline</span><span class="tag">controls & confounders</span><span class="tag">seeds & significance</span><span class="tag">compute budget</span></div>
 
 > [!TIP] The question behind the question
-> RS/AS panels rarely ask "is your idea good" — they ask **"how do you know this diff actually caused the improvement?"** A strong answer walks a clean chain: one hypothesis → a strong frozen baseline → change one factor → control confounders → variance/seeds → scope the claim. This chapter is the research-facing complement to [Debugging & Experimentation](#/foundations/debugging-experimentation).
+> In RS/AS interviews, an appealing idea is often followed by **"How do you know this change caused the improvement?"** A strong answer connects hypothesis → reproducible baseline → matched comparison or factorial design → confounder control → uncertainty → claim scope. This chapter is the research-facing complement to [Debugging & Experimentation](#/foundations/debugging-experimentation).
 
 ```mermaid
 flowchart TB
@@ -33,7 +33,7 @@ Write the claim as **one sentence with a predicted direction** *before* running 
 ## Ablation discipline
 
 > [!WARNING] "All modules on = best" is not an ablation
-> An ablation must show the **marginal contribution** of each component by removing/replacing it **one at a time**, holding everything else (data, schedule, augmentation, resolution) fixed at the baseline.
+> A basic ablation removes or replaces one component while matching data, schedule, augmentation, and resolution, thereby estimating a **conditional marginal effect**. If components are expected to interact, do not stop at leave-one-out; add a factorial or additive comparison.
 
 | Technique | What it isolates | When |
 | --- | --- | --- |
@@ -43,14 +43,14 @@ Write the claim as **one sentence with a predicted direction** *before* running 
 | **Sensitivity sweep** | Robustness to a key hyperparameter | Reviewers ask "did you just tune it?" |
 | **Cross-dataset / backbone** | Generality vs overfitting to one setting | Generality claims |
 
-**Beomyoung's worked example (ZIM):** attribute the gain across **three independent axes** — architecture (matting head), loss (soft-boundary terms), and the ~1M-image **data pipeline**. Report data-alone (+α), architecture-on-top-of-data (+β), and the full model, so no reviewer can collapse the story into "just more data." See the [ZIM deep-dive](#/resume/zim).
+**When using a personal-project example:** design a factorial or additive ablation with architecture, loss, and data as separate axes, and report their interactions. Fill in values such as `+α`, `+β`, or data scale only when they are verified in the [ZIM deep-dive](#/resume/zim) and the actual experiment table; do not assume unmeasured independence.
 
 > [!NOTE] Interaction effects
 > Sometimes a component only helps *in the presence of* another (removing either alone shows little; removing both collapses). Report this explicitly with a 2×2 rather than hiding it — it's a real scientific finding, not a messy result.
 
 ## Controls & confounders
 
-Every "our method is better" is a causal claim. Prove the cause with controls.
+"Our method is better" can describe benchmark superiority; "this component caused the gain" is causal attribution. Keep those claims distinct and use matched controls when making the latter.
 
 ```mermaid
 flowchart LR
@@ -73,22 +73,58 @@ flowchart LR
 - **Test-set leakage / tuning on test** — hyperparameters chosen on the test split.
 
 > [!DANGER] Contamination in the foundation-model era
-> With web-scale pretraining, benchmark examples may already be *in* the training corpus. Check near-duplicates (perceptual hash), use official splits only, tune on val and touch test **once**. For VLMs/LLMs, explicitly reason about whether the eval appeared in pretraining data. → [Reading & Critiquing Papers](#/research/papers).
+> Web-scale pretraining may contain benchmark examples. Audit near-duplicates, timestamps, and source overlap where possible; use official splits and validation for selection; and limit and log access to the test set or lockbox. If you lack complete corpus visibility, do not claim contamination has been ruled out—report what is known and unknown. → [Reading & Critiquing Papers](#/research/papers).
 
 ## Statistical significance, seeds & variance
 
 <details class="qa"><summary>"Is a 0.3-point improvement real?"</summary>
 <div class="qa-body">
 
-**Short:** Only if it's larger than **seed variance**. Report mean ± std over 3–5 seeds (paired to the baseline where possible); if the gap is inside the noise band, don't sell it as SOTA.
+**Short:** Form a **paired difference** on the same seeds and splits, then inspect the effect size and confidence interval. There is no rule that mean ± standard deviation alone decides whether it is "real," or that the effect must exceed the standard deviation.
 
-**Deep:** Academic ML rarely enforces a formal t-test, but the *principle* holds: a single-run delta is an anecdote. Use paired comparisons (same seeds/splits) to reduce variance, bootstrap CIs when seeds are cheap, and beware **multiple-comparison p-hacking** across many benchmarks. Be honest on stage: "*I don't dress up a 0.2-point win that's below our seed std as a contribution.*"
+**Deep:** A single-run delta is uncertain. First define the analysis unit—seed, image, query, or user—then, where appropriate, estimate a **confidence interval for the difference** with a paired bootstrap or permutation test, or an appropriate hierarchical model. Determine the required number of seeds or samples with power analysis based on the expected effect and variance. Selecting only the best result after many benchmarks, metrics, or HPO trials creates selection bias, so predeclare the primary hypothesis and use multiple-comparison correction or a confirmatory holdout.
 </div></details>
 
 > [!NOTE] CV-metric subtleties
-> mIoU/AP are sensitive to class imbalance and threshold; small objects and **boundary quality** get washed out by aggregate scores. Do **stratified analysis** (by size / class / difficulty) — the aggregate can hide exactly the failure a product cares about. → [Evaluation Metrics](#/foundations/evaluation-metrics).
+> Both mIoU and AP can hide small objects, rare classes, and boundary quality in an aggregate. **AP integrates a ranking rather than fixing one confidence threshold**, but it is sensitive to the IoU-threshold range, maximum detections, interpolation, and class-averaging convention. Report size, class, and difficulty slices along with operating-point metrics. → [Evaluation Metrics](#/foundations/evaluation-metrics).
 
-**When seeds are expensive** (one run = days on many GPUs): you can't average 5 seeds of a full pretrain. Mitigations: report variance of the *fine-tuning* stage, seed the smaller ablations, show the effect on multiple datasets as a robustness proxy, and be explicit that the headline model is a single run.
+**When seeds are expensive,** full-scale replication may be impractical. Examine variance and learning curves at smaller scale or in fine-tuning, prioritize repeats for the key ablations, and state that results across multiple datasets do not replace seed uncertainty. If the headline model is a single run, say so and supplement it with paired per-example uncertainty where possible.
+
+<details class="concept-code">
+<summary>View as conceptual code</summary>
+
+> This is **experimental pseudocode** for a matched comparison with paired uncertainty. The statistical method must be adapted to the metric and analysis unit.
+
+```python
+def run_matched_experiment(base_cfg, proposed_diff, seeds, frozen_eval):
+    records = []
+    for seed in seeds:
+        common = freeze_everything_except(base_cfg, proposed_diff.changed_factor)
+        for variant in ["baseline", "proposed"]:
+            seed_everything(seed)
+            cfg = apply_variant(common, proposed_diff, variant)
+            model = train(cfg)                              # Same data, schedule, and budget
+            model.eval()
+            with no_grad():
+                pred = model(frozen_eval.inputs)
+            records.append(per_unit_metrics(
+                pred, frozen_eval.labels,
+                unit_id=frozen_eval.analysis_unit,          # Image, query, user, or scene
+                seed=seed, variant=variant,
+                artifact_hash=hash_config_data_code(cfg),
+            ))
+
+    paired = join_on(records, keys=["seed", "unit_id"])
+    delta = paired.proposed - paired.baseline
+    # Resample whole hierarchy levels such as seed and user or video.
+    interval = hierarchical_bootstrap_ci(delta, levels=["seed", "unit_id"])
+    return {"effect": mean(delta), "confidence_interval": interval,
+            "slice_effects": prespecified_slices(delta)}
+```
+
+Do not reuse the test set or lockbox for HPO selection, and record missing or failed runs with their reasons. Do not assume a simple per-example bootstrap captures all seed-, user-, or video-level variation.
+
+</details>
 
 ## Compute-budgeting the experiment plan
 
@@ -99,33 +135,33 @@ A defensible allocation:
 
 | Bucket | Share | Purpose |
 | --- | --- | --- |
-| Small-scale pilots / sweeps | ~40% | Kill weak hypotheses at 1/10 cost before committing |
+| Small-scale pilots / sweeps | example ~40% | Check implementation, learning curves, and sensitivity cheaply; verify whether rankings persist at full scale |
 | Main runs (baseline + method) | ~30% | The headline comparison, matched settings |
 | Ablations + seeds | ~20% | Attribution + variance |
 | Buffer / re-runs | ~10% | Bugs, OOMs, one more control a reviewer will want |
 
 > [!NOTE] Pilot before you commit
-> The cheapest experiment is the one you *don't* run at full scale. A hypothesis that shows no signal at 1/10 data/steps rarely rescues itself at full scale — spend the pilot budget to kill or promote ideas *before* the expensive runs. Reserve the big runs for the two or three hypotheses that survived.
+> Pilots cheaply filter bugs and obviously weak directions, but rankings at small scale can reverse at full scale. Check learning curves and rank correlation across several scales, and use a predeclared escalation rule rather than "pilot failed → idea dead." The 40/30/20/10 split above is illustrative; adapt it to uncertainty, failure cost, and cluster constraints.
 
-**Report compute as a first-class result:** train GPU-hours, params (and *active* params for MoE), inference ms/memory, and data-curation human-hours. An accuracy-only Pareto is incomplete — reviewers and product both decide on **accuracy per cost**. Beomyoung's ~10 ms on-device segmentation is a clean example of *constraint-first* design where the budget defined the experiment.
+**Report compute as a first-class result:** training GPU-hours, energy and hardware, parameters (active and total for MoE), inference latency/throughput/memory, and data-curation human-hours. A single ratio such as `accuracy/cost` hides the shape of the trade-off, so show comparisons at equal training and test-time budgets and the **Pareto frontier**. Cite a personal latency result only when device, batch, precision, and input size are verified in the CV or report.
 
 ## Reproducibility artifacts
 
-Minimum set to fix/release: seed list, library versions/lockfile or Docker, config YAML with **all** hyperparameters, data-prep script + license note, eval entrypoint, checkpoints, and a mean/std reporting convention. Aim for **one-command reproduce**. Bit-level determinism is often impossible on GPU (non-deterministic kernels) — then commit to **statistical** reproducibility (within variance) and a bugfix changelog. Beomyoung's open-sourced codebases (ZIM, ECLIPSE, PointWSSIS, BESTIE, SSUL, DRS) are the evidence to cite here.
+The minimum internal fixed set is: seeds, library/driver/hardware versions, lockfile or container, full configuration, data-preparation and split provenance, evaluation entry point, checkpoint hash, and reporting convention. Release code, configs, or checkpoints when license, privacy, and size permit; otherwise explain the boundary with a synthetic sample, pseudocode, or an artifact manifest. Aim for **one-command reproduce**, but distinguish bit-level determinism from statistical reproducibility. Cite a personal open-source example only after verifying that its repository actually meets these requirements.
 
 ## Agent / multimodal experiments differ
 
 The "modules" are no longer just layers — they're **tools, memory, orchestrator, verifier, and a test-time compute budget**.
 
 - Ablate: no-memory · no-verifier · single- vs multi-agent · perception-tool-off (blind LLM).
-- **Budget-match:** giving an agent more tools/tokens trivially raises success — always compare at **equal test-time token/tool budget**, or the ablation is meaningless.
-- Report trajectory metrics *and* final success; fix non-deterministic environments (seed, cached web, frozen tool versions). → [Agentic AI & Tool Use](#/llm/agents), [Reasoning & Test-Time Compute](#/llm/reasoning).
+- **Budget-match:** more tools, tokens, or attempts can raise agent success. Report equal-budget comparisons as well as the quality–cost frontier, and record actual spending and early stopping by planner.
+- Report trajectory metrics and final success; separate reproducible snapshots (seed, cached or simulated web, pinned tool versions) from current live-environment evaluation. A live web cannot be fully frozen, so record timestamps and failure provenance. → [Agentic AI & Tool Use](#/llm/agents), [Reasoning & Test-Time Compute](#/llm/reasoning).
 
 ### Follow-ups they'll push
 
 - *"What's the single most common confounder in your field?"* — resolution/epoch/capacity drift; name it fast.
 - *"How would you convince me the gain isn't cherry-picked?"* — seeds + out-of-domain set + show failure cases.
-- *"When do you stop ablating?"* — when each remaining component's marginal effect is inside the noise, or the reviewer's causal question is answered.
+- *"When do you stop ablating?"* — when you have answered the key attribution, interaction, and failure-boundary questions that could change the decision, and the next experiment's information value is below its cost.
 - *"Additive vs leave-one-out — which and why?"* — leave-one-out for necessity, additive for a compounding story; report both if they disagree.
 
 ## Experiment-design checklist (copy-paste)
@@ -136,7 +172,8 @@ The "modules" are no longer just layers — they're **tools, memory, orchestrato
 [ ] Strong, reproducible baseline frozen
 [ ] One factor changed at a time (ablation matrix drafted)
 [ ] Confounders controlled: data / capacity / schedule / resolution
-[ ] Seeds run; mean ± std reported; effect > variance
+[ ] Paired effect + confidence interval; power rationale for the sample/seed count
+[ ] HPO/benchmark selection count logged; multiple-comparison/selection bias controlled
 [ ] Contamination / leakage check
 [ ] Compute reported (GPU-hrs, params, latency)
 [ ] Failure cases + stratified analysis
@@ -151,10 +188,10 @@ The "modules" are no longer just layers — they're **tools, memory, orchestrato
 | Ablation | Change one factor; show each component's marginal contribution |
 | ZIM pattern | Attribute gain across independent axes: architecture · loss · data |
 | Confounders | Epochs, capacity, resolution, augmentation, test-tuning |
-| Significance | Mean ± std over seeds; effect must exceed seed variance |
+| Uncertainty | Define the analysis unit; paired effect, CI, and power; mean ± std is a supporting summary |
 | CV metrics | Stratify — aggregate mIoU/AP hides small-object & boundary failure |
 | Compute | Pilot cheap, matched main runs, seeds, buffer; report cost as a result |
 | Agents | Modules = tools/memory/verifier; **budget-match** every comparison |
-| Contamination | Near-dup check, official splits, touch test once |
+| Contamination | Near-duplicate/source/time audit, limited and logged test access, unknowns stated |
 
 **Related:** [Debugging & Experimentation](#/foundations/debugging-experimentation) · [Failure & Negative Results](#/research/failure) · [Reading & Critiquing Papers](#/research/papers) · [The Research Job Talk](#/research/job-talk) · [Evaluation Metrics](#/foundations/evaluation-metrics) · [Agentic AI & Tool Use](#/llm/agents) · [Deep-Dive: ZIM](#/resume/zim) · [Deep-Dive: ECLIPSE](#/resume/eclipse)

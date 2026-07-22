@@ -3,11 +3,11 @@
 <div class="tag-row"><span class="tag">rejection reasons</span><span class="tag">per-round pitfalls</span><span class="tag">RS/AS-specific</span><span class="tag">how to avoid</span></div>
 
 > [!TIP] Learn the failure modes, not just the material
-> Most rejections aren't "didn't know enough" — they're **predictable, avoidable mistakes**: can't implement from scratch under time pressure, can't defend your own paper, obscured your contribution, bluffed instead of saying "I don't know." This chapter is the negative image of the whole book: know these and you dodge the majority of no-hires.
+> Rejection reasons often are not disclosed, so their proportions cannot be stated confidently. Still, mock interviews and retrospectives can reduce recurring risks: failing to implement under time pressure, being unable to defend your own work, blurring contribution boundaries, and covering uncertainty with guesses. This chapter is a diagnostic checklist for those **observable failure modes**.
 
-## The top rejection reasons for RS/AS candidates
+## Recurring risks for RS/AS candidates
 
-Synthesized from practitioner write-ups on why strong researchers still get rejected. Each is a *signal* the panel records — map yours to a fix.
+This list is not an official ranking or rubric for any company. Prioritize the current role's preparation guide and the recruiter's explanation, then map problems observed in your own mocks to the fixes.
 
 ```mermaid
 flowchart TB
@@ -22,17 +22,17 @@ flowchart TB
 
 | # | Rejection reason | Why it happens to strong people | The fix |
 | --- | --- | --- | --- |
-| 1 | **Can't implement from scratch** | "Uses ML daily" ≠ "codes attention / a backward pass / an SGD loop cold." | Drill [ML-coding from scratch](#/ml-coding/intro): attention, NMS/IoU, k-means, a training loop — cleanly, <30 min. |
-| 2 | **Breadth gap** | RS fundamentals rounds "ask almost anything"; one hole (RL, diffusion, MoE, RoPE) sinks it. | Cover the [foundations](#/foundations/optimization) map; you don't need depth everywhere, but no zeros. |
-| 3 | **Can't defend own work** | Fumbling baselines, ablations, or limitations of *your own paper* is disqualifying for research roles. | Pre-mortem every paper: "why not baseline X?", failure cases, what you'd redo. See [job talk](#/research/job-talk). |
+| 1 | **Can't implement from scratch** | "Uses ML daily" and "can implement a core operation in a constrained environment" are different skills. | Practice [ML coding from scratch](#/ml-coding/intro) under a time limit and the actual tool policy. |
+| 2 | **Breadth gap** | If an explanation breaks down on a core foundation for the role, there is less time to demonstrate other strengths. | Prioritize the [foundations](#/foundations/optimization) map using the job description and preparation guide. |
+| 3 | **Can't defend own work** | If you cannot explain the baselines, ablations, or limitations of flagship work, ownership becomes difficult to assess. | Pre-mortem every flagship paper: "why not baseline X?", failure cases, and what you would redo. See [job talk](#/research/job-talk). |
 | 4 | **Obscured contribution** | Over-using "we" so the panel can't isolate what *you* did. | The crisp [I-vs-we split](#/behavioral/star): "we" for the goal, "I" for every decision. |
 | 5 | **Coding hygiene / can't debug** | Especially AS/RE tracks — messy, untested, can't debug live. | Types, tests, small functions; narrate your debugging. |
 | 6 | **Behavioral misses** | No concrete result, no reflection, poor collaboration signal, blame. | Quantify every story; end on ownership + learning. |
-| 7 | **Fit mismatch (senior)** | Teams with 1–2 openings pass on "strong but off-fit"; may redirect to eng track. | Target teams whose *active* problems match; make the fit explicit in the [HM screen](#/process/recruiter-hm). |
-| 8 | **Integrity in negotiation** | Inflated/forged competing offers — instant credibility loss at this comp level. | Share ranges honestly; never fabricate. See [Negotiation](#/process/negotiation). |
+| 7 | **Fit mismatch** | Strong general ability and the scope this team currently needs can differ. | Target teams whose *current* problems match, and verify fit in the [HM screen](#/process/recruiter-hm). |
+| 8 | **Compromised negotiation integrity** | Inflated or fabricated competing offers create trust, relationship, and documentary risks. | Share only real facts and deadlines. See [Negotiation](#/process/negotiation). |
 
-> [!DANGER] The two fatal ones for research roles
-> **Can't defend your own published work** and **obscured contribution** are the research-specific killers. A brilliant paper you can't dissect under questioning, or a story where the panel can't tell what you personally drove, both read as "maybe the co-authors carried this." Nothing else on your CV recovers from that impression.
+> [!WARNING] Two items to check especially carefully for research roles
+> **The ability to defend your own published work** and **clear contribution boundaries** are important evidence for assessing ownership. Do not stop at listing strong results; prepare to explain decisions, alternatives, validation, and limitations under questioning.
 
 ## Mistakes by round
 
@@ -80,7 +80,7 @@ See [Coding Round Strategy](#/coding/strategy) and [Communication](#/playbook/co
 
 - **Generic "why us."** Spray-and-pray signal. One honest "I admired ___" per org fixes it.
 - **Comp-only or blame-driven "why leave."** Frame as pull (70%), not push. → [HM screen](#/process/recruiter-hm).
-- **Speculating about unreleased products.** Especially fatal at Apple (secrecy culture).
+- **Speculating about unreleased products or roadmaps.** Stay within public job descriptions and official materials.
 
 ## Cross-cutting behavioral & communication red flags
 
@@ -89,13 +89,13 @@ These get logged in the debrief regardless of round:
 <dl class="kv">
 <dt>Defensiveness under a hint</dt><dd>Fighting a nudge reads as "hard to work with." Take hints gracefully — they're *helping* you.</dd>
 <dt>Bluffing</dt><dd>A confident wrong answer destroys trust more than an admission. The dig-in exposes it anyway.</dd>
-<dt>Ego / dismissiveness</dt><dd>Trashing prior teammates, baselines, or "obvious" questions. Low-ego collaboration is explicitly valued (Meta, Mistral, NVIDIA).</dd>
+<dt>Ego / dismissiveness</dt><dd>Trashing prior teammates, baselines, or "obvious" questions weakens confidence in your collaboration style and judgment.</dd>
 <dt>Not listening</dt><dd>Answering the question you prepared instead of the one asked; missing the interviewer's steer.</dd>
 <dt>Self-editorializing</dt><dd>"I think I bombed that" to the interviewer/recruiter primes a negative read and you're a noisy judge of yourself.</dd>
 </dl>
 
-> [!WARNING] The intellectual-honesty test is always running
-> NVIDIA names it explicitly, but every panel weights it: admitting the limits of what you know, of your own paper, and of a chosen approach is *positive* signal. Overclaiming is the fastest way to lose a research interview.
+> [!WARNING] Intellectual honesty is a round-independent principle
+> Exact rubrics vary by company, but clearly bounding what you know, what your own research establishes, and what a chosen approach can support demonstrates verifiable reasoning. Admit unknowns together with a path to check them.
 
 ## The PhD → industry translation trap
 
@@ -143,7 +143,7 @@ You can't fix a mistake you can't see. Most candidates have **one or two dominan
 
 | Mistake | One-line fix |
 | --- | --- |
-| Can't code from scratch | drill attention / NMS / training loop cold, <30 min |
+| Can't code from scratch | drill attention / NMS / a training loop within the allowed environment and time |
 | Breadth gap | no zeros across the foundations map |
 | Can't defend own paper | pre-mortem baselines, ablations, failure cases |
 | Obscured contribution | "we" for the goal, "I" for every decision |

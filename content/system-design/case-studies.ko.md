@@ -6,7 +6,7 @@
 > 각 case는 [9-step framework](#/system-design/framework)를 따라 걷습니다. CV/VLM research-applied 후보의 영역 정중앙에 놓이도록 골랐습니다 — background removal / matting, visual search, vision moderation, segmentation data engine, face auth / anti-spoofing, recommendation ranking, OCR / document AI — 그래서 framing을 그대로 당신의 loop로 들어올릴 수 있어요. 정확한 숫자가 아니라 *구조*와 *trade-off 논거*를 훔치세요. 당일에는 당신 자신의 가정을 말하면 됩니다.
 
 > [!NOTE] 당신의 CV를 소리 내어 말하세요
-> case가 실제 ship한 작업과 닿는 곳 — foreground-segmentation API, ZIM zero-shot matting → CLOVA X, on-device ONNX human seg(~10 ms class), FaceSign anti-spoofing, grounded-VLM 데이터 작업 — 에서는 **그것을 명시하세요**. "정확히 이것의 한 버전을 ship했습니다; 여기서 무엇을 재사용하고 100× 규모에서 무엇을 바꿀지 말씀드리죠"는 design 라운드에서 할 수 있는 가장 강한 문장입니다.
+> 아래 경력 예시는 **본인의 제출 CV와 공개 가능한 사실에 실제로 적혀 있을 때만** 1인칭으로 사용하세요. 역할·제품명·latency·배포 범위가 다르면 정확한 본인 기여로 바꾸고, 기밀 수치나 팀 전체 성과를 개인 성과로 말하지 않습니다.
 
 ---
 
@@ -51,7 +51,7 @@ flowchart TB
     HQ[Matting model<br/>ZIM-class]
     Post[Alpha refine · encode]
   end
-  subgraph Offline
+  subgraph MattingOffline[Offline]
     Lake[(Opt-in sample lake)]
     Mine[Hard-case mining<br/>+ active learning]
     Train[Training cluster]
@@ -82,7 +82,7 @@ flowchart TB
 > [!QUESTION] "왜 preview는 on-device인데 export는 cloud인가요 — 왜 하나의 모델이 아니죠?"
 > **Short:** 제약이 다릅니다. Preview는 ~30 ms와 privacy가 필요하고; export는 품질이 필요하며 1–2 s와 GPU를 쓸 수 있습니다.
 >
-> **Deep:** export에 충분히 좋은 단일 모델은 중급 폰에서 30 ms를 맞출 수 없고, 폰에 들어갈 만큼 작은 단일 모델은 export에서 눈에 띄는 alpha error를 남깁니다. Tiering은 각자 자기 objective를 최적화하게 하고, 상호작용의 ~99%를 GPU fleet 밖에 유지(cost)하며, privacy-first 시장을 만족시킵니다. 대가는 학습·distill·일관성 유지를 해야 하는 모델이 *둘*이라는 것 — 저라면 on-device student를 export teacher로*부터* distill해서 둘의 행동이 일치하게 하겠습니다.
+> **Deep:** preview와 export의 latency·quality·privacy 제약이 다르면 tiering이 합리적입니다. GPU를 피하는 비율은 사용자 행동과 export rate로 계산해야 하며 근거 없이 99%라고 두지 않습니다. device별 thermal/quality와 cloud 비용 곡선을 측정하고, on-device student를 export teacher에서 distill하되 preview↔export 일관성도 평가합니다.
 
 ---
 
@@ -106,7 +106,7 @@ flowchart LR
   V --> ANN[(ANN index<br/>HNSW / IVF-PQ)]
   ANN -->|top ~500| RR[Re-ranker<br/>cross-features + metadata]
   RR -->|top k| Res[Results]
-  subgraph Offline
+  subgraph RetrievalOffline[Offline]
     Cat[Catalog images] --> Eb[Batch encode] --> Build[Build / refresh index]
     Build --> ANN
   end
@@ -152,13 +152,13 @@ flowchart TB
   Fast -->|clearly safe| Pub[Publish]
   Fast -->|uncertain / risky| Heavy[Stage 2: heavy multimodal model<br/>image + OCR text + context]
   Heavy -->|high conf violate| Block[Block + log]
-  Heavy -->|gray zone| HQ[Human review queue]
-  HQ --> Label[(Reviewed labels)]
-  Label --> Train[Retrain / active learning]
-  Train --> Reg[(Registry)] -.-> Fast & Heavy
+  Heavy -->|gray zone| ModQueue[Human review queue]
+  ModQueue --> Label[(Reviewed labels)]
+  Label --> ModTrain[Retrain / active learning]
+  ModTrain --> ModReg[(Registry)] -.-> Fast & Heavy
   KnownCSAM[(Known-bad hash DB<br/>PhotoDNA-style)] --> Fast
   style Heavy fill:#e0533f,color:#fff
-  style HQ fill:#12a150,color:#fff
+  style ModQueue fill:#12a150,color:#fff
 ```
 
 ### 4–6 · Data, model, eval
@@ -191,7 +191,7 @@ flowchart TB
 ### 1–2 · Clarify + metrics
 
 - **Goal:** *human-minute당 labeled-mask 품질*을 최대화. 시스템의 산출물은 **데이터**이고, 그 metric은 단일 모델의 accuracy가 아니라 dollar당 downstream 모델 품질.
-- **Metrics:** offline = **mask quality**(auto-label의 mIoU/boundary-F를 audited gold set 대비) + **human-correction rate**; system = labels/hour, $/1k masks, engine 산출물로 학습한 모델의 mIoU; guardrail = label-noise 상한, class coverage.
+- **Metrics:** offline = auto-label의 mIoU/boundary-F와 human-correction rate; system = labels/hour, mask 1,000개당 비용, 생성 label로 학습한 downstream 모델 품질; guardrail = label-noise 상한과 class coverage.
 
 ### 3 · Architecture (model-in-the-loop labeling)
 
@@ -200,12 +200,12 @@ flowchart LR
   Raw[(Unlabeled stream)] --> Auto[Auto-label<br/>promptable seg SAM-class<br/>+ open-vocab detector]
   Auto --> Conf{Confidence /<br/>agreement}
   Conf -->|high| Accept[Auto-accept]
-  Conf -->|low / disagree| Human[Human correction UI]
+  Conf -->|low / disagree| LabelHuman[Human correction UI]
   Accept --> Pool[(Label pool)]
-  Human --> Pool
-  Pool --> Train[Train / improve model]
-  Train --> Auto
-  Pool --> AL[Active learning<br/>pick next batch] --> Human
+  LabelHuman --> Pool
+  Pool --> LabelTrain[Train / improve model]
+  LabelTrain --> Auto
+  Pool --> AL[Active learning<br/>pick next batch] --> LabelHuman
   style Auto fill:#6366f1,color:#fff
   style AL fill:#e0533f,color:#fff
 ```
@@ -238,8 +238,8 @@ flowchart LR
 
 ### 1–2 · Clarify + metrics
 - **두 개의 하위 문제:** face **recognition**(이게 enroll된 사용자인가?) + liveness / **presentation-attack detection (PAD)**(사진/replay/mask가 아니라 살아있는 사람인가?). PAD가 어렵고 security-critical한 절반입니다.
-- **Cost asymmetry:** **false accept**(spoof 성공)는 payment에 치명적이고; false reject는 그저 성가실 뿐 → **고정된 매우 낮은 FAR**(예: 1e-5–1e-6)에서 동작시키고 *그 지점에서의* FRR를 최소화.
-- **Metrics:** recognition = **TAR@FAR**(verification ROC); PAD = **APCER / BPCER / ACER**(ISO 30107-3의 attack vs bona-fide error rate). Guardrail: on-device latency; **fairness** = skin tone / age / gender에 걸친 error parity는 필수.
+- **Cost asymmetry:** system false accept는 recognition impostor accept와 PAD attack accept가 결합된 결과입니다. recognition은 목표 FAR에서 TAR/FRR을, PAD는 공격 유형별 APCER와 BPCER trade-off를 따로 설계합니다. $10^{-5}$ 같은 극저 FAR 주장은 충분한 negative trial과 confidence interval이 없으면 검증할 수 없습니다.
+- **Metrics:** recognition = **TAR@FAR**; PAD = **APCER / BPCER**, 필요 시 ACER. ACER 평균 하나는 공격별 최악값과 비용 비대칭을 숨길 수 있으므로 attack instrument·device·demographic slice와 confidence interval을 보고합니다.
 - **Privacy:** face template은 biometric → **on-device, encrypted, 원본 이미지를 서버로 보내지 않음**(FaceSign의 정부 인증 맥락).
 
 ### 3 · Architecture
@@ -248,30 +248,30 @@ flowchart TB
   Cam[Camera + IR/depth if available] --> Live[Liveness / PAD model]
   Live -->|spoof| Rej[Reject]
   Live -->|live| Emb[Face embedding model]
-  Emb --> M{Cosine vs enrolled template}
+  Emb --> M
+  subgraph SE["TEE / secure enclave (device별 지원 범위)"]
+    Tpl[(Encrypted template)]
+    M{Protected template match}
+  end
+  Tpl --> M
   M -->|match| Acc[Accept]
   M -->|no| Fb[Reject → PIN fallback]
-  subgraph SE["Secure enclave (on-device)"]
-    Live
-    Emb
-    Tpl[(Encrypted template)]
-  end
   style Live fill:#e0533f,color:#fff
 ```
 
 ### 4–6 · Data, model, eval
 - **PAD data:** device/lighting에 걸친 다양한 **attack instrument**(print, screen replay, 2D/3D mask, cutout); 이는 **open-set** 문제(새 attack이 계속 등장)이므로 단순 binary classification이 아니라 robustness/anomaly framing.
-- **Signals:** 하드웨어가 허락하면 multi-modal(**IR/depth**가 대부분의 2D replay를 무력화), texture/moiré 단서, 고위험 action에는 선택적 active challenge(blink/turn).
+- **Signals:** 하드웨어가 허락하면 IR/depth가 일부 print/screen replay에 추가 신호를 주지만 센서 spoof·3D mask·domain shift를 무력화하지는 않습니다. texture/moiré와 선택적 challenge도 replay·accessibility·UX 위협 모델을 함께 평가합니다.
 - **Model:** 컴팩트한 CNN embedding(recognition은 **ArcFace-style margin loss**) + PAD head; enclave용으로 distill/quantize.
 - **Eval:** **cross-dataset / cross-attack** generalization이 진짜 시험(일부 attack으로 학습, 보지 못한 것으로 테스트) — in-distribution PAD 수치는 오해를 부를 만큼 높습니다.
 
 ### 7–9 · Serve, monitor, govern
-- 모든 inference는 secure enclave에서 **on-device**; 서버는 pass/fail + audit metadata만 봅니다.
+- inference는 가능한 한 on-device에서 수행하되, 일반 NPU/GPU 연산 전체가 secure enclave 안에서 돈다고 가정하지 않습니다. enclave/TEE는 보통 key·template·match 같은 작은 trusted component를 보호하며 범위는 OS/SoC별로 확인합니다. 서버 telemetry도 최소화·동의·보존기간을 적용합니다.
 - **Monitoring:** spoof-attempt rate, device/OS 업데이트별 FRR drift, new-attack campaign 탐지; 새로 관측된 attack을 추가하는 빠른 loop.
-- **Failure/abuse:** liveness down → PIN으로 fallback(**절대** accept로 fail-open 안 됨); template 유출 → 취소 가능하고 재등록 가능하게.
+- **Failure/abuse:** liveness down → PIN/다중 인증으로 fail-closed. 생체정보는 바꿀 수 없으므로 raw embedding만 저장하지 말고 keyed/cancellable template, device-bound key와 version을 써 유출 시 transformation/key를 회전하고 재등록할 수 있게 합니다.
 
-> [!QUESTION] "왜 accuracy가 아니라 고정된 FAR에서 PAD를 최적화하나요?"
-> **Short:** 비용이 극도로 비대칭입니다 — false accept 하나가 payment 계정을 비울 수 있어요 — 그래서 operating point를 PAD ROC 위 아주 작은 고정 FAR에서 고르고, data/threshold/model을 모두 *그 지점에서* false reject를 최소화하도록 튜닝합니다. 평범한 accuracy는 security 시스템에서 유일하게 중요한 숫자를 숨깁니다.
+> [!QUESTION] "왜 face-auth를 accuracy 하나로 최적화하지 않나요?"
+> **Short:** recognition은 TAR@FAR, PAD는 공격별 APCER@BPCER로 분리합니다. 최종 operating point는 공격 비용·사용자 마찰과 두 단계의 결합 오류로 정합니다. ACER/accuracy 하나는 희귀하지만 치명적인 attack accept를 숨길 수 있습니다.
 
 ---
 
@@ -293,15 +293,15 @@ flowchart LR
   Rank --> Rr[Re-rank<br/>diversity · freshness · rules]
   Rr --> Feed[Feed]
   Log[(Interaction logs)] --> FS[Feature store] --> Rank
-  Log --> Tr[Train] --> Reg[(Registry)] -.-> Rank
+  Log --> Tr[Train] --> RecReg[(Registry)] -.-> Rank
   style Rank fill:#e0533f,color:#fff
 ```
 
 ### 4–6 · Data, model, eval
 - **Retrieval:** in-batch negative를 쓰는 **two-tower**(user tower / item tower) → item embedding에 대한 ANN(Case B와 같은 기술).
 - **Ranker:** 풍부한 cross-feature(user×item×context); **GBDT** baseline → high-cardinality ID를 위한 embedding을 가진 **DLRM / deep ranking**. score가 blend/auction으로 들어간다면 calibrated probability가 중요합니다.
-- **Feedback loop & bias:** log는 **현재 모델에 의해 편향**됩니다(보여준 것에 대한 click만 관측) → **position-bias** 보정, exploration(ε-greedy / bandit), inverse-propensity weighting. 이것이 rec 시스템을 규정하는 *바로 그* 미묘함입니다.
-- **Eval:** offline에서 counterfactual/replay 추정, 그다음 A/B; **feedback-loop amplification**(rich-get-richer, filter bubble)을 감시.
+- **Feedback loop & bias:** 보여 준 item의 outcome만 관측하므로 logging policy의 **propensity와 노출 위치**를 기록하고, 안전한 exploration으로 support/overlap을 확보합니다. IPS/self-normalized IPS는 작은 propensity의 높은 분산에 clipping·diagnostic이 필요하고, outcome model을 결합한 doubly robust estimator도 model misspecification을 점검합니다.
+- **Eval:** replay/off-policy estimate는 overlap이 있는 정책 변화에만 신뢰하고 effective sample size와 CI를 보고한 뒤 staged A/B로 확인합니다. novelty·interference·장기 효과 때문에 "online이 항상 즉시 진실"이라고 단순화하지 않습니다.
 
 ### 7–9 · Serve, monitor, govern
 - **Serving:** **train/serve parity**(최우선 버그 원천)를 갖춘 feature store, 사전 계산된 user/item embedding, 빠듯한 p99, caching.
@@ -325,19 +325,19 @@ flowchart LR
 ### 3 · Architecture
 ```mermaid
 flowchart LR
-  Img[Doc photo] --> Pre[Dewarp · deskew · denoise]
-  Pre --> Det[Text detector]
+  Img[Doc photo] --> DocPre[Dewarp · deskew · denoise]
+  DocPre --> Det[Text detector]
   Det --> Rec[Recognizer OCR]
   Rec --> Lay[Layout + KV extraction<br/>LayoutLM-class or doc-VLM]
   Lay --> Val[Validation / business rules]
-  Val -->|low conf| Human[Human-in-the-loop]
+  Val -->|low conf| DocHuman[Human-in-the-loop]
   Val -->|ok| Out[Structured output]
-  Human --> Store[(Corrected → retrain)]
+  DocHuman --> Store[(Corrected → retrain)]
   style Lay fill:#e0533f,color:#fff
 ```
 
 ### 4–6 · Data, model, eval
-- **Pipeline vs VLM:** 고전적 pipeline(DBNet-class detector + CRNN/transformer recognizer + LayoutLM)은 stage별로 제어 가능하고, 싸고, debug 가능; **document VLM**은 더 단순하고 지저분한 layout에 더 강하지만 무겁고 field를 **hallucinate**할 수 있습니다. Hybrid: 이해는 VLM, 숫자는 **deterministic parsing/validation**.
+- **Pipeline vs VLM:** staged pipeline은 component별 제어·측정이 쉽고, document VLM은 open-ended layout에 유연할 수 있지만 무겁고 field를 hallucinate할 수 있습니다. Hybrid에서도 deterministic parser/schema/checksum은 **형식과 산술 일관성**만 검증하며 이미지의 실제 값을 읽었다는 사실까지 보장하지 않습니다.
 - **Data:** synthetic document 생성(font, template, augmentation) + real labeled scan; multilingual.
 - **Eval:** field별·document-type별 slice(receipt vs invoice vs ID); VLM 경로의 **hallucinated-field** rate 추적.
 
@@ -347,7 +347,7 @@ flowchart LR
 - **Failure:** 영수증의 틀린 총액은 high-cost → validation rule(checksum, 총액이 합과 일치해야) + 사람에게 fail.
 
 > [!QUESTION] "document-VLM 하나인가, staged pipeline인가?"
-> **Short:** 지저분하고 굽은 layout에 대한 robustness와 적은 per-template 엔지니어링이면 VLM; stage별 metric, cost, control이면 pipeline. 저라면 layout/understanding에는 VLM을 쓰되 numeric field에는 **deterministic validation**(regex, checksum, 총액)을 유지하고 low-confidence는 사람에게 라우팅하겠습니다 — VLM은 하필 중요한 숫자를 hallucinate하거든요.
+> **Short:** VLM과 pipeline을 같은 document/language slice와 비용에서 비교합니다. numeric field에는 regex·schema·checksum·subtotal 합 같은 일관성 검사를 적용하되, 통과가 정답을 보장하지 않으므로 source span/box를 함께 반환하고 high-risk·low-confidence는 사람이 확인합니다.
 
 ### Follow-ups they'll push (any case)
 
@@ -364,7 +364,7 @@ flowchart LR
 | **B · Visual search** | metric learning + ANN + re-rank | two-stage retrieval; PQ-compressed index | encoder version skew across query/catalog |
 | **C · Moderation** | multi-label detection | hash-first + cheap→heavy cascade; fail-closed | adversarial drift; slice-unfair recall |
 | **D · Data engine** | model-in-the-loop labeling | self-improving flywheel + active learning | self-reinforcing label bias (no gold set) |
-| **E · Face auth / PAD** | recognition + presentation-attack detection | on-device enclave; operate at fixed low FAR | false accept (spoof); cross-attack generalization |
+| **E · Face auth / PAD** | recognition + presentation-attack detection | on-device + protected template; TAR@FAR와 APCER/BPCER 분리 | system false accept; cross-attack generalization |
 | **F · Recommendation** | retrieval + ranking (+ re-rank) | two-tower ANN → heavy ranker; debias logs | feedback-loop bias; train/serve skew |
 | **G · OCR / doc AI** | detect → recognize → layout/KV | pipeline vs doc-VLM + deterministic validation | VLM hallucinated numeric fields |
 

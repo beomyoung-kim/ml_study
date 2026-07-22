@@ -3,17 +3,17 @@
 <div class="tag-row"><span class="tag">CVPR 2024</span><span class="tag">continual learning</span><span class="tag">panoptic</span><span class="tag">visual prompt tuning</span><span class="tag">distillation-free</span><span class="tag">first author</span></div>
 
 > [!TIP] 30초 pitch
-> ECLIPSE는 distillation이나 replay 없이 **continual (class-incremental) panoptic segmentation**을 합니다. step 1 이후에는 **Mask2Former 전체를 freeze**하고, 새로운 class group마다 작은 **visual prompt 세트 + MLP head**(파라미터의 ~1.3%)만 학습합니다. Freezing이 catastrophic forgetting을 구조적으로 제거하고, **logit-manipulation** 규칙이 순수 freezing이 유발할 no-object semantic drift와 error propagation을 바로잡습니다. Distillation-free이면서 ADE20K continual panoptic에서 SOTA에 도달합니다.
+> ECLIPSE는 distillation이나 replay 없이 <strong>continual (class-incremental) panoptic segmentation</strong>을 다룹니다. step 1 이후 <strong>Mask2Former parameter를 freeze</strong>하고 새 class group마다 작은 **visual-prompt set + MLP head**(전체 parameter의 약 1.3%)만 학습합니다. Freezing은 기존 parameter의 drift를 막아 forgetting을 줄이고, <strong>logit manipulation</strong>은 변화하는 no-object 의미와 step 간 error propagation을 보정합니다. 논문은 ADE20K continual-panoptic protocol에서 당시 강한 결과를 보고합니다.
 
 **Public references:** [paper (arXiv 2403.20126)](https://arxiv.org/abs/2403.20126) · [code](https://github.com/clovaai/ECLIPSE). 근거 챕터: [Continual Learning](#/cv/continual-learning).
 
 ## 문제 & 동기
 
-실제 배포는 계속 카테고리를 추가하지만, 옛 데이터 전체로 retrain할 기회는 드뭅니다(저장, 프라이버시, 비용). **Continual panoptic**은 이 문제의 가장 어려운 형태입니다:
+실제 배포는 계속 카테고리를 추가하지만, 옛 데이터 전체로 retrain할 기회는 드뭅니다(저장, 프라이버시, 비용). <strong>Continual panoptic</strong>은 이 문제의 가장 어려운 형태입니다:
 
-- **Panoptic > semantic 난이도:** *things*(instance matching), *stuff*, 그리고 매 step마다 의미가 바뀌는 *no-object/background* label을 모두 다뤄야 합니다. PQ = SQ × RQ는 recognition 실패에 민감하고, ADE20K는 이미지당 instance가 많습니다.
-- **선행 연구(MiB, PLOP, CoMFormer):** **knowledge distillation + pseudo-labeling**에 의존합니다. 이는 forward pass가 두 배가 되고, distillation weight / threshold에 민감하며, step이 늘수록 scaling이 나빠짐을 뜻합니다.
-- continual **panoptic**은 특히 semantic 대비 덜 연구되었습니다.
+- **Semantic segmentation에 더해지는 난점:** *things*의 instance matching, *stuff*, 그리고 매 step마다 의미가 바뀌는 *no-object/background* label을 함께 다룹니다. PQ = SQ × RQ는 recognition 실패에도 민감합니다.
+- **선행 연구(MiB, PLOP, CoMFormer):** <strong>knowledge distillation + pseudo-labeling</strong>에 의존합니다. 이는 forward pass가 두 배가 되고, distillation weight / threshold에 민감하며, step이 늘수록 scaling이 나빠짐을 뜻합니다.
+- continual <strong>panoptic</strong>은 특히 semantic 대비 덜 연구되었습니다.
 
 ## Method
 
@@ -28,7 +28,7 @@ step-$t$ token의 no-object score, 그리고 왜 softmax가 아니라 sigmoid인
 
 $$s^{\varnothing}_t=\delta\sum_{k\neq t} s^{\mathcal{C}^k}_t \qquad (\delta=0.5,\ \text{post-hoc})$$
 
-직관: *"이 token이 다른 step에 속한 class들에서 높은 점수를 낸다면, 아마 내 step의 객체가 아니다."* Classification은 **sigmoid**(class별 독립 점수)를 씁니다 — class 집합이 step마다 계속 바뀔 때 상대적 **softmax**는 정의가 애매하기 때문입니다.
+직관: *"이 token이 다른 step에 속한 class들에서 높은 점수를 낸다면, 아마 내 step의 객체가 아니다."* Classification은 **sigmoid**(class별 독립 점수)를 씁니다 — class 집합이 step마다 계속 바뀔 때 상대적 <strong>softmax</strong>는 정의가 애매하기 때문입니다.
 
 ```mermaid
 flowchart LR
@@ -55,7 +55,7 @@ flowchart LR
 ## SSUL — 전편 (NeurIPS 2021, co-first author)
 
 > [!NOTE] Storyboard: SSUL → ECLIPSE
-> **SSUL**(*Semantic Segmentation with Unknown Label for Exemplar-based Class-Incremental Learning*, [arXiv 2106.11562](https://arxiv.org/abs/2106.11562), [code](https://github.com/clovaai/SSUL))은 **continual semantic** segmentation을 다뤘습니다. 아이디어: 명시적 **"unknown" class**를 모델링하고(미래/배경 픽셀을 known class로 억지로 끼워 넣지 않도록) 작은 exemplar memory를 더하며, saliency로 plasticity를 bootstrap. ECLIPSE는 그것의 panoptic, distillation-free, replay-free 진화형입니다: prompt **isolation**이 unknown-label + exemplar 장치를 대체하고, saliency 없이도 semantic에서 경쟁력을 유지합니다. 하나의 연구 라인으로 말하세요: *"나는 continual-seg 문제는 유지하되 그 목발들을 제거했다 — 먼저 label ambiguity를, 그다음 distillation과 replay를."*
+> **SSUL**(*Semantic Segmentation with Unknown Label for Exemplar-based Class-Incremental Learning*, [arXiv 2106.11562](https://arxiv.org/abs/2106.11562), [code](https://github.com/clovaai/SSUL))은 **continual semantic** segmentation을 다뤘습니다. 아이디어: 명시적 <strong>"unknown" class</strong>를 모델링하고(미래/배경 픽셀을 known class로 억지로 끼워 넣지 않도록) 작은 exemplar memory를 더하며, saliency로 plasticity를 bootstrap. ECLIPSE는 그것의 panoptic, distillation-free, replay-free 진화형입니다: prompt <strong>isolation</strong>이 unknown-label + exemplar 장치를 대체하고, saliency 없이도 semantic에서 경쟁력을 유지합니다. 하나의 연구 라인으로 말하세요: *"나는 continual-seg 문제는 유지하되 그 목발들을 제거했다 — 먼저 label ambiguity를, 그다음 distillation과 replay를."*
 
 ## 예상 deep-dive Q&A
 
@@ -64,13 +64,13 @@ flowchart LR
 
 **Short:** instance matching(things), stuff, 그리고 매 step마다 의미가 drift하는 no-object label을 동시에 다뤄야 하고; PQ가 recognition error를 강하게 벌합니다.
 
-**Deep:** semantic seg에서 background는 (바뀌더라도) 단일 class입니다. Panoptic에서 "no-object"는 background **+ 과거 class + 미래 class**를 뜻하고, 그 집합이 매 step 바뀌므로, 어떤 *고정된* no-object classifier도 miscalibrate됩니다. 게다가 PQ = SQ × RQ는 recognition(RQ)이 실패하면 무너지고, ADE20K의 이미지당 다수 instance가 이를 증폭합니다.
+**Deep:** semantic seg에서 background는 (바뀌더라도) 단일 class입니다. Panoptic에서 "no-object"는 background <strong>+ 과거 class + 미래 class</strong>를 뜻하고, 그 집합이 매 step 바뀌므로, 어떤 *고정된* no-object classifier도 miscalibrate됩니다. 게다가 PQ = SQ × RQ는 recognition(RQ)이 실패하면 무너지고, ADE20K의 이미지당 다수 instance가 이를 증폭합니다.
 </div></details>
 
 <details class="qa"><summary>freezing이 어떻게 forgetting을 막고, 그 비용은 무엇인가요?</summary>
 <div class="qa-body">
 
-**Short:** 옛 weight가 절대 움직이지 않으니 옛 지식이 정확히 보존됩니다; 비용은 **error propagation**과 plasticity 감소입니다.
+**Short:** 기존 parameter update를 막아 representation drift를 줄이지만, 옛 지식과 최종 출력이 정확히 보존되는 것은 아닙니다. 새 prompt와 aggregation 때문에 <strong>error propagation</strong>이 생길 수 있고 plasticity도 줄어듭니다.
 
 **Deep:** step 1이 버스를 자동차로 자신 있게 오분류하면 freezing이 그걸 고정시킵니다. Logit manipulation이 후속 step의 class 증거로 잘못된 no-object 결정을 억제해 이를 완화합니다. Plasticity 감소는 실제입니다: 새 class PQ는 joint-training oracle에 못 미칩니다. 저는 **deep** prompt(100-10에서 new-PQ 18.8 vs shallow 14.0, ~+100K params)와 더 강한 frozen init(Swin-L / COCO)으로 plasticity를 회복합니다. 포지션: *"stability 우선, plasticity는 저렴한 레버로."*
 </div></details>
@@ -92,9 +92,9 @@ Softmax는 고정된 class 집합에 대해 normalize하지만 — 집합이 매
 <details class="qa"><summary>distillation/replay가 더 강할 수 있습니다. 왜 피하나요?</summary>
 <div class="qa-body">
 
-**Short:** 낮은 학습 복잡도와 memory, 깨지기 쉬운 hyperparameter 감소, 원본 옛 데이터를 저장할 필요 없음(프라이버시).
+**Short:** 낮은 학습 복잡도와 memory, distillation hyperparameter 감소, old-data replay가 필요 없다는 장점입니다. 원본 데이터를 보관하지 않아도 된다는 점은 정책과 전체 pipeline에 따라 privacy 이점이 될 수 있습니다.
 
-**Deep:** KD/replay 방법은 forward pass를 두 배로 만들고 distillation weight와 pseudo-label threshold에 민감하며 scaling이 껄끄럽습니다. ECLIPSE는 그것을 prompt **isolation**으로 바꿉니다 — ~1.3% params, ~5.6× 적은 학습 memory. 정직하게 명시할 trade-off: inference가 여러 prompt group을 돌리므로 비용이 step에 따라 늘고, 매우 큰 class 수는 prompt-set 크기에 부담을 줍니다. 그건 future work지만, frozen trunk가 공유되므로 총 FLOP 증가는 완만합니다.
+**Deep:** KD/replay 방법은 forward pass를 두 배로 만들고 distillation weight와 pseudo-label threshold에 민감하며 scaling이 껄끄럽습니다. ECLIPSE는 그것을 prompt <strong>isolation</strong>으로 바꿉니다 — ~1.3% params, ~5.6× 적은 학습 memory. 정직하게 명시할 trade-off: inference가 여러 prompt group을 돌리므로 비용이 step에 따라 늘고, 매우 큰 class 수는 prompt-set 크기에 부담을 줍니다. 그건 future work지만, frozen trunk가 공유되므로 총 FLOP 증가는 완만합니다.
 </div></details>
 
 ### 어려운 follow-up
@@ -114,7 +114,7 @@ Prompt-set 크기와 inference에서 aggregate되는 group 수가 step에 따라
 <details class="qa"><summary>제품 스토리는?</summary>
 <div class="qa-body">
 
-배포된 segmentation API에 전체 retrain이나 옛 데이터 보관 없이 새 카테고리를 추가하기: 작은 **adapter(prompt + MLP)**를 배포합니다. 이는 프라이버시 친화적, 점진적 on-device 또는 API 업데이트에 매핑됩니다 — Apple/Meta 스타일 팀이 신경 쓰는 서사입니다.
+가능한 제품 매핑은 전체 retrain이나 old-data replay 없이 새 category용 <strong>adapter(prompt + MLP)</strong>를 추가하는 것입니다. 다만 논문 결과만으로 실제 배포, on-device 적합성, privacy 준수를 보장하지는 않습니다. 그런 요구가 JD에 있을 때 hypothesis로 연결하세요.
 </div></details>
 
 ## 솔직한 한계
@@ -125,12 +125,12 @@ Prompt-set 크기와 inference에서 aggregate되는 group 수가 step에 따라
 
 ## 어떤 JD와 연결되는가
 
-| Company | Connection |
+| JD signal | 연결할 근거 |
 | --- | --- |
-| Apple | 효율적 adaptation; 프라이버시 친화적, replay-free model update |
-| Meta | 점진적으로 특화되는 장수 foundation model |
-| NVIDIA | robotics를 위한 continual perception(시간에 따라 class 등장) |
-| Microsoft | 확장 가능하고 저비용인 model-update pipeline |
+| Continual / class-incremental perception | prompt isolation, 변화하는 no-object 처리, long-sequence 한계 |
+| Parameter-efficient adaptation | step당 약 1.3% trainable parameter, frozen trunk |
+| 제한된 old-data storage | replay-free 학습; privacy 효과는 전체 pipeline과 정책을 별도 검증 |
+| Model-update systems | adapter 단위 update 가능성과 step 수에 따른 inference 비용 trade-off |
 
 ## Cheat-sheet
 

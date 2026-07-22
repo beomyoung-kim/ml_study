@@ -1,9 +1,67 @@
 # Attention From Scratch
 
-> [!TIP] Say this first
-> "Attention is a soft dictionary lookup: queries score every key with a dot product, we scale by $1/\sqrt{d}$ so the softmax doesn't saturate, softmax turns scores into weights, and we take the weighted average of the values." Then write the four lines. Every VLM and LLM you'll touch is built on this.
+> [!NOTE] Goal of this chapter
+> Attention is the heart of Transformers, LLMs, and VLMs. Here you will understand how each token decides **how much to consult every other token**, moving from a picture to intuition to NumPy code, and then implement, run, and test it yourself. Prerequisite: [NumPy & Broadcasting Primer](#/ml-coding/numpy-primer); for conceptual context, see [CNNs, RNNs & Transformers](#/foundations/architectures).
 
-Implement scaled dot-product attention (with masking) and multi-head attention. This is *the* building block for the [Transformer block](#/ml-coding/transformer) and the entire modern stack — see [CNNs, RNNs & Transformers](#/foundations/architectures) for the conceptual side.
+## What and why—a “soft dictionary lookup”
+
+In the sentence “The **cat** **sat** on the mat,” understanding “sat” requires asking “who sat?” and consulting **cat**. Attention learns exactly this choice: **which words to consult, and by how much**.
+
+The dictionary analogy makes it concrete. An ordinary dictionary lookup retrieves one value whose key matches exactly. Attention performs a **soft** lookup: it measures similarity against every key and mixes **multiple values** in proportion to those similarities.
+
+<dl class="kv">
+<dt>Query ($Q$)</dt><dd>“The information I want right now”—the question posed by the current token.</dd>
+<dt>Key ($K$)</dt><dd>“The index for the information I contain”—a search tag exposed by each token.</dd>
+<dt>Value ($V$)</dt><dd>“The content to retrieve”—the payload mixed according to similarity.</dd>
+</dl>
+
+<figure>
+<svg viewBox="0 0 640 300" xmlns="http://www.w3.org/2000/svg" font-family="Inter, sans-serif" font-size="12">
+  <!-- every token is projected to Q, K, and V -->
+  <text x="60" y="24" text-anchor="middle" fill="#98a3b2">input X (all tokens)</text>
+  <g fill="none" stroke="#98a3b2" stroke-width="1.4">
+    <rect x="30" y="34" width="60" height="26" rx="5"/><rect x="30" y="66" width="60" height="26" rx="5"/><rect x="30" y="98" width="60" height="26" rx="5"/>
+  </g>
+  <text x="60" y="52" text-anchor="middle" fill="currentColor">the</text>
+  <text x="60" y="84" text-anchor="middle" fill="currentColor">cat</text>
+  <text x="60" y="116" text-anchor="middle" fill="currentColor">sat</text>
+  <!-- projections -->
+  <g font-size="11">
+    <rect x="130" y="34" width="74" height="26" rx="5" fill="#0ea5e9"/><text x="167" y="52" text-anchor="middle" fill="#fff">Q=XWQ</text>
+    <rect x="130" y="66" width="74" height="26" rx="5" fill="#6366f1"/><text x="167" y="84" text-anchor="middle" fill="#fff">K=XWK</text>
+    <rect x="130" y="98" width="74" height="26" rx="5" fill="#12a150"/><text x="167" y="116" text-anchor="middle" fill="#fff">V=XWV</text>
+  </g>
+  <path d="M90 79 L130 47" stroke="#98a3b2" stroke-width="1.2" marker-end="url(#aa)"/>
+  <path d="M90 79 L130 79" stroke="#98a3b2" stroke-width="1.2" marker-end="url(#aa)"/>
+  <path d="M90 79 L130 111" stroke="#98a3b2" stroke-width="1.2" marker-end="url(#aa)"/>
+  <text x="120" y="150" text-anchor="middle" fill="#98a3b2" font-size="10">three learned projections</text>
+  <!-- QK^T scores -->
+  <text x="300" y="24" text-anchor="middle" fill="#0ea5e9">① scores = Q·Kᵀ / √d</text>
+  <g>
+    <rect x="250" y="40" width="100" height="100" rx="4" fill="none" stroke="#0ea5e9" stroke-width="1.5"/>
+    <line x1="250" y1="73" x2="350" y2="73" stroke="#0ea5e9" opacity=".4"/><line x1="250" y1="106" x2="350" y2="106" stroke="#0ea5e9" opacity=".4"/>
+    <line x1="283" y1="40" x2="283" y2="140" stroke="#0ea5e9" opacity=".4"/><line x1="316" y1="40" x2="316" y2="140" stroke="#0ea5e9" opacity=".4"/>
+  </g>
+  <path d="M196 79 L250 90" stroke="#98a3b2" stroke-width="1.2" marker-end="url(#aa)"/>
+  <!-- softmax -->
+  <text x="300" y="175" text-anchor="middle" fill="#e0533f">② softmax (per row, over keys)</text>
+  <path d="M300 140 L300 158" stroke="#98a3b2" stroke-width="1.2" marker-end="url(#aa)"/>
+  <!-- weighted sum -->
+  <text x="500" y="24" text-anchor="middle" fill="#12a150">③ weighted sum of V</text>
+  <g fill="none" stroke="#12a150" stroke-width="1.5"><rect x="450" y="40" width="60" height="26" rx="5"/><rect x="450" y="72" width="60" height="26" rx="5"/><rect x="450" y="104" width="60" height="26" rx="5"/></g>
+  <rect x="560" y="72" width="60" height="26" rx="5" fill="#e0533f"/><text x="590" y="90" text-anchor="middle" fill="#fff">output</text>
+  <path d="M350 90 L450 85" stroke="#98a3b2" stroke-width="1.2" marker-end="url(#aa)"/>
+  <path d="M510 85 L560 85" stroke="#98a3b2" stroke-width="1.2" marker-end="url(#aa)"/>
+  <text x="300" y="205" text-anchor="middle" fill="#98a3b2" font-size="10">Each row is a distribution (sum=1); darker means more attention.</text>
+  <defs><marker id="aa" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0 0 L6 3 L0 6" fill="#98a3b2"/></marker></defs>
+</svg>
+<figcaption>Every token passes through all three projections to produce Q, K, and V. Then ① every query scores every key, ② softmax turns scores into attention proportions, and ③ those proportions form a weighted average of the values.</figcaption>
+</figure>
+
+<div class="widget" data-widget="attention"></div>
+
+> [!TIP] Interview one-liner
+> “Attention is a soft dictionary lookup. A query scores every key with a dot product; scale by $1/\sqrt{d}$ to keep softmax from saturating; softmax turns scores into weights; and those weights form a weighted average of the values.” Then write the four lines below.
 
 ## The math
 
@@ -11,23 +69,19 @@ $$
 \text{Attention}(Q,K,V) = \text{softmax}\!\left(\frac{QK^\top}{\sqrt{d_k}}\right)V
 $$
 
-with $Q\in\mathbb{R}^{T_q\times d_k}$, $K\in\mathbb{R}^{T_k\times d_k}$, $V\in\mathbb{R}^{T_k\times d_v}$. Multi-head runs $h$ attentions in parallel on $d/h$-dim subspaces and concatenates:
+Here $Q\in\mathbb{R}^{T_q\times d_k}$, $K\in\mathbb{R}^{T_k\times d_k}$, and $V\in\mathbb{R}^{T_k\times d_v}$. **Multi-head attention** runs $h$ attentions in parallel on $d/h$-dimensional subspaces and concatenates them:
 
 $$
 \text{MHA}(x) = \big[\text{head}_1;\dots;\text{head}_h\big]W^O,\quad
 \text{head}_i=\text{Attention}(xW_i^Q, xW_i^K, xW_i^V)
 $$
 
-Try it live — adjust a query and watch the weights and output move:
-
-<div class="widget" data-widget="attention"></div>
-
 > [!TIP] Live code — implement, run, test
 > The NumPy blocks below are **live editors**. Fill in the body, hit **▶ Run tests**, and watch the cases pass. Stuck? Reveal the reference **Solution** — but attempt first; the struggle *is* the practice. The first Run downloads a small Python runtime and NumPy (~15 MB); later runs are instant.
 
 ## Scaled dot-product attention (NumPy)
 
-First the numerically stable **softmax** over the key axis:
+First, implement a numerically stable **softmax** over the key axis. See the stability discussion in [Losses & Gradients](#/ml-coding/losses-gradients) for why subtracting the maximum matters.
 
 <div class="widget" data-widget="code">
 <script type="application/json" class="code-config">
@@ -35,15 +89,17 @@ First the numerically stable **softmax** over the key axis:
 </script>
 </div>
 
-Then **scaled dot-product attention** — score, scale, softmax, weight the values (this lab returns the output; the reference also returns the weights):
+Then implement **scaled dot-product attention**: score → scale → mask → softmax → weighted sum of values. A Boolean mask uses `True=allowed`; an additive mask accepts floating-point values such as 0 or a large negative number. Attention is undefined when every key for a query is blocked, so this implementation raises `ValueError`.
 
 <div class="widget" data-widget="code">
 <script type="application/json" class="code-config">
-{"func":"sdpa","packages":["numpy"],"approx":true,"starter":"import numpy as np\n\ndef softmax(x, axis=-1):\n    x = np.asarray(x, dtype=float)\n    x = x - np.max(x, axis=axis, keepdims=True)\n    e = np.exp(x)\n    return e / np.sum(e, axis=axis, keepdims=True)\n\ndef sdpa(q, k, v, mask=None):\n    # scores = QK^T / sqrt(d); softmax over keys; return the weighted sum of V\n    pass","tests":[{"args":[[[1,0],[0,1]],[[1,0],[0,1]],[[1,2],[3,4]]],"expect":[[1.6604769013466862,2.6604769013466862],[2.3395230986533138,3.3395230986533138]]},{"args":[[[2,0,0]],[[2,0,0],[0,2,0],[0,0,2]],[[1,1],[2,2],[3,3]]],"expect":[[1.2485832277662388,1.2485832277662388]]},{"args":[[[1,1],[2,0]],[[1,0],[0,1]],[[10,0],[0,10]]],"expect":[[5.0,5.0],[8.04429682506957,1.9557031749304312]]}],"solution":"import numpy as np\n\ndef softmax(x, axis=-1):\n    x = np.asarray(x, dtype=float)\n    x = x - np.max(x, axis=axis, keepdims=True)\n    e = np.exp(x)\n    return e / np.sum(e, axis=axis, keepdims=True)\n\ndef sdpa(q, k, v, mask=None):\n    q, k, v = np.asarray(q, float), np.asarray(k, float), np.asarray(v, float)\n    d = q.shape[-1]\n    scores = q @ np.swapaxes(k, -1, -2) / np.sqrt(d)\n    if mask is not None:\n        mask = np.asarray(mask)\n        scores = np.where(mask, scores, -1e9) if mask.dtype == bool else scores + mask\n    w = softmax(scores, axis=-1)\n    return w @ v"}
+{"func":"sdpa","packages":["numpy"],"approx":true,"starter":"import numpy as np\n\ndef sdpa(q, k, v, mask=None):\n    # scores = QK^T/sqrt(d); boolean mask uses True=allowed; reject fully masked rows\n    pass","tests":[{"args":[[[1,0],[0,1]],[[1,0],[0,1]],[[1,2],[3,4]]],"expect":[[1.6604769013466862,2.6604769013466862],[2.3395230986533138,3.3395230986533138]]},{"args":[[[2,0,0]],[[2,0,0],[0,2,0],[0,0,2]],[[1,1],[2,2],[3,3]]],"expect":[[1.2485832277662388,1.2485832277662388]]},{"args":[[[1,1],[2,0]],[[1,0],[0,1]],[[10,0],[0,10]],[[true,false],[true,true]]],"expect":[[10.0,0.0],[8.04429682506957,1.9557031749304312]]}],"solution":"import numpy as np\n\ndef sdpa(q, k, v, mask=None):\n    q, k, v = np.asarray(q, float), np.asarray(k, float), np.asarray(v, float)\n    if q.shape[-1] != k.shape[-1] or k.shape[-2] != v.shape[-2] or q.shape[-1] == 0:\n        raise ValueError('incompatible attention shapes')\n    scores = q @ np.swapaxes(k, -1, -2) / np.sqrt(q.shape[-1])\n    if mask is not None:\n        mask = np.asarray(mask)\n        if mask.dtype == bool:\n            allowed = np.broadcast_to(mask, scores.shape)\n            if np.any(~allowed.any(axis=-1)):\n                raise ValueError('every query needs at least one allowed key')\n            scores = np.where(allowed, scores, -np.inf)\n        elif np.issubdtype(mask.dtype, np.floating):\n            scores = scores + mask\n        else:\n            raise TypeError('mask must be boolean or floating additive mask')\n    m = np.max(scores, axis=-1, keepdims=True)\n    e = np.exp(scores - m)\n    w = e / e.sum(axis=-1, keepdims=True)\n    return w @ v"}
 </script>
 </div>
 
-**Why $\sqrt{d}$:** if $q,k$ have unit-variance entries, $q\cdot k$ has variance $\approx d$, so raw scores grow with dimension and push softmax into saturated, near-one-hot regions with vanishing gradients. Dividing by $\sqrt{d}$ keeps the score variance $\approx 1$. *(verifiable)*
+### Why divide by $\sqrt{d}$?
+
+Under the initialization approximation that the components of $q$ and $k$ are roughly independent with mean 0 and variance 1, the variance of $q\cdot k=\sum_{i=1}^d q_ik_i$ is approximately $d$. Without scaling, logits grow with dimension, pushing softmax toward saturation and potentially making gradients very small. Dividing by $\sqrt{d}$ keeps the score variance near 1 under this approximation. This motivates a stable initial scale; it does not claim that learned components remain perfectly independent. See [Linear Algebra & Calculus](#/foundations/linear-algebra-calculus).
 
 ## Masking
 
@@ -53,11 +109,43 @@ Then **scaled dot-product attention** — score, scale, softmax, weight the valu
 </script>
 </div>
 
-- **Causal mask** blocks position $t$ from seeing the future ($>t$) — required for autoregressive decoding.
-- **Key-padding mask** blocks attention to `[PAD]` keys; shape `(B,1,1,Tk)`, broadcasts over heads and queries.
-- Combine with logical **AND** (both must permit). Always apply the mask **before** softmax, filling blocked entries with a large negative number so they get ~0 weight.
+- A **causal mask** blocks position $t$ from seeing the future ($>t$), which is required for autoregressive next-token decoding.
+- A **key-padding mask** blocks attention to `[PAD]` keys. Its shape is `(B,1,1,Tk)`, broadcasting over heads and queries.
+- Combine them with logical **AND**, since both must permit an entry. Apply a mask **before** softmax. Set blocked Boolean entries to `-inf`, but note that a row with every key blocked is meaningless: callers must allow at least one key or define an explicit zero-output policy.
 
 ## Multi-head attention
+
+Why use several heads instead of one large attention operation? Intuitively, one head consults tokens from only one “point of view.” Splitting the $d$ dimensions into $h$ smaller subspaces allows several perspectives—such as syntax, position, and meaning—to operate simultaneously at the **same asymptotic compute**, before their outputs are recombined.
+
+<figure>
+<svg viewBox="0 0 640 190" xmlns="http://www.w3.org/2000/svg" font-family="Inter, sans-serif" font-size="12">
+  <rect x="20" y="80" width="90" height="34" rx="6" fill="#6366f1"/><text x="65" y="102" text-anchor="middle" fill="#fff">input (D)</text>
+  <text x="200" y="24" text-anchor="middle" fill="#98a3b2">split → H heads (D/h)</text>
+  <g fill="none" stroke="#0ea5e9" stroke-width="1.6">
+    <rect x="160" y="40" width="80" height="26" rx="5"/><rect x="160" y="80" width="80" height="26" rx="5"/><rect x="160" y="120" width="80" height="26" rx="5"/>
+  </g>
+  <text x="200" y="57" text-anchor="middle" fill="currentColor">head 1</text>
+  <text x="200" y="97" text-anchor="middle" fill="currentColor">head 2</text>
+  <text x="200" y="137" text-anchor="middle" fill="currentColor">head h</text>
+  <path d="M110 97 L160 53" stroke="#98a3b2" stroke-width="1.2" marker-end="url(#ab)"/>
+  <path d="M110 97 L160 93" stroke="#98a3b2" stroke-width="1.2" marker-end="url(#ab)"/>
+  <path d="M110 97 L160 133" stroke="#98a3b2" stroke-width="1.2" marker-end="url(#ab)"/>
+  <text x="330" y="24" text-anchor="middle" fill="#e0533f">attend independently</text>
+  <g fill="#e0533f" opacity="0.85"><rect x="300" y="40" width="60" height="26" rx="5"/><rect x="300" y="80" width="60" height="26" rx="5"/><rect x="300" y="120" width="60" height="26" rx="5"/></g>
+  <path d="M240 53 L300 53" stroke="#98a3b2" stroke-width="1.2" marker-end="url(#ab)"/>
+  <path d="M240 93 L300 93" stroke="#98a3b2" stroke-width="1.2" marker-end="url(#ab)"/>
+  <path d="M240 133 L300 133" stroke="#98a3b2" stroke-width="1.2" marker-end="url(#ab)"/>
+  <text x="470" y="24" text-anchor="middle" fill="#12a150">concatenate</text>
+  <rect x="430" y="80" width="80" height="34" rx="6" fill="none" stroke="#12a150" stroke-width="1.8"/><text x="470" y="102" text-anchor="middle" fill="currentColor">merged (D)</text>
+  <path d="M360 53 L430 92" stroke="#98a3b2" stroke-width="1.2" marker-end="url(#ab)"/>
+  <path d="M360 93 L430 97" stroke="#98a3b2" stroke-width="1.2" marker-end="url(#ab)"/>
+  <path d="M360 133 L430 102" stroke="#98a3b2" stroke-width="1.2" marker-end="url(#ab)"/>
+  <rect x="560" y="80" width="70" height="34" rx="6" fill="#e0533f"/><text x="595" y="102" text-anchor="middle" fill="#fff">Wᴼ output</text>
+  <path d="M510 97 L560 97" stroke="#98a3b2" stroke-width="1.2" marker-end="url(#ab)"/>
+  <defs><marker id="ab" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0 0 L6 3 L0 6" fill="#98a3b2"/></marker></defs>
+</svg>
+<figcaption>Split $(B,T,D)$ into $(B,H,T,D/h)$ and treat heads like a batch axis, so one matrix multiplication computes all heads at once. Concatenate the result and mix it through $W^O$.</figcaption>
+</figure>
 
 Implement `mha`; the harness `run_mha` builds a fixed, seeded `(B,T,D)=(1,3,4)` input with `H=2` heads so the output is deterministic (the helpers `softmax`/`causal_mask`/`sdpa` are provided):
 
@@ -67,7 +155,7 @@ Implement `mha`; the harness `run_mha` builds a fixed, seeded `(B,T,D)=(1,3,4)` 
 </script>
 </div>
 
-Splitting heads into the batch-like axis lets one `@` compute all heads at once. **Complexity:** $O(T^2 d)$ compute and $O(T^2)$ memory for the score matrix, per head.
+Splitting heads into the batch-like axis lets one `@` compute all heads at once. **Complexity:** $O(T^2 d)$ compute and $O(T^2)$ memory for the score matrix, per head—the fundamental reason attention becomes expensive on long sequences.
 
 ## PyTorch module
 
@@ -103,11 +191,6 @@ if __name__ == "__main__":
     Ws = [rng.standard_normal((D, D)) * 0.1 for _ in range(4)]
     y = mha(x, *Ws, num_heads=H, causal=True)
     assert y.shape == (B, T, D)
-    # causal: position 0 must place zero weight on future keys
-    q = rng.standard_normal((1, 1, 4, 8))
-    _, w = sdpa(q, q, q, mask=causal_mask(4))
-    assert np.allclose(w[0, 0, 0, 1:], 0.0, atol=1e-6)
-    assert np.allclose(w.sum(-1), 1.0)          # weights are a distribution
     print("OK", y.shape)
 ```
 
@@ -129,7 +212,7 @@ if __name__ == "__main__":
 
 **Short:** the $T\times T$ score matrix is $O(T^2)$ memory; FlashAttention never materializes it, computing attention in tiles with an online (streaming) softmax and staying in fast SRAM.
 
-**Deep:** naive attention writes the full scores/weights to HBM — memory-bandwidth-bound and quadratic in sequence length. FlashAttention tiles $Q,K,V$, keeps running max and running denominator per query block (the log-sum-exp trick applied online), and fuses the whole op into one kernel. Same output, $O(T)$ extra memory, far fewer HBM round-trips. `F.scaled_dot_product_attention` dispatches to it automatically. *(verifiable)*
+**Deep:** naive attention writes the full scores and weights to HBM. FlashAttention tiles $Q,K,V$ and computes online softmax with running maxima and denominators, reducing HBM traffic. It computes the same mathematical attention, although floating-point operation order means results need not be bitwise identical. `F.scaled_dot_product_attention` selects among Flash, memory-efficient, and math backends according to dtype, shape, device, and mask constraints, so do not claim it always dispatches to FlashAttention.
 </div></details>
 
 <details class="qa"><summary>Self-attention vs cross-attention?</summary>
@@ -141,8 +224,8 @@ if __name__ == "__main__":
 </div></details>
 
 ### Follow-ups
+- **What about position?** Self-attention without positional information is **equivariant** to token permutations: permuting the input permutes the output in the same way. Inject order with positional encoding or RoPE.
 - **MQA / GQA?** Share one (or a few) K/V heads across many query heads to shrink the KV-cache — key for inference; see the [Transformer block](#/ml-coding/transformer).
-- **RoPE vs learned positions?** Rotary embeddings inject *relative* position by rotating Q and K; the modern default in LLaMA/Qwen/Mistral.
 - **Additive (Bahdanau) vs dot-product attention?** Additive uses an MLP scorer — more params, no free matmul; dot-product won for hardware efficiency.
 
 ## Cheat-sheet
@@ -150,11 +233,12 @@ if __name__ == "__main__":
 | Item | Value |
 | --- | --- |
 | Formula | $\text{softmax}(QK^\top/\sqrt{d_k})V$ |
+| Intuition | soft dictionary lookup: similarity-weighted average of values |
 | Scale | $1/\sqrt{d_k}$: keeps score variance $\approx 1$ |
 | Softmax axis | over **keys** (`axis=-1`) |
 | Masking | apply **before** softmax, fill $-\infty$; combine with AND |
 | Head split | $(B,T,D)\!\to\!(B,H,T,D/h)$ |
 | Complexity | $O(T^2 d)$ time, $O(T^2)$ score memory |
-| Prod kernel | `F.scaled_dot_product_attention` (FlashAttention) |
+| Prod kernel | `F.scaled_dot_product_attention` selects Flash/memory-efficient/math backends when eligible |
 
-**Cross-links:** [A Transformer Block](#/ml-coding/transformer) · [CNNs, RNNs & Transformers](#/foundations/architectures) · [LLM Fundamentals](#/llm/fundamentals) · [The ML Coding Round](#/ml-coding/intro)
+**Cross-links:** [NumPy Primer](#/ml-coding/numpy-primer) · [Positional Encoding & RoPE](#/ml-coding/positional-encoding-rope) · [A Transformer Block](#/ml-coding/transformer) · [CNNs, RNNs & Transformers](#/foundations/architectures) · [LLM Fundamentals](#/llm/fundamentals)

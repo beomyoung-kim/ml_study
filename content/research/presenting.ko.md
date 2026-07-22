@@ -3,33 +3,35 @@
 <div class="tag-row"><span class="tag">whiteboarding your work</span><span class="tag">2-min / 10-min / 30-min</span><span class="tag">tailoring to audience</span><span class="tag">figures that land</span></div>
 
 > [!TIP] 메타 스킬
-> Presenting은 slide-design 작업이 아니라 — **시간 예산 하의 audience-modeling**입니다. 같은 작업이 *누가 듣고 얼마나 오래*냐에 따라 elevator pitch, whiteboard chalk-talk, 또는 full job talk가 됩니다. 이 장은 일반 스킬이고; [The Research Job Talk](#/research/job-talk)은 구체적인 45분 포맷입니다. Beomyoung은 참고할 실제 무대 경험이 있으니 — DAN 24, Centum Digital Week 2025, NeurIPS 2021 Social — 이론이 아니라 *검증된 습관*에서 말하세요.
+> Presenting은 slide-design 작업만이 아니라 **시간 예산 하의 audience-modeling**입니다. 같은 작업이 *누가 듣고 얼마나 오래*냐에 따라 elevator pitch, whiteboard chalk-talk, 또는 full job talk가 됩니다. 이 장은 길이·청중·매체에 따른 **adaptation**을 다루고, 45분 구성·Q&A·claim ledger의 기준은 [The Research Job Talk](#/research/job-talk)에 한 번만 둡니다. DAN 24, Centum Digital Week, NeurIPS Social 같은 발표를 사례로 쓸 때는 실제 프로그램·연도·본인 역할을 공개 기록으로 확인하세요.
 
 ```mermaid
 flowchart LR
   M[Motivation<br/>why care] --> P[Problem<br/>precise task]
   P --> I[Insight / Method]
-  I --> E[Evidence<br/>results + ablation]
-  E --> L[Limitations]
+  I --> PresentEvidence[Evidence<br/>results + ablation]
+  PresentEvidence --> L[Limitations]
   L --> F[Future / fit]
   F --> Q[Q&A]
 ```
 
 ## One work, three lengths
 
-가장 어려운 스킬은 **graceful degradation**입니다: 흐름을 잃지 않으면서 내용을 잘라내기. 30분 버전을 만든 뒤, 세부를 *덜어내되 spine은 절대 덜어내지 않고* 더 짧은 버전을 파생하세요.
+가장 어려운 스킬은 **graceful degradation**입니다: 흐름을 잃지 않으면서 내용을 잘라내기. 먼저 source deck과 narrative spine을 만든 뒤, 시간에 맞춰 세부를 덜어낸 버전을 파생하세요. 긴 버전을 무조건 먼저 완성해야 하는 것은 아니지만, 각 버전에서 problem → delta → evidence의 연결은 유지합니다.
 
 | | **2-minute** (elevator / hallway) | **10-minute** (chalk-talk / screen) | **30-minute** (seminar / job talk) |
 | --- | --- | --- | --- |
 | Goal | 더 듣고 싶게 만들기 | **하나의 아이디어** + 증거 전달 | Depth + defensibility + trajectory |
 | Content | Problem + your one result | Motivation → 1 insight → 2 evidences → next | Full arc + ablations + limitations + future |
 | Slides/board | none / 1 | ~6–10 | ~18–22 + backup |
-| Cut first | hook + result만 빼고 전부 | background, secondary results | nothing — 이게 full version |
+| Cut first | hook + result만 **남기고** 전부 | 긴 background, secondary results | secondary history/results; backup으로 이동 |
 | Keep always | the pain and your delta | the *mechanism* | the honest limitation |
 
 ### The 2-minute version (memorize)
 
-> "I make pixel-level perception **label-efficient**, and I ship it: my work became a segmentation API that beats commercial tools and an image-matting model (ZIM, ICCV 2025 Highlight) inside CLOVA-X. Now I'm connecting that pixel-level grounding to language models so they reason from **visual evidence**, not guesses."
+> **Placeholder draft:** "I make pixel-level perception **label-efficient** and deployable. One line of work produced [publicly verifiable paper/product result]; another showed [one measured research result]. Now I'm connecting pixel-level grounding to language models so their answers can be checked against **visual evidence**."
+
+`commercial tools보다 우수`, `ICCV Highlight`, `CLOVA-X 통합` 같은 문구는 사실이어도 각각 **평가 범위·공식 기록·본인 기여**를 확인한 뒤 대괄호를 교체하세요. 두 제품이 같은 모델이라는 인상을 주지 않습니다.
 
 패턴: **Pain → what you did → why it matters → where you're going**, 네 호흡에. jargon 없이, 즉시 풀지 않을 acronym 없이.
 
@@ -47,29 +49,29 @@ flowchart TB
 
 ### The 30-minute version
 
-Full resolution의 [job-talk arc](#/research/job-talk): motivation → prior art → **contributions up front** → one deep-dive → results + ablations → impact → future/fit, 방어용 backup deck과 함께.
+[job-talk arc](#/research/job-talk)의 압축형입니다: motivation → prior art → **contributions up front** → one deep-dive → results + ablations → impact → future/fit. 정확한 시간표·Q&A·claim 검증 규칙은 job-talk 장을 기준으로 하고 여기서 중복하지 않습니다.
 
 ## Tailoring to the audience
 
 > [!WARNING] 잘못된 altitude가 talk을 가라앉힌다
 > 같은 슬라이드가 expert panel에는 너무 얕고 mixed room에는 너무 빽빽합니다. **먼저 방을 읽고** altitude를 설정하세요 — job talk에서 채점되는 신호입니다.
 
-| Audience | Set altitude to… | Lead with | Beomyoung's rep |
+| Audience | Set altitude to… | Lead with | Candidate evidence (if verified) |
 | --- | --- | --- | --- |
-| Mixed / product (execs, PMs) | User value & impact first | 보이는 제품 pain, 데모 | **DAN 24** — CLOVA-X Image Editing |
-| Trend / broad tech | Narrative + one concrete anchor | 분야가 가는 방향, 그다음 *당신의* 작업을 증명으로 | **Centum Digital Week 2025** — agents |
-| Expert research panel | Mechanism & evidence | gap과 당신의 delta; 선택을 방어 | **NeurIPS 2021 Social** — SSUL |
+| Mixed / product (execs, PMs) | User value & impact first | 보이는 제품 pain, 데모 | 공개 기록이 있다면 product-event 발표 |
+| Trend / broad tech | Narrative + one concrete anchor | 분야가 가는 방향, 그다음 *당신의* 작업을 증명으로 | 공개 기록이 있다면 broad-tech 발표 |
+| Expert research panel | Mechanism & evidence | gap과 당신의 delta; 선택을 방어 | 논문과 연결되는 workshop/social 발표 |
 | Hiring committee | Contribution clarity + trajectory | *당신이* 한 것, 그리고 다음 질문 | the [job talk](#/research/job-talk) |
 
 > [!EXAMPLE] audience-tailoring에 대해 할 말
-> "At DAN, user value came before research detail; at the NeurIPS Social, the technical core came first. I practice changing **altitude** for the room without changing the truth of the result."
+> 실제 두 발표의 deck·영상에서 차이를 확인할 수 있다면: "At the product event, user value came before research detail; at the research event, the technical core came first. I change **altitude** for the room without changing the truth of the result."
 
 <details class="qa"><summary>"You have a mixed audience — non-experts and experts. What's your first two minutes?"</summary>
 <div class="qa-body">
 
 **Short:** 모두가 이해하는 구체적이고 보이는 failure(들쭉날쭉한 cut-out edge; VLM이 자신 있게 물체를 오분류)로 시작하고, one-line promise를 말하고, 깊이가 오고 있음을 *신호*하여 expert가 인내하게 하세요.
 
-**Deep:** 모두가 올라타는 단일 "on-ramp"을 준 뒤 올라가세요. 각 acronym을 한 번 정의. "for the experts, details in backup" 포인터를 두어 어느 쪽도 잃지 마세요. AI 대서사나 시장 규모 차트로 절대 시작하지 말고 — *pain*으로 시작하세요.
+**Deep:** 모두가 올라타는 단일 "on-ramp"을 준 뒤 올라가세요. 각 acronym을 한 번 정의하고, "for the experts, details in backup" 포인터를 두세요. 대개 거대한 시장 규모보다 청중이 확인할 수 있는 *problem/failure*가 더 빠른 출발점이지만, 발표 목적이 사업 검토라면 시장 근거가 먼저일 수도 있습니다.
 </div></details>
 
 ## Whiteboarding your own work
@@ -81,7 +83,7 @@ flowchart TD
   A[Announce the plan<br/>'I'll draw the pipeline, then the one trick'] --> B[Draw the spine<br/>input → model → output]
   B --> C[Add the ONE contribution<br/>in a different color]
   C --> D[Annotate the loss / data as you speak]
-  D --> E[Pause: invite questions]
+  D --> WhitePause[Pause: invite questions]
 ```
 
 <details class="qa"><summary>"Whiteboard your most important result for me."</summary>
@@ -89,7 +91,7 @@ flowchart TD
 
 **Short:** 계획을 말하고, **pipeline spine**을 왼쪽에서 오른쪽으로 그린 뒤, 무엇이 *당신 것*인지 시각적으로 명백하도록 두 번째 색으로 기여를 더하고, 진행하며 loss/data를 서술하세요.
 
-**Deep:** 보드를 슬라이드처럼 관리하세요: 공간을 예약(가장자리로 벗어나지 말 것), 맨 위에 *thesis sentence*를 쓰고 그대로 두기, 중요한 하나의 equation을 박스로. 그리면서 말하세요 — 침묵은 불확실로 읽힙니다. 자연스러운 지점에서 질문을 유도; whiteboard는 Q&A를 대화형으로 만들어 당신에게 유리합니다. → [Communication & Whiteboarding](#/playbook/communication).
+**Deep:** 보드를 슬라이드처럼 관리하세요: 공간을 예약(가장자리로 벗어나지 말 것), 맨 위에 *thesis sentence*를 쓰고 그대로 두기, 중요한 하나의 equation을 박스로. 그리면서 핵심 의도를 짧게 설명하되, 생각하거나 복잡한 도형을 그리는 짧은 침묵은 괜찮습니다. 자연스러운 지점에서 질문을 유도하면 whiteboard Q&A를 대화형으로 만들 수 있습니다. → [Communication & Whiteboarding](#/playbook/communication).
 </div></details>
 
 > [!NOTE] Whiteboard hygiene
@@ -101,7 +103,7 @@ flowchart TD
 ## Figures that land
 
 > [!TIP] one-job 규칙
-> 모든 figure는 **하나의** 질문에 답합니다; 둘이 필요하면 나누세요. 독자는 ~5초 안에 요점을 얻고, 그다음 당신이 뉘앙스를 서술합니다.
+> 발표용 figure는 가능하면 **하나의 주 질문**에 답하게 설계하세요. 복합 figure가 필요하면 panel/annotation으로 읽기 순서를 드러냅니다. 핵심 메시지는 몇 초 안에 찾을 수 있게 하고, 세부 뉘앙스는 말로 보완하세요.
 
 | Figure | Does one job | Trap to avoid |
 | --- | --- | --- |
@@ -116,8 +118,8 @@ flowchart TD
 ## Delivery mechanics
 
 - **Opener/closer는 암기**, 중간은 자유롭게 — 청중이 기억하는 두 순간.
-- ~1 slide/minute; slide text ≤ ~6 lines; thesis sentence는 슬라이드에 크게.
-- Live demo? 항상 **muted video / static image fallback**을 — 데모는 무대에서 실패합니다.
+- ~1 slide/minute와 slide text ~6 lines는 **리허설 출발점**이지 규칙이 아닙니다. 복잡한 figure는 오래, transition slide는 짧게 두세요.
+- Live demo는 네트워크·권한·latency 때문에 실패할 수 있으므로 **muted video / static image fallback**을 준비하세요.
 - Q&A: restate → answer → "does that address it?"; 절대 허세 금지. [job-talk Q&A frame](#/research/job-talk) 참고.
 - English talk: **transition phrase**("which brings me to…", "the key insight here is…")를 리허설하여 word-finding에 momentum이 멈추지 않게.
 
@@ -143,18 +145,20 @@ flowchart TD
 
 ## Opening 30 seconds (practice draft)
 
-> "I work on making pixel-level perception **label-efficient** and getting it into real products — a segmentation API that outperforms commercial tools, and a matting model, ZIM, inside CLOVA-X image editing. Now I'm connecting that pixel- and region-level grounding to language-model agents, so they reason from *visual evidence* instead of unsupported description. Today I'll walk one idea from that trajectory in depth, its limitations, and the next question I'd open with this team."
+> **Placeholder draft:** "I work on making pixel-level perception **label-efficient** and deployable. In [verified project], I contributed [documented role] and we measured [scoped result]. Now I'm connecting pixel- and region-level grounding to language-model agents so their outputs can be checked against *visual evidence*. Today I'll walk through one idea from that trajectory, its limitations, and the next question I'd explore with this team."
+
+대괄호는 최신 CV·논문·공개 product page로 채우고, 내부 수치는 공개 가능한 aggregate와 평가 범위만 말하세요.
 
 ## Cheat-sheet
 
 | Item | One-liner |
 | --- | --- |
-| Degrade gracefully | 30분 버전을 만들고, 세부를 덜어 10/2분을 파생, spine은 절대 아님 |
+| Degrade gracefully | source narrative에서 세부를 덜어 30/10/2분을 파생; spine은 빼지 않음 |
 | 2-min | Pain → what you did → why it matters → where you're going |
 | Altitude | Product room = value first; expert panel = mechanism first |
 | Whiteboard | 계획 announce → spine 그리기 → 기여를 2nd color로 → 그리면서 말하기 |
-| Figures | 각각 one job; ~5초 readable; 당신의 row/number만 강조 |
-| Demos | 항상 muted-video / static fallback |
+| Figures | 주 질문 하나; 읽기 순서 명확히; 비교의 핵심 row/number 강조 |
+| Demos | muted-video / static fallback 준비 |
 | Openers/closers | 축자적으로 암기; 중간은 자유롭게 |
 | Q&A | Restate → answer → confirm; 절대 허세 금지 |
 

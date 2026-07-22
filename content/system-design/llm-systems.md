@@ -3,10 +3,10 @@
 <div class="tag-row"><span class="tag">RAG</span><span class="tag">agents + tool use</span><span class="tag">serving: batching · KV cache · spec-decode</span><span class="tag">LLM-as-judge + guardrails</span><span class="tag">VLM serving</span></div>
 
 > [!TIP] The 2026 framing
-> LLM system design is [the same 9-step spine](#/system-design/framework) with three new load-bearing concerns: **retrieval quality, agent reliability over long horizons, and inference economics (latency × cost).** In 2026 the battleground is explicitly *intelligence-per-dollar* — token-efficiency "effort" knobs, cheap open MoE, adjustable thinking budgets — so a strong answer always attaches a **cost and latency number** to every design choice. This chapter reuses the deeper primitives from [Agentic AI & Tool Use](#/llm/agents) and [Mixed Precision & Efficiency](#/foundations/mixed-precision-efficiency); here we assemble them into systems.
+> LLM system design is [the same 9-step spine](#/system-design/framework) with three new load-bearing concerns: **retrieval quality, agent reliability over long horizons, and inference economics (latency × cost).** Knobs such as effort or thinking budgets, MoE, and routing reshape the quality–latency–cost curve, so a strong answer attaches a measurement or back-of-the-envelope bound to the **key choices that could change the decision**. Do not invent a number for every detail; state the workload assumptions, uncertainty, and validation plan with it. This chapter reuses the deeper primitives from [Agentic AI & Tool Use](#/llm/agents) and [Mixed Precision & Efficiency](#/foundations/mixed-precision-efficiency); here we assemble them into systems.
 
 > [!WARNING] On model names and numbers
-> Frontier model versions churn monthly and most headline benchmarks are vendor-reported. Design in terms of **capabilities and mechanisms** (MoE active-vs-total params, thinking budgets, context length, tool-use), not leaderboard scores. If you must cite a number, hedge it. *(This is itself a signal — panels probe whether you read benchmarks critically; see the Llama-4 LMArena and Berkeley-RDI reward-hacking episodes below.)*
+> Frontier model versions and access terms change frequently. When citing a leaderboard result, name the model snapshot, tool/access conditions, judge, date, and whether the result was independently verified. Design around capabilities and mechanisms and the quality–latency–cost curve of the actual workload. As the BenchJack example below shows, include the benchmark harness itself in the threat model.
 
 ---
 
@@ -16,7 +16,7 @@
 
 ### Why RAG, and the failure it fixes
 
-Parametric knowledge is frozen at training cutoff, unattributable, and expensive to update. RAG grounds generation in retrieved context → fresher, cheaper to update, and **citable**. The design job is almost entirely about **retrieval quality and context construction** — the LLM is the easy part.
+Parametric knowledge alone makes it difficult to control the version, provenance, and authorization of a current private corpus. RAG retrieves external documents and supplies citation candidates, but synthesis, abstention, and citation agreement remain separate problems even after retrieval succeeds. This chapter covers the operational design; see [RAG](#/llm/rag) for the canonical treatment of chunking and retrieval mechanics.
 
 ```mermaid
 flowchart LR
@@ -29,8 +29,8 @@ flowchart LR
   VDB --> HY
   BM --> HY
   HY -->|top N| RR[Rerank<br/>cross-encoder] -->|top k| CTX[Context assembly]
-  CTX --> LLM[LLM + prompt]
-  LLM --> Ans[Answer + citations]
+  CTX --> RagLLM[LLM + prompt]
+  RagLLM --> Ans[Answer + citations]
   Ans --> Guard[Grounding / citation check]
   style RR fill:#e0533f,color:#fff
   style Guard fill:#12a150,color:#fff
@@ -40,9 +40,9 @@ flowchart LR
 
 <dl class="kv">
 <dt>Chunking</dt><dd>Fixed-size is a baseline; <b>structure-aware / semantic chunking</b> (headings, tables, code blocks) plus overlap preserves meaning. Chunk size trades recall (small, precise) vs context coherence (large). Store rich <b>metadata</b> (source, section, timestamp, ACL) for filtering and citation.</dd>
-<dt>Hybrid retrieval</dt><dd><b>Dense (embeddings) + lexical (BM25)</b> beats either alone: dense catches paraphrase, lexical catches rare tokens/IDs/code. Fuse with reciprocal-rank fusion.</dd>
-<dt>Reranking</dt><dd>A <b>cross-encoder reranker</b> over the top-N restores precision the ANN stage sacrificed for speed — the single highest-ROI quality lever in most RAG systems.</dd>
-<dt>Context assembly</dt><dd>Dedup, order, and <b>budget</b> tokens; more context is not better (lost-in-the-middle, cost). Include citation anchors so the model can attribute.</dd>
+<dt>Hybrid retrieval</dt><dd>Dense retrieval is strong on paraphrases and lexical retrieval on rare IDs or code, so combining them often raises recall; depending on the domain and query mix, however, one retriever may be better. Compare score calibration or RRF on a labeled set.</dd>
+<dt>Reranking</dt><dd>A top-N cross-encoder can improve precision, but it adds latency and cost and can suffer domain mismatch. Choose N, model, and top-k from the measured recall–latency curve.</dd>
+<dt>Context assembly</dt><dd>Manage deduplication, ordering, token budget, and provenance. A citation anchor makes tracing possible but does not prove that the source supports a claim, so evaluate citation entailment.</dd>
 </dl>
 
 ### Metrics (separate retrieval from generation)
@@ -50,19 +50,20 @@ flowchart LR
 | Stage | Offline metric | Failure it catches |
 | --- | --- | --- |
 | Retrieval | Recall@k, nDCG, hit-rate | the answer wasn't in the retrieved set (unfixable downstream) |
-| Generation | **faithfulness/groundedness**, answer relevance, citation accuracy | hallucination *despite* correct context |
-| End-to-end | task success, human/LLM-judge | the product-level question |
+| Generation | answer correctness, faithfulness/attribution, citation precision/recall, no-answer calibration | correct context is ignored or unsupported claims are made |
+| End-to-end | task success, calibrated human/LLM judge, latency·cost | product-level quality and operational trade-off |
 
 > [!QUESTION] "Your RAG system hallucinates — how do you localize the bug?"
 > **Short:** Decompose into retrieval vs generation. Check retrieval recall first; if the evidence wasn't retrieved, no prompt fixes it.
 >
-> **Deep:** Two distinct failures with different fixes. **(1) Retrieval miss** — the supporting chunk isn't in the top-k → fix chunking, embeddings, hybrid+rerank, or query rewrite. Measure with retrieval recall on a labeled set. **(2) Groundedness failure** — evidence was present but the model ignored/contradicted it → fix the prompt (force citation), add a **grounding-check guardrail** that verifies each claim maps to a retrieved span, or lower temperature. Reporting a single "accuracy" number hides which one you have; that decomposition is the signal.
+> **Deep:** **(1) Retrieval miss** is diagnosed with Recall@k on a labeled set; then inspect chunking, embeddings, filters, hybrid retrieval, and reranking. **(2) Generation/attribution failure** means the evidence was present but the claim is not supported. A prompt or lower temperature can mitigate this but does not enforce it; use claim-to-span verification, abstention, and human audit. **(3) Authorization/freshness failure** is a separate security incident: the answer may be factually correct but expose another tenant's material or a deleted document.
 
 ### Serve, update, monitor
 
-- **Freshness:** incremental re-embed on doc change; version the embedding model (re-embedding the whole corpus on an encoder upgrade is mandatory — the same version-skew trap as [visual search](#/system-design/case-studies)).
-- **Cost:** cache embeddings; **prompt/KV cache** shared system prefixes; retrieve-then-decide whether the query even needs the LLM.
-- **Monitor:** retrieval recall drift, groundedness rate, citation-click / thumbs, stale-source rate.
+- **Freshness/version:** propagate additions, edits, and deletions incrementally, and record document, chunk, embedding, and index versions. On an encoder change, verify compatibility and migrate with a dual index or backfill; an immediate full reindex is not the only valid strategy.
+- **Authorization:** apply tenant and ACL or row-level filters before retrieval, then recheck results and citations. If a metadata filter is post-retrieval, evaluate both top-k recall and leakage risk.
+- **Cache:** include tenant/user authorization, model, prompt, embedding, preprocessing, and document version in the key; add encryption, TTL, deletion propagation, and auditing. Do not let a shared prefix or KV cache cross user-data boundaries.
+- **Monitor:** retrieval-recall drift, answer and attribution quality, citation precision/recall, no-answer calibration, stale or deleted sources, ACL violations, latency, and cost.
 
 ---
 
@@ -90,20 +91,22 @@ flowchart TD
 
 ### Reliability levers (the whole game)
 
-- **Bounded autonomy:** hard caps on steps, wall-clock, tool calls, and $ per task; a **halt-and-escalate** path when exceeded. Unbounded agents are the #1 production failure.
+- **Bounded autonomy:** hard caps on steps, wall-clock, tool calls, and cost per task, plus a **halt-and-escalate** path. Include priority, deadlines, cancellation, and queue backpressure in the contract.
 - **Verification:** a critic/verifier step (or a deterministic checker for verifiable subtasks) catches errors before they compound. Prefer **verifiable checks** (does the code run? does the SQL parse?) over an LLM opinion where possible.
 - **Memory & context management:** long horizons blow the context window → summarize/compact, external scratchpad, retrieve only relevant history. In 2026 "context compaction" and effort/thinking-budget controls are first-class.
-- **Tool contract & safety:** typed schemas, input validation, **sandboxed** side-effecting tools, permission gates on destructive actions, idempotency/retry semantics.
+- **Tool contract & safety:** typed schemas and semantic validation, per-tool authorization and least privilege, secret isolation, a sandbox and network allowlist, approval for destructive actions, idempotency keys, retry semantics, and audit logs. Treat tool output and retrieved text as untrusted data.
 - **Failure handling:** retries with backoff, tool-error → replan, and a safe partial result rather than a confident wrong one.
 
 ### Metrics — reliability is the metric, not single-task success
 
 | Metric | Why it matters in 2026 |
 | --- | --- |
-| **Task success @ k attempts** | single-shot success overstates reliability |
-| **Long-horizon reliability** | METR: the task length agents complete at 50% reliability is doubling ~every 4–7 months — measure *how long* a task it holds, not just pass/fail *(verifiable trend)* |
+| **pass@1 and success@k** | the best of k attempts can **overstate** single-run reliability, so report both along with per-attempt cost and correlation |
+| **Long-horizon reliability** | METR TH1.1 reports different and uncertain doubling estimates for the 50% software-task horizon; do not extrapolate it to general autonomy |
 | **Cost & latency per task** | test-time compute is variable; cost-per-task is now a first-class reported axis |
 | **Safety-violation rate** | unauthorized/destructive actions; a guardrail, not a nice-to-have |
+
+[METR TH1.1 (2026-01)](https://metr.org/blog/2026-1-29-time-horizon-1-1/) reports doubling estimates of about 196.5 days over the full period, 130.8 days since 2023, and 88.6 days since 2024. Cite the task set, human-time estimates, period choice, and uncertainty rather than turning these into one "four-to-seven-month law."
 
 > [!QUESTION] "Agent success rate is 60% — is that shippable?"
 > **Short:** Depends entirely on the cost of a wrong action and whether failures are *safe* and *detectable*.
@@ -116,15 +119,15 @@ flowchart TD
 
 > *"Serve a large (MoE) chat/agent model at high QPS with a p95 latency SLA at minimum cost."*
 
-This is where research-applied candidates prove **systems awareness**. Anchor every choice to the two-phase nature of LLM inference and to a cost number.
+This is where research-applied candidates demonstrate **systems awareness**. Start from the two-phase nature of LLM inference and the workload, then connect the major trade-offs to estimates of latency, throughput, memory, and cost.
 
 ### The mechanisms interviewers expect you to name
 
 ```mermaid
 flowchart LR
   Req[Requests] --> Sched[Continuous batching<br/>scheduler]
-  Sched --> Prefill[Prefill<br/>compute-bound · parallel]
-  Prefill --> Decode[Decode<br/>memory-bandwidth-bound · token-by-token]
+  Sched --> Prefill[Prefill<br/>parallel · often compute-heavy]
+  Prefill --> Decode[Decode<br/>token-by-token · often bandwidth-heavy]
   Decode --> KV[(Paged KV cache)]
   Decode --> Spec[Speculative decoding<br/>draft → verify]
   Sched --> AS{Autoscale<br/>on queue depth}
@@ -133,13 +136,48 @@ flowchart LR
 ```
 
 <dl class="kv">
-<dt>Prefill vs decode</dt><dd>Two regimes. <b>Prefill</b> (process the prompt) is compute-bound and parallel; <b>decode</b> (generate tokens) is memory-bandwidth-bound and sequential — it dominates latency. Disaggregating them onto different pools is a 2026 serving pattern.</dd>
-<dt>Continuous (in-flight) batching</dt><dd>Insert/evict requests from the batch every step instead of waiting for the slowest to finish. The single biggest throughput win over naive static batching.</dd>
-<dt>Paged KV cache (vLLM)</dt><dd>VM-style paging of the KV cache eliminates fragmentation → far higher batch sizes and memory utilization. KV cache is usually the binding memory constraint at long context.</dd>
-<dt>Speculative decoding</dt><dd>A cheap drafter proposes several tokens; the target model verifies in one pass (EAGLE/Medusa/MTP). Now a <b>default serving layer</b>, not an optimization. Helps most when the drafter's acceptance rate is high and you're decode-bound; can *hurt* at very high batch sizes where you're already compute-saturated.</dd>
+<dt>Prefill vs decode</dt><dd>Prefill processes prompt tokens in parallel and is often compute-heavy; decode is token by token and, at small batches, often weighted toward memory bandwidth. The real bottleneck changes with model, batch, sequence, and parallelism, so verify it with profiling or a roofline analysis. Choose disaggregation only when the traffic mix benefits.</dd>
+<dt>Continuous (in-flight) batching</dt><dd>Insert and evict requests at step boundaries instead of waiting for the slowest request. It is an important throughput and utilization optimization over static batching for online traffic with variable sequence lengths, but measure scheduler overhead, the SLA, and batch saturation.</dd>
+<dt>Paged KV cache (vLLM)</dt><dd>Block-based KV management can greatly reduce fragmentation and reservation waste, but it does not remove metadata or internal fragmentation. At long context, measure weights, activations, KV, and allocator overhead together.</dd>
+<dt>Speculative decoding</dt><dd>A drafter proposes tokens and the target verifies them; this is an optional latency optimization. Standard rejection-sampling forms can preserve the target distribution, but variants such as Medusa, EAGLE, and MTP do not all carry the same guarantee. Benchmark acceptance, verification overhead, and batch conditions rather than treating it as a default.</dd>
 <dt>Precision & KV reduction</dt><dd>FP8/4-bit weights (NVFP4/MXFP4), quantized KV (INT8 ≈ 2×, FP4 ≈ 4×), MLA/GQA to shrink KV. See <a href="#/foundations/mixed-precision-efficiency">Efficiency</a>.</dd>
-<dt>MoE serving</dt><dd>Report <b>active vs total</b> params: total sets memory (all experts resident), active sets per-token compute. Expert parallelism + load balancing are the systems concerns.</dd>
+<dt>MoE serving</dt><dd>Active parameters are an important factor in token FLOPs and total parameters in weight memory, but actual latency and resident memory also depend on sharding or offload, shared layers, all-to-all communication, load imbalance, and batch size.</dd>
 </dl>
+
+<details class="concept-code">
+<summary>View as conceptual code</summary>
+
+> This is **pseudocode** for a continuous-batching scheduler. It illustrates admission and cache lifecycle, not a real GPU kernel or paged-allocator implementation.
+
+```python
+def scheduler_tick(waiting, running, kv_pool, now):
+    cancel_expired(running, now)                         # Reclaim unnecessary decode and KV immediately
+    while waiting and kv_pool.can_admit(waiting.peek()):
+        req = deadline_fair_pop(waiting)                 # Prevent starvation of long requests
+        req.kv_blocks = kv_pool.reserve(prompt_bound(req))
+        running.add(req)
+
+    prefill_batch = choose_prefills(running, token_budget=PREFILL_BUDGET)
+    if prefill_batch:
+        prefill(prefill_batch)                           # Different prompt lengths require masking
+
+    decode_batch = [r for r in running if r.prefilled and not r.finished]
+    if decode_batch:
+        next_logits = decode_one_token(decode_batch)     # Each request has a different current KV length
+        for req, logits in zip(decode_batch, next_logits):
+            req.append(sample(logits), kv_pool)
+            if req.hit_eos_or_limit():
+                stream_finish(req)
+                kv_pool.release(req.kv_blocks)
+                running.remove(req)
+
+    record(queue_age=waiting.max_age(), free_kv=kv_pool.free_blocks,
+           ttft_by_priority=measure_ttft())
+```
+
+Allowing unlimited prefills can degrade decode TPOT, while always prioritizing decode can degrade TTFT for new requests. Tune token budgets, priority, deadlines, and KV headroom together.
+
+</details>
 
 ### Latency vocabulary (say these exactly)
 
@@ -151,12 +189,12 @@ flowchart LR
 | **Cost / 1M tokens** | the money axis | GPU-hours ÷ throughput; precision; spec-decode |
 
 > [!EXAMPLE] Back-of-envelope you should offer unprompted
-> "At target QPS × mean output tokens, decode throughput sets the GPU count. Continuous batching + paged KV lifts tokens/s/GPU; speculative decoding cuts TPOT when acceptance is high; 4-bit weights + quantized KV cut memory so I can raise batch size. I'd route short/cheap requests to a small model and only escalate to the big MoE when needed — that router is usually the largest single cost lever." Attaching mechanisms to a cost story is the whole signal.
+> "At target QPS × mean output tokens, decode throughput is a major term in the required fleet size. Continuous batching and paged KV can raise tokens/s/GPU, speculative decoding can reduce TPOT when acceptance is high, and weight/KV quantization changes memory use and feasible batch size. If quality holds, I would also compare routing to a smaller model first as a cost lever." Benchmark which lever matters most for the traffic mix and quality constraints.
 
 > [!QUESTION] "Batch size up → throughput up but latency up. How do you set it?"
-> **Short:** To the largest batch that still meets p95 TTFT/TPOT — then autoscale replicas on queue depth, not CPU.
+> **Short:** Find a batch that meets p95 TTFT/TPOT and fairness, then design autoscaling and admission control from queue depth and age, arrival rate, and saturation.
 >
-> **Deep:** Throughput and per-request latency trade off directly; the SLA picks the batch ceiling. Split fast interactive traffic from bulk/async so a batch tuned for throughput doesn't starve latency-sensitive requests (or disaggregate prefill/decode). Autoscale on **queue depth / TTFT**, since GPU util saturates before latency does. Cache shared prompt prefixes (KV reuse) to cut prefill cost for common system prompts.
+> **Deep:** Isolate interactive and bulk or asynchronous work by queue and priority, and add deadline-aware scheduling, a maximum queue age, load shedding, and cancellation. GPU utilization alone can reveal queue growth too late, so use queue depth/age and TTFT as well. Reuse a prefix/KV cache only when the exact tokens, model, adapter, tenant, and authorization key match.
 
 ---
 
@@ -167,7 +205,7 @@ flowchart LR
 The extra concern is the **vision front-end and its token economics**.
 
 - **Variable visual tokens:** native-/dynamic-resolution ViTs (Qwen-VL-class) emit a variable, often *large* number of visual tokens; a hi-res document or a video can dwarf the text tokens and blow up both prefill cost and KV memory. **Token budgeting / pruning / compression** is the central lever.
-- **Two-stage pipeline:** image → vision encoder → projector → LLM. The **encoder pass is cacheable** — the same image across turns should be encoded once and its features cached.
+- **Two-stage pipeline:** image → vision encoder → projector → LLM. Features for the same image can be cached, but key them on preprocessing and encoder/projector versions, crop/resize settings, and authorization as well as the content hash; apply privacy-aware TTL and deletion.
 - **Batching mismatch:** image encoding is a fixed compute burst (like prefill); text decode is sequential. Consider encoding on a separate pool and feeding features to the decode fleet, mirroring prefill/decode disaggregation.
 - **Video:** dynamic FPS sampling + temporal token compression, or the token count explodes with length. Cross-link [Video-Language Models](#/vlm/video), [VLM Implementation Details](#/vlm/practical).
 
@@ -176,7 +214,7 @@ flowchart LR
   Img[Image / video frames] --> Enc[Vision encoder<br/>cacheable]
   Enc --> Tok[Visual tokens<br/>prune / compress]
   Txt[Text] --> Merge[Merge sequence]
-  Tok --> Merge --> LLM[LLM decode]
+  Tok --> Merge --> VlmLLM[LLM decode]
   Enc -.->|feature cache| Cache[(Per-image cache)]
   style Tok fill:#e0533f,color:#fff
 ```
@@ -194,7 +232,7 @@ Open-ended LLM/agent outputs have no single ground truth, so evaluation is itsel
 
 | Eval type | Use when | Watch out for |
 | --- | --- | --- |
-| **Programmatic / verifiable** | code runs, math checks, schema/format, exact-match | prefer this whenever possible — cheap, unhackable |
+| **Programmatic / verifiable** | code runs, math checks, schema/format, exact-match | strong within a clear scope, but tests, harnesses, and partial specifications can be gamed |
 | **LLM-as-judge** | open-ended quality, helpfulness, groundedness at scale | **position, verbosity, self-enhancement bias**; prompt-injection; calibrate against human labels |
 | **Human eval** | ground-truth calibration, high-stakes, judge validation | cost, throughput, rater agreement/guidelines |
 
@@ -202,9 +240,41 @@ Open-ended LLM/agent outputs have no single ground truth, so evaluation is itsel
 
 - **Debias:** randomize position, control for length, avoid a model grading its own family (self-enhancement), use **rubrics** or pairwise comparisons over raw scores, and periodically validate the judge against human labels.
 - **Guardrails (runtime, not eval):** input filters (prompt-injection, PII), output filters (safety classifiers, groundedness/citation checks, PII redaction, format validators). Guardrails run *in the request path*; evals run *offline/online on samples*.
+- **Judge isolation:** delimit candidate output and retrieved/tool content as untrusted, and deny the judge tool, network, and secret access. Record judge prompt/version, order, and seed; calibrate disagreement and abstention against human samples.
+
+<details class="concept-code">
+<summary>View as conceptual code</summary>
+
+> This is **evaluation pseudocode** for calibrating a pairwise judge against human labels. It does not treat judge scores as ground truth.
+
+```python
+def evaluate_pair(ex, candidate_a, candidate_b, rng):
+    order = rng.permutation([("A", candidate_a), ("B", candidate_b)])
+    packet = render_untrusted_candidates(ex.rubric, order)  # No tool, network, or secret access
+    verdict = judge.eval().compare(packet, allow_abstain=True)
+    verdict = map_back_to_original_order(verdict, order)
+
+    swapped = judge.compare(render_untrusted_candidates(ex.rubric, order[::-1]),
+                            allow_abstain=True)
+    swapped = map_back_to_original_order(swapped, order[::-1])
+    if verdict != swapped:                                 # Position-sensitive sample
+        verdict = "abstain_or_human_review"
+    return verdict
+
+def validate_judge(frozen_human_set):
+    rng = SeededRNG(EVAL_SEED)
+    predictions = [evaluate_pair(ex, ex.candidate_a, ex.candidate_b, rng)
+                   for ex in frozen_human_set]
+    report = agreement_and_confusion(predictions, human_labels(frozen_human_set))
+    report.by_slice(["length_gap", "topic", "safety", "model_family"])
+    # Revalidate thresholds and the abstention policy whenever prompt or judge version changes.
+    return report
+```
+
+</details>
 
 > [!DANGER] Benchmarks are now a security problem
-> The 2026 Berkeley-RDI result: an automated agent broke **8 major agent benchmarks by attacking the eval harness, not the task** (e.g., reading the gold answer via a `file://` URL, faking a `curl`, pytest hooks) — several hitting ~100%. *(verifiable)* Takeaway for a design round: **treat >90% agent-benchmark claims with heavy skepticism**, sandbox eval harnesses, use private held-out sets, and report **cost-per-task and reliability curves**, not just top-1. Saying this unprompted signals you actually track the field. See [Evaluation Metrics](#/foundations/evaluation-metrics).
+> [BenchJack](https://arxiv.org/abs/2605.12673) reports 219 flaws across 10 benchmarks, while the [Berkeley RDI summary](https://rdi.berkeley.edu/blog/trustworthy-benchmarks-cont/) describes audits of eight prominent benchmarks. Do not conflate the blog's eight with the paper's ten. The lesson is that even programmatic checks can be gamed when the specification, permissions, or harness is vulnerable. Use sandboxing, immutable private held-out data, canary tasks, filesystem/network isolation, and cost and reliability reporting.
 
 <details class="qa"><summary>How would you evaluate a RAG assistant end-to-end before and after launch?</summary>
 <div class="qa-body">
@@ -226,7 +296,7 @@ Open-ended LLM/agent outputs have no single ground truth, so evaluation is itsel
 
 - *"Cut serving cost 50% without hurting quality — what do you try first?"* → route/cascade to a smaller model, quantize + quantized KV, raise batch via paged KV, spec-decode, prompt-prefix caching; measure quality on a held-out set at each step.
 - *"Your agent works in eval but fails in production — why?"* → benchmark contamination/harness gaming, distribution shift in real tools, missing error-handling on real tool failures, unbounded cost.
-- *"How do you stop prompt injection in a RAG/agent system?"* → treat retrieved/tool content as untrusted, input+output guardrails, least-privilege tools, don't let retrieved text issue tool calls unfiltered.
+- *"How do you stop prompt injection in a RAG/agent system?"* → separate content from instructions and taint retrieved/tool output as untrusted; use per-tool authorization, least privilege, secret isolation, an egress allowlist, human approval, and auditing. Do not claim one filter "stops" it; limit the blast radius.
 
 ## Cheat-sheet
 
@@ -234,13 +304,13 @@ Open-ended LLM/agent outputs have no single ground truth, so evaluation is itsel
 | --- | --- |
 | **RAG** | chunk → hybrid retrieve (dense+BM25) → **rerank** → assemble → generate → grounding-check; separate retrieval recall from generation faithfulness |
 | **Agents** | perceive→reason→act→observe; reliability = bounded autonomy + verifier + memory compaction; measure long-horizon reliability + cost/task |
-| **Serving** | prefill (compute) vs decode (bandwidth); **continuous batching + paged KV + speculative decoding**; TTFT/TPOT/throughput/cost-per-Mtok |
+| **Serving** | profile prefill and decode; choose continuous batching, paged KV, and speculative decoding by workload; TTFT/TPOT/throughput/cost |
 | **MoE** | report active vs total params; expert parallelism + load balancing |
 | **VLM serving** | variable visual tokens dominate cost; prune/budget tokens; cache encoder; disaggregate encode/decode |
-| **Eval** | verifiable > LLM-judge > human; debias the judge; guardrails in-path; **benchmarks are a security surface** (RDI/BenchJack) |
-| **Cost** | attach a latency + $ number to every choice; route small→big; 2026 = intelligence-per-dollar |
+| **Eval** | programmatic, judge, and human evaluation are complementary; include harness and permissions in the threat model and calibrate judges against humans |
+| **Cost** | attach latency, memory, and currency estimates to decision-changing choices and evaluate them with quality |
 
 > [!TIP] The closing line
-> "I'd ground knowledge with RAG, keep the agent's autonomy bounded and verified, serve with continuous batching + paged KV + speculative decoding behind a small→large router, and evaluate with verifiable checks plus a bias-audited judge — reporting cost-per-task and reliability, not just accuracy." Every 2026 concern in one breath.
+> "I'd first define the knowledge source and authorization boundary, bound and verify the agent's autonomy, choose batching, KV, and quantization optimizations for the workload, and then report quality, cost per task, and reliability with verifiable checks and calibrated evaluation." Choose RAG, routing, and speculative decoding only when the requirements and benchmarks justify them.
 
 **Related:** [Agentic AI & Tool Use](#/llm/agents) · [Mixed Precision & Efficiency](#/foundations/mixed-precision-efficiency) · [LLM Fundamentals](#/llm/fundamentals) · [Post-Training & Alignment](#/llm/alignment) · [Reasoning & Test-Time Compute](#/llm/reasoning) · [VLM Implementation Details](#/vlm/practical) · [Video-Language Models](#/vlm/video) · [Evaluation Metrics](#/foundations/evaluation-metrics) · [The Design Framework](#/system-design/framework) · [Worked Case Studies](#/system-design/case-studies)

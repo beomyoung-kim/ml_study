@@ -126,6 +126,71 @@ Each call returns the best *downward* chain; the global answer may **bend** at a
 
 `O(N)`. This return-a-chain / update-a-global split is the template for **diameter** (LC 543), **house robber III** (LC 337), and most "path within a tree" DPs.
 
+## Canonical backtracking—choose, explore, undo
+
+Backtracking is not an explicit tree data structure. It is DFS over a **search tree of choices**. Each call defines the path selected so far and the range of next candidates; add a choice, recurse, and then restore the state.
+
+```python
+def subsets(nums):
+    """All subsets of positionally distinct input elements."""
+    out, path = [], []
+
+    def dfs(start):
+        out.append(path.copy())      # storing path itself aliases one mutable object
+        for i in range(start, len(nums)):
+            path.append(nums[i])     # choose
+            dfs(i + 1)               # explore: never revisit an earlier index
+            path.pop()               # unchoose
+
+    dfs(0)
+    return out
+
+
+def unique_permutations(nums):
+    """Return distinct permutations even when values repeat."""
+    nums = sorted(nums)
+    out, path = [], []
+    used = [False] * len(nums)
+
+    def dfs():
+        if len(path) == len(nums):
+            out.append(path.copy())
+            return
+        for i, value in enumerate(nums):
+            if used[i]:
+                continue
+            # At one depth, use an equal value as the starting choice only once.
+            if i > 0 and nums[i] == nums[i - 1] and not used[i - 1]:
+                continue
+            used[i] = True
+            path.append(value)
+            dfs()
+            path.pop()
+            used[i] = False
+
+    dfs()
+    return out
+
+
+assert subsets([]) == [[]]
+assert sorted(subsets([1, 2])) == [[], [1], [1, 2], [2]]
+assert unique_permutations([1, 1, 2]) == [
+    [1, 1, 2], [1, 2, 1], [2, 1, 1]
+]
+```
+
+| Problem form | State and candidates | Typical pruning |
+| --- | --- | --- |
+| Subset / combination | `path`, next `start` index | stop when the remaining suffix cannot fill the target length |
+| Permutation | `path`, `used[]` | sort, then skip duplicates at the same depth |
+| Sum to target | current sum or remainder, `start` | with sorted positive candidates, stop at `candidate > remaining` |
+| Grid word search | coordinates, character index, visited state | stop immediately on bounds or character mismatch; restore visited |
+
+There are $2^N$ subsets, so copying every answer takes about $O(N2^N)$ time. There are $N!$ permutations, requiring $O(N\cdot N!)$ including output copies. Do not merely say “exponential”: explain that this is close to optimal relative to the output size, and justify each pruning condition. Repeated identical states when only an optimum or count is needed are a signal to switch to memoization or dynamic programming.
+
+> [!WARNING] Backtracking traps
+> Common bugs include forgetting to `return` at the base case and exploring invalid lengths; storing `path` instead of `path.copy()`; or returning early on success without restoring visited state. With duplicate inputs, distinguish “skip an equal candidate at the same depth” from “skip it at every depth.”
+
 ## Common tree-DP recipes
 
 | Problem | Return upward | Global update |
@@ -180,6 +245,8 @@ Each call returns the best *downward* chain; the global answer may **bend** at a
 | DFS vs BFS memory | `O(H)` vs `O(W)` |
 | Iterative in-order | left-spine stack, visit on pop, go right |
 | Validate BST | inherit `(low, high)` bounds, not parent-only |
+| Backtracking | choose → explore → unchoose; store `path.copy()` in answers |
+| Duplicate pruning | sort, then skip equal candidates only at the same depth |
 | Complexity | traversal `O(N)`; balanced BST ops `O(log N)` |
 
 **Related:** [Graphs (BFS/DFS)](#/coding/graphs-bfs-dfs) · [Binary Search](#/coding/binary-search) · [Dynamic Programming](#/coding/dynamic-programming) · back to [The Core Patterns](#/coding/patterns) and [Coding Round Strategy](#/coding/strategy).

@@ -1,7 +1,7 @@
 # Union-Find (Disjoint Set Union)
 
 > [!TIP] 이 말부터 시작하세요
-> "문제가 **동적 연결성(dynamic connectivity)**에 관한 것일 때 — edge가 도착하고 '이 둘이 같은 그룹인가?'를 계속 묻는 상황 — Union-Find는 `union`과 `connected`를 둘 다 amortized로 거의 `O(1)`에 답합니다." path compression *과* union by rank를 함께 쓰면 연산이 `O(α(N))`인데, `α`(inverse Ackermann)는 상상 가능한 어떤 입력에서도 ≤ 4입니다.
+> "문제가 **동적 연결성(dynamic connectivity)에** 관한 것일 때 — edge가 도착하고 '이 둘이 같은 그룹인가?'를 계속 묻는 상황 — Union-Find는 `union`과 `connected`를 둘 다 amortized로 거의 `O(1)`에 답합니다." path compression *과* union by rank를 함께 쓰면 연산이 `O(α(N))`입니다. `α`는 매우 느리게 증가하지만 "모든 상상 가능한 입력에서 정확히 4 이하" 같은 표현보다 사실상 상수로 취급한다고 답하는 편이 안전합니다.
 
 DSU는 각 tree가 하나의 집합인 forest를 유지합니다. 두 가지 최적화가 이를 사실상 상수 시간으로 만듭니다: **path compression**은 `find` 도중 tree를 평탄화하고, **union by rank/size**는 tree를 얕게 유지합니다. edge가 추가될 때마다 DFS/BFS를 재실행해야 하는 상황에서 알맞은 도구입니다.
 
@@ -133,9 +133,11 @@ def kruskal_mst(n: int, edges: list[tuple[int, int, int]]) -> int:
             total += w
             if uf.count == 1:
                 break                       # spanning tree complete
+    if n > 0 and uf.count != 1:
+        raise ValueError("graph is disconnected; only a spanning forest exists")
     return total
 ```
-정렬에서 오는 `O(E log E)`; DSU 작업은 사실상 선형입니다. Prim(heap 기반)과 비교하면 — Kruskal은 sparse graph와 edge-list 입력에서 유리합니다.
+정렬에서 오는 `O(E log E)`; DSU 작업은 사실상 선형입니다. 마지막 연결성 검사가 없으면 disconnected graph에서 반환하는 값은 MST가 아니라 minimum spanning forest의 가중치입니다.
 
 ## 언급할 변형
 

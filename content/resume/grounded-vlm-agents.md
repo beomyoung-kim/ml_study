@@ -3,19 +3,19 @@
 <div class="tag-row"><span class="tag">ongoing</span><span class="tag">NeurIPS 2026 (under review)</span><span class="tag">grounded VLM</span><span class="tag">visual agents</span><span class="tag">training-free</span><span class="tag">framing over specifics</span></div>
 
 > [!DANGER] Ground rules for this chapter
-> This work is **unpublished / under review**. Never fabricate methods, numbers, dataset names, or an acceptance decision. Sell it on **motivation, problem definition, position among public trends, and the bridge from my public work (ZIM, ECLIPSE)**. Method specifics are "pre-release." Use the decline-and-redirect script at the end when pushed.
+> This work is <strong>unpublished / under review</strong>. Do not fabricate methods, figures, datasets, or an acceptance decision. Explain only the approved motivation and problem definition plus connections from public work such as ZIM and ECLIPSE, and distinguish details as pre-release. Use the decline-and-redirect script at the end when pushed.
 
 > [!TIP] 30-second pitch
-> Two threads. **(1) Grounded Multimodal AI:** tie language reasoning to **pixel/region-level evidence** so a model resolves region-based queries and reasons *verifiably* instead of emitting unsupported text. **(2) Visual Reasoning Agents:** **training-free** agentic program synthesis that dynamically composes specialist vision models into query-specific executable workflows for multi-step **spatial/temporal** reasoning that end-to-end VLMs still fumble. My NeurIPS'26 submission sits in thread 2: a **diagnostic framework for 3D spatial reasoning** that turns *silent perception failures* into **typed diagnoses**, driving targeted **program repair** — aiming to rival frontier VLMs *without task-specific training*.
+> Two threads. **(1) Grounded Multimodal AI:** connect language reasoning to <strong>pixel/region-level artifacts</strong> so claims become inspectable. Grounding does not automatically guarantee correctness; boxes and masks can hallucinate too. **(2) Visual Reasoning Agents:** use **training-free** agentic program synthesis to compose specialist vision models into query-specific workflows for multi-step **spatial/temporal** reasoning. A submission under review at NeurIPS 2026 sits in thread 2: a 3D spatial-reasoning framework that turns *silent perception failures* into <strong>typed diagnoses</strong> that drive targeted <strong>program repair</strong>. State comparative performance only within the task, models, and protocol of the submission.
 
 **Résumé anchors (do not over-specify beyond these):** grounded VLMs connecting language reasoning with pixel/region evidence, resolving region queries, reasoning verifiably; training-free program synthesis building query-specific workflows from specialist models; a 3D-spatial diagnostic framework: silent failures → typed diagnoses → targeted repair. Backing chapters: [Grounding & Region Reasoning](#/vlm/grounding), [Visual Reasoning Agents](#/vlm/visual-agents), [Agentic AI & Tool Use](#/llm/agents), [VLM Pretraining](#/vlm/pretraining).
 
 > [!NOTE] The concrete paper behind thread 2
-> The NeurIPS'26 submission has its own chapter — full mechanism, architecture diagram, results framing, the co-requisite ablation, and hard-follow-up Q&A: **[Deep-Dive: Spatial-Reasoning Agent](#/resume/neurips26-spatial-reasoning)**. That chapter is where you rehearse the *technical* depth; keep *this* chapter for the higher-level narrative and the "how to talk about unpublished work" framing. (The public version is redacted — codename and exact numbers are held offline while under double-blind review.)
+> The submission under review has its own chapter covering the mechanism, architecture diagram, results framing, co-requisite ablation, and hard-follow-up Q&A: **[Deep-Dive: Spatial-Reasoning Agent](#/resume/neurips26-spatial-reasoning)**. The public version is redacted; non-public figures and identifying information are not automatically approved as interview material, so follow conference and company policy first.
 
 ## The core research question
 
-> *When a language model produces a visually plausible sentence, how do we (a) bind it to pixel/region evidence and executable perception tools, and (b) when a tool is silently wrong, **diagnose and repair** rather than fail silently?*
+> *When a language model produces a visually plausible sentence, how do we (a) bind it to pixel/region evidence and executable perception tools, and (b) when a tool is silently wrong, <strong>diagnose and repair</strong> rather than fail silently?*
 
 Two failure modes motivate the two threads:
 
@@ -50,14 +50,14 @@ flowchart TB
 | Concept segmentation | SAM 3 | text concept → mask/track |
 | Diagnostic benches | Spatial457, Omni3D-Bench, SpatialAct | measure spatial / repair gaps |
 
-**My stated position:** on top of specialist perception quality (ZIM/seg) and a label-efficient/continual background, I explore **verifiable grounding** and **failure-diagnosable agents** — *adjacent* to VADAR's dynamic-API/3D framing, but I won't present comparison numbers on unpublished work.
+**My stated position:** on top of specialist perception quality (ZIM/seg) and a label-efficient/continual background, I explore <strong>verifiable grounding</strong> and <strong>failure-diagnosable agents</strong> — *adjacent* to VADAR's dynamic-API/3D framing, but I won't present comparison numbers on unpublished work.
 
 ## Predicted deep-dive Q&A (framing answers)
 
 <details class="qa"><summary>Why grounded VLMs — what's wrong with end-to-end?</summary>
 <div class="qa-body">
 
-**Short:** End-to-end VLMs hallucinate and give **unsupported descriptions**; even a correct answer can rest on wrong evidence (*spurious success*).
+**Short:** End-to-end VLMs hallucinate and give <strong>unsupported descriptions</strong>; even a correct answer can rest on wrong evidence (*spurious success*).
 
 **Deep:** For products (editing, robotics, UI agents) you must *resolve a region* and justify the answer with visual evidence, not prose. Grounding makes the reasoning auditable and lets you detect when the model is right for the wrong reason — which end-to-end accuracy alone hides.
 </div></details>
@@ -65,9 +65,9 @@ flowchart TB
 <details class="qa"><summary>Why training-free agents rather than fine-tuning one big VLM?</summary>
 <div class="qa-body">
 
-**Short:** Compose and swap specialist tools (including our own matte/seg) without retraining; fine-tuning per task can degrade the foundation/product model.
+**Short:** It can compose and replace specialist tools without retraining. Because task-specific fine-tuning can reduce general capability or maintainability in some settings, compare composition with adaptation rather than assuming either is always best.
 
-**Deep:** It mirrors the ZIM lesson — task-specific fine-tuning can erode general capability. Training-free composition keeps each specialist at full strength and lets you upgrade a module without touching the rest. The cost is **tool error**, which is exactly why diagnosis/repair is the research contribution rather than an afterthought.
+**Deep:** It mirrors the ZIM lesson — task-specific fine-tuning can erode general capability. Training-free composition keeps each specialist at full strength and lets you upgrade a module without touching the rest. The cost is <strong>tool error</strong>, which is exactly why diagnosis/repair is the research contribution rather than an afterthought.
 </div></details>
 
 <details class="qa"><summary>What is a "silent perception failure," and what's a "typed diagnosis"?</summary>
@@ -81,13 +81,13 @@ flowchart TB
 <details class="qa"><summary>Why is 3D spatial reasoning hard for end-to-end VLMs?</summary>
 <div class="qa-body">
 
-Metric distances, occlusion, object-centric orientation, and multi-hop spatial composition. SpatialVLM-style models show real limits here. Programs with depth/detection tools help, but **tool-error accumulation** is the crux — hence the diagnostic angle.
+Metric distances, occlusion, object-centric orientation, and multi-hop spatial composition. SpatialVLM-style models show real limits here. Programs with depth/detection tools help, but <strong>tool-error accumulation</strong> is the crux — hence the diagnostic angle.
 </div></details>
 
 <details class="qa"><summary>How does ZIM fit in?</summary>
 <div class="qa-body">
 
-Specialist mask/matte quality is a **lower bound** on any editing/agent chain that relies on it, and **Grounded-ZIM** (text → box → matte) is a working prototype of grounded UX. But the ongoing work is *not* just "ZIM again" — ZIM is an **asset** I can plug in and diagnose, not the same paper.
+Specialist mask/matte quality is a <strong>lower bound</strong> on any editing/agent chain that relies on it, and **Grounded-ZIM** (text → box → matte) is a working prototype of grounded UX. But the ongoing work is *not* just "ZIM again" — ZIM is an <strong>asset</strong> I can plug in and diagnose, not the same paper.
 </div></details>
 
 ### Hard-pressure follow-ups
@@ -95,13 +95,13 @@ Specialist mask/matte quality is a **lower bound** on any editing/agent chain th
 <details class="qa"><summary>End-to-end frontier models keep getting better — won't they eat modular agents?</summary>
 <div class="qa-body">
 
-They're strong, but four things keep modularity valuable: (1) **precise measurement** (metric 3D), (2) **verifiable evidence**, (3) **module upgrade without retraining**, (4) **diagnostic repair** of failures. In practice a **hybrid** is the default — a frontier reasoner orchestrating diagnosable specialists — and that's where I'm betting.
+They are strong, but modularity can offer (1) **precise measurement**, (2) **inspectable intermediate evidence**, (3) **module-level upgrades**, and (4) <strong>diagnostic repair</strong> of failures. It also introduces orchestration cost and tool-error accumulation. A frontier reasoner composing diagnosable specialists is therefore one practical <strong>hybrid</strong> design, not a default for every product.
 </div></details>
 
 <details class="qa"><summary>Isn't this just ideas without results?</summary>
 <div class="qa-body">
 
-My execution is proven on public, peer-reviewed work (ZIM ICCV Highlight, ECLIPSE, PointWSSIS, BESTIE, SSUL). The ongoing work is under review, so I won't quote numbers or claim acceptance — but I can state the problem definition precisely and place it accurately in the public literature. That distinction *is* the honest answer.
+Public, peer-reviewed work—ZIM ICCV Highlight, ECLIPSE, PointWSSIS, BESTIE, and SSUL—is evidence of past execution. This work is under review, so do not present figures or acceptance as independently public and verified. Separate the problem definition and position in public literature that you are permitted to discuss.
 </div></details>
 
 <details class="qa"><summary>How would you evaluate it? (general)</summary>
@@ -119,18 +119,17 @@ LLMs hallucinating tool APIs, infinite re-planning loops, tool-version breakage,
 ## The bridge from public work (say this)
 
 - **Perception quality** (ZIM, on-device seg) → the specialist tool layer agents depend on.
-- **Label-efficiency / continual** (PointWSSIS, ECLIPSE) → the instinct to avoid task-specific retraining and to upgrade modules incrementally.
+- **Label-efficiency / continual** (PointWSSIS, ECLIPSE) → a research axis that reduces supervision cost and full-model update cost.
 - **Safety/verifiability mindset** (FaceSign) → wanting answers backed by evidence, not prose.
 
-## Company-specific one-liners
+## Connections by JD signal
 
-| Company | One line |
+| JD signal | Evidence to connect |
 | --- | --- |
-| Meta | Grounded, verifiable reasoning + tool-use agents for product VLMs |
-| Apple | Region evidence + efficient on-device specialists + alignment |
-| Adobe | Region-grounded editing/generation programs |
-| ByteDance | Generative FM + controllable perception |
-| NVIDIA | Spatial agents for robotics; efficient specialist stacks |
+| Grounding / tool-use agent | Region/pixel evidence, execution trace, typed failure |
+| Embodied / spatial reasoning | Composition of detection, depth, and segmentation tools plus error accumulation |
+| Controllable editing | Region-grounded artifacts and inspectable intermediate steps |
+| Efficient adaptation | Benefits of training-free composition and orchestration cost |
 
 ## Guardrails — allowed vs forbidden phrasing
 
@@ -146,9 +145,9 @@ Any unpublished accuracy/% gain; "we outperform VADAR"-style claims; stating the
 
 ## Honest limitations
 
-- Under review → no verifiable results to cite; sell framing, not outcomes.
-- Two threads overlap but have **different failure modes** (hallucination vs. silent tool error) — keep them distinct in the room.
-- Training-free composition inherits **tool error**; the whole bet is that diagnosis/repair can manage it.
+- Under review → no independently public results to cite; explain only the approved problem and mechanism scope.
+- Two threads overlap but have <strong>different failure modes</strong> (hallucination vs. silent tool error) — keep them distinct in the room.
+- Training-free composition inherits <strong>tool error</strong>; the whole bet is that diagnosis/repair can manage it.
 
 ## Cheat-sheet
 
@@ -158,7 +157,7 @@ Any unpublished accuracy/% gain; "we outperform VADAR"-style claims; stating the
 | Thread 2 | Visual Reasoning Agents — training-free program synthesis from specialist tools |
 | NeurIPS'26 (under review) | 3D-spatial diagnostic framework: silent failure → **typed diagnosis** → **program repair** |
 | Public lineage | VisProg, ViperGPT, VADAR, ViGoRL/MGPO, TerraScope, SAM 3 |
-| Bridge | ZIM/seg (tools) · ECLIPSE/PointWSSIS (no-retrain instinct) · FaceSign (verifiability) |
+| Bridge | ZIM/seg (tools) · ECLIPSE/PointWSSIS (label/update efficiency) · FaceSign (verifiability) |
 | Golden rule | Framing over specifics; no numbers; not accepted-yet |
 
 ## Cross-links

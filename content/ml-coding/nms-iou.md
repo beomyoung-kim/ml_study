@@ -1,13 +1,62 @@
 # IoU & Non-Max Suppression
 
-> [!TIP] Say this first
-> "IoU is intersection over union; the whole trick is computing the intersection rectangle by broadcasting `max` of the top-lefts and `min` of the bottom-rights, then clamping negatives to zero. NMS is a greedy loop: keep the top score, drop everything that overlaps it too much, repeat." Then code it.
+> [!NOTE] Goal of this chapter
+> You will implement two indispensable object-detection tools. **IoU** is a ruler for how much two boxes overlap; **NMS** is a cleanup step that keeps the best among duplicate boxes around the same object. Both use broadcasting from the [NumPy Primer](#/ml-coding/numpy-primer) to avoid inner Python loops. This chapter leads naturally into [Object Detection](#/cv/detection).
 
-The bread-and-butter of any detection/segmentation loop. Boxes are `[x1, y1, x2, y2]` in continuous coordinates, so area is $(x_2-x_1)(y_2-y_1)$ (no `+1`). The interviewer is watching **vectorization** and **edge cases** (zero-area boxes, full containment, empty input) far more than the algorithm itself.
+## What and why
+
+A detector usually emits **several overlapping boxes** around one object. That creates two problems:
+
+1. We need a ruler for **“Do these boxes refer to the same object?”** → **IoU**.
+2. We need a way to **remove duplicates** → **NMS (Non-Max Suppression)**.
+
+**IoU (Intersection over Union)** divides the overlap area of two boxes by their combined area. It ranges from 0, no overlap, to 1, identical boxes.
+
+<figure>
+<svg viewBox="0 0 640 230" xmlns="http://www.w3.org/2000/svg" font-family="Inter, sans-serif" font-size="13">
+  <!-- intersection shaded first (under strokes) -->
+  <rect x="200" y="95" width="90" height="80" fill="rgba(18,161,80,.35)"/>
+  <!-- box A -->
+  <rect x="70" y="45" width="220" height="130" fill="rgba(99,102,241,.10)" stroke="#6366f1" stroke-width="2.5"/>
+  <text x="110" y="38" fill="#6366f1" font-weight="700">box A</text>
+  <!-- box B -->
+  <rect x="200" y="95" width="200" height="110" fill="rgba(224,83,63,.10)" stroke="#e0533f" stroke-width="2.5"/>
+  <text x="360" y="222" fill="#e0533f" font-weight="700">box B</text>
+  <!-- intersection label -->
+  <text x="245" y="140" text-anchor="middle" fill="#12a150" font-weight="700" font-size="12">intersection</text>
+  <text x="245" y="156" text-anchor="middle" fill="#12a150" font-size="10">(∩)</text>
+  <!-- formula -->
+  <text x="470" y="90" fill="currentColor" font-size="14">IoU =</text>
+  <line x1="470" y1="105" x2="600" y2="105" stroke="currentColor" stroke-width="1.2"/>
+  <text x="535" y="98" text-anchor="middle" fill="#12a150">intersection area</text>
+  <text x="535" y="125" text-anchor="middle" fill="#98a3b2">union area (∪)</text>
+  <text x="470" y="165" fill="#98a3b2" font-size="11">0 = no overlap</text>
+  <text x="470" y="182" fill="#98a3b2" font-size="11">1 = identical</text>
+</svg>
+<figcaption>IoU divides the <b>intersection</b>, shown in green, by the <b>union</b> of the boxes. Detection evaluation and the overlap decision in NMS both use this one number.</figcaption>
+</figure>
+
+**NMS** cleans up a cluster of overlapping boxes: keep the highest-scoring box, drop boxes whose IoU with it exceeds a threshold, and repeat on the survivors.
+
+<figure>
+<svg viewBox="0 0 640 190" xmlns="http://www.w3.org/2000/svg" font-family="Inter, sans-serif" font-size="12">
+  <text x="150" y="20" text-anchor="middle" fill="#98a3b2" font-weight="700">before NMS—duplicates</text>
+  <rect x="70" y="45" width="150" height="95" fill="none" stroke="#98a3b2" stroke-width="1.5"/><text x="78" y="60" fill="#98a3b2">0.72</text>
+  <rect x="85" y="55" width="150" height="95" fill="none" stroke="#98a3b2" stroke-width="1.5"/><text x="200" y="70" fill="#98a3b2">0.68</text>
+  <rect x="60" y="35" width="150" height="95" fill="none" stroke="#e0533f" stroke-width="2.5"/><text x="66" y="30" fill="#e0533f" font-weight="700">0.95 ★</text>
+  <text x="320" y="95" text-anchor="middle" font-size="22" fill="#98a3b2">→</text>
+  <text x="500" y="20" text-anchor="middle" fill="#98a3b2" font-weight="700">after NMS—keep the best</text>
+  <rect x="425" y="35" width="150" height="95" fill="rgba(224,83,63,.12)" stroke="#e0533f" stroke-width="2.5"/><text x="431" y="30" fill="#e0533f" font-weight="700">0.95 ✓</text>
+</svg>
+<figcaption>Of three boxes around the same object, NMS keeps the 0.95 box and removes the others that overlap it too much.</figcaption>
+</figure>
+
+> [!TIP] Interview one-liner
+> “IoU broadcasts the `max` of top-left corners and `min` of bottom-right corners to form the intersection, then clamps negative side lengths to zero. NMS is a greedy loop: keep the top score, drop boxes that overlap it too much, and repeat.” Interviewers watch **vectorization** and **edge cases**—zero-area boxes, full containment, and empty input—more than the basic algorithm.
 
 ## The math
 
-For two boxes $A, B$:
+Boxes use continuous `[x1,y1,x2,y2]` coordinates, and their area is $(x_2-x_1)(y_2-y_1)$ with no `+1`; this differs from the old VOC integer-pixel convention. For two boxes $A,B$:
 
 $$
 \text{IoU}(A,B) = \frac{|A \cap B|}{|A \cup B|} = \frac{|A\cap B|}{|A| + |B| - |A\cap B|}
@@ -28,7 +77,7 @@ Area of each `[x1, y1, x2, y2]` box, clamping negative side lengths to zero so d
 
 <div class="widget" data-widget="code">
 <script type="application/json" class="code-config">
-{"func":"box_area","packages":["numpy"],"approx":true,"starter":"def box_area(boxes):\n    # (N,4) xyxy boxes -> (N,) areas; clamp negative side lengths to 0\n    pass","tests":[{"args":[[[0,0,10,10],[1,1,4,5],[5,5,2,2]]],"expect":[100.0,12.0,0.0]},{"args":[[[0,0,2,3],[0,0,0,9]]],"expect":[6.0,0.0]},{"args":[[[2,2,5,7]]],"expect":[15.0]}],"solution":"import numpy as np\n\ndef box_area(boxes):\n    boxes = np.asarray(boxes, dtype=float)\n    return np.maximum(0.0, boxes[:, 2] - boxes[:, 0]) * np.maximum(0.0, boxes[:, 3] - boxes[:, 1])"}
+{"func":"box_area","packages":["numpy"],"approx":true,"starter":"def box_area(boxes):\n    # (N,4) xyxy boxes -> (N,) areas; clamp negative side lengths to 0\n    pass","tests":[{"args":[[[0,0,10,10],[1,1,4,5],[5,5,2,2]]],"expect":[100.0,12.0,0.0]},{"args":[[[0,0,2,3],[0,0,0,9]]],"expect":[6.0,0.0]},{"args":[[[2,2,5,7]]],"expect":[15.0]},{"args":[[]],"expect":[]}],"solution":"import numpy as np\n\ndef box_area(boxes):\n    boxes = np.asarray(boxes, dtype=float).reshape(-1, 4)\n    return np.maximum(0.0, boxes[:, 2] - boxes[:, 0]) * np.maximum(0.0, boxes[:, 3] - boxes[:, 1])"}
 </script>
 </div>
 
@@ -40,19 +89,19 @@ The full $(N,M)$ IoU grid: broadcast `max` of the top-lefts and `min` of the bot
 
 <div class="widget" data-widget="code">
 <script type="application/json" class="code-config">
-{"func":"iou_matrix","packages":["numpy"],"approx":true,"starter":"def iou_matrix(a, b):\n    # a:(N,4), b:(M,4) -> (N,M); broadcast max of top-lefts, min of bottom-rights, clamp\n    pass","tests":[{"args":[[[0,0,10,10]],[[0,0,10,10]]],"expect":[[1.0]]},{"args":[[[0,0,10,10]],[[1,1,11,11]]],"expect":[[0.680672268907563]]},{"args":[[[0,0,10,10],[20,20,30,30]],[[0,0,10,10],[5,5,15,15]]],"expect":[[1.0,0.14285714285714285],[0.0,0.0]]},{"args":[[[0,0,2,2]],[[10,10,12,12]]],"expect":[[0.0]]}],"solution":"import numpy as np\n\ndef iou_matrix(a, b):\n    a = np.asarray(a, dtype=float)\n    b = np.asarray(b, dtype=float)\n    def area(x):\n        return np.maximum(0.0, x[:, 2] - x[:, 0]) * np.maximum(0.0, x[:, 3] - x[:, 1])\n    lt = np.maximum(a[:, None, :2], b[None, :, :2])\n    rb = np.minimum(a[:, None, 2:], b[None, :, 2:])\n    wh = np.maximum(0.0, rb - lt)\n    inter = wh[..., 0] * wh[..., 1]\n    union = area(a)[:, None] + area(b)[None, :] - inter\n    return inter / np.maximum(union, 1e-8)"}
+{"func":"iou_matrix","packages":["numpy"],"approx":true,"starter":"def iou_matrix(a, b):\n    # a:(N,4), b:(M,4) -> (N,M); broadcast max of top-lefts, min of bottom-rights, clamp\n    pass","tests":[{"args":[[[0,0,10,10]],[[0,0,10,10]]],"expect":[[1.0]]},{"args":[[[0,0,10,10]],[[1,1,11,11]]],"expect":[[0.680672268907563]]},{"args":[[[0,0,10,10],[20,20,30,30]],[[0,0,10,10],[5,5,15,15]]],"expect":[[1.0,0.14285714285714285],[0.0,0.0]]},{"args":[[[0,0,2,2]],[[10,10,12,12]]],"expect":[[0.0]]},{"args":[[[0,0,1,1],[2,2,3,3]],[]],"expect":[[],[]]}],"solution":"import numpy as np\n\ndef iou_matrix(a, b):\n    a = np.asarray(a, dtype=float).reshape(-1, 4)\n    b = np.asarray(b, dtype=float).reshape(-1, 4)\n    def area(x):\n        return np.maximum(0.0, x[:, 2] - x[:, 0]) * np.maximum(0.0, x[:, 3] - x[:, 1])\n    lt = np.maximum(a[:, None, :2], b[None, :, :2])\n    rb = np.minimum(a[:, None, 2:], b[None, :, 2:])\n    wh = np.maximum(0.0, rb - lt)\n    inter = wh[..., 0] * wh[..., 1]\n    union = area(a)[:, None] + area(b)[None, :] - inter\n    return inter / np.maximum(union, 1e-8)"}
 </script>
 </div>
 
-The `[:, None]` / `[None, :]` axis insertions are the whole game: they line up the $(N,1,\cdot)$ and $(1,M,\cdot)$ tensors so broadcasting produces the full $(N,M)$ grid without a loop. **Complexity:** $O(NM)$ time and memory.
+The `[:, None]` / `[None, :]` axis insertions are the whole game: they line up the $(N,1,\cdot)$ and $(1,M,\cdot)$ tensors so broadcasting produces the full $(N,M)$ grid without a loop. Review broadcasting in the [NumPy Primer](#/ml-coding/numpy-primer). **Complexity:** $O(NM)$ time and memory.
 
 ### 3. Greedy NMS <span class="badge badge-med">Medium</span>
 
-Sort by score, keep the top box, drop every survivor whose IoU with it exceeds the threshold, repeat. Returns kept indices in decreasing-score order.
+Sort by score, keep the top box, drop every survivor whose IoU with it exceeds the threshold, and repeat. For equal scores, this educational implementation uses a stable sort to preserve input-index order. Actual CPU and GPU NMS implementations may resolve ties differently, so product logic should not depend on tie order.
 
 <div class="widget" data-widget="code">
 <script type="application/json" class="code-config">
-{"func":"nms","packages":["numpy"],"starter":"def nms(boxes, scores, iou_thr=0.5):\n    # greedy: keep the top score, drop boxes with IoU > thr, repeat; return kept indices\n    pass","tests":[{"args":[[[0,0,10,10],[1,1,11,11],[20,20,30,30],[0,0,10,10]],[0.9,0.8,0.7,0.95],0.5],"expect":[3,2]},{"args":[[[0,0,10,10],[1,1,11,11]],[0.9,0.8],0.5],"expect":[0]},{"args":[[[0,0,10,10],[1,1,11,11]],[0.9,0.8],0.95],"expect":[0,1]},{"args":[[[0,0,10,10],[100,100,110,110]],[0.5,0.9],0.5],"expect":[1,0]},{"args":[[],[],0.5],"expect":[]}],"solution":"import numpy as np\n\ndef nms(boxes, scores, iou_thr=0.5):\n    boxes = np.asarray(boxes, dtype=float)\n    scores = np.asarray(scores, dtype=float)\n    def iou_m(a, b):\n        lt = np.maximum(a[:, None, :2], b[None, :, :2])\n        rb = np.minimum(a[:, None, 2:], b[None, :, 2:])\n        wh = np.maximum(0.0, rb - lt)\n        inter = wh[..., 0] * wh[..., 1]\n        area = lambda x: np.maximum(0.0, x[:, 2] - x[:, 0]) * np.maximum(0.0, x[:, 3] - x[:, 1])\n        union = area(a)[:, None] + area(b)[None, :] - inter\n        return inter / np.maximum(union, 1e-8)\n    if boxes.size == 0:\n        return []\n    order = scores.argsort()[::-1]\n    keep = []\n    while order.size > 0:\n        i = int(order[0])\n        keep.append(i)\n        if order.size == 1:\n            break\n        ious = iou_m(boxes[i][None], boxes[order[1:]])[0]\n        order = order[1:][ious <= iou_thr]\n    return keep"}
+{"func":"nms","packages":["numpy"],"starter":"def nms(boxes, scores, iou_thr=0.5):\n    # greedy: keep the top score, drop boxes with IoU > thr, repeat; return kept indices\n    pass","tests":[{"args":[[[0,0,10,10],[1,1,11,11],[20,20,30,30],[0,0,10,10]],[0.9,0.8,0.7,0.95],0.5],"expect":[3,2]},{"args":[[[0,0,10,10],[1,1,11,11]],[0.9,0.8],0.5],"expect":[0]},{"args":[[[0,0,10,10],[1,1,11,11]],[0.9,0.8],0.95],"expect":[0,1]},{"args":[[[0,0,10,10],[100,100,110,110]],[0.5,0.9],0.5],"expect":[1,0]},{"args":[[],[],0.5],"expect":[]}],"solution":"import numpy as np\n\ndef nms(boxes, scores, iou_thr=0.5):\n    boxes = np.asarray(boxes, dtype=float).reshape(-1, 4)\n    scores = np.asarray(scores, dtype=float).reshape(-1)\n    if len(boxes) != len(scores):\n        raise ValueError('boxes and scores must have equal length')\n    def iou_m(a, b):\n        lt = np.maximum(a[:, None, :2], b[None, :, :2])\n        rb = np.minimum(a[:, None, 2:], b[None, :, 2:])\n        wh = np.maximum(0.0, rb - lt)\n        inter = wh[..., 0] * wh[..., 1]\n        area = lambda x: np.maximum(0.0, x[:, 2] - x[:, 0]) * np.maximum(0.0, x[:, 3] - x[:, 1])\n        union = area(a)[:, None] + area(b)[None, :] - inter\n        return inter / np.maximum(union, 1e-8)\n    if boxes.size == 0:\n        return []\n    order = np.argsort(-scores, kind='stable')\n    keep = []\n    while order.size > 0:\n        i = int(order[0])\n        keep.append(i)\n        if order.size == 1:\n            break\n        ious = iou_m(boxes[i][None], boxes[order[1:]])[0]\n        order = order[1:][ious <= iou_thr]\n    return keep"}
 </script>
 </div>
 
@@ -126,7 +175,7 @@ if __name__ == "__main__":
 
 **Short:** offset each box's coordinates by a large per-class constant so boxes of different classes can never overlap, then run one global NMS — that's exactly `batched_nms`.
 
-**Deep:** add `class_id * (max_coordinate + 1)` to every coordinate. Boxes from different classes are now displaced into disjoint regions of the plane, so their IoU is 0 and they never suppress each other, while within-class geometry is preserved. One sort, one NMS pass, no Python-level class loop.
+**Deep:** under a contract with non-negative coordinates and enough dtype range, add `class_id * (max_coordinate + 1)` to every coordinate. If negative coordinates are allowed, base the offset on the full coordinate span; also avoid FP16 overflow. When those assumptions are unclear, explicit per-class NMS is safer.
 </div></details>
 
 <details class="qa"><summary>Soft-NMS vs hard NMS — when and why?</summary>
@@ -161,4 +210,4 @@ if __name__ == "__main__":
 | Soft-NMS | decay: $e^{-\text{IoU}^2/\sigma}$ | better recall, small cost |
 | Class-aware | coordinate offset per class | one global pass (`batched_nms`) |
 
-**Cross-links:** [Object Detection](#/cv/detection) · [mAP & mIoU](#/ml-coding/metrics-map-miou) · [The ML Coding Round](#/ml-coding/intro)
+**Next:** [Object Detection](#/cv/detection) · [mAP & mIoU](#/ml-coding/metrics-map-miou) · [NumPy Primer](#/ml-coding/numpy-primer)

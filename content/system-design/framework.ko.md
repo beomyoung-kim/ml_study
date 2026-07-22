@@ -3,9 +3,9 @@
 <div class="tag-row"><span class="tag">9-step spine</span><span class="tag">problem → metric → data → model → serve → monitor</span><span class="tag">research vs product framing</span><span class="tag">45–60 min</span></div>
 
 > [!TIP] 첫 60초에 이 말을 하세요
-> "뭔가를 설계하기 전에, use case와 제약, 그리고 성공을 어떻게 측정할지를 먼저 명확히 하고, 그다음에 baseline 시스템을 스케치한 뒤 원하시는 부분을 deep-dive하겠습니다." 구조화된 오프닝 자체가 채점되는 신호입니다. 면접관은 *"모델로 뛰어들기 전에 문제를 framing한다"*라고 적힌 rubric 항목을 채우고 있어요. 그 증거를 즉시 주세요.
+> "뭔가를 설계하기 전에, use case와 제약, 그리고 성공을 어떻게 측정할지를 먼저 명확히 하고, 그다음에 baseline 시스템을 스케치한 뒤 원하시는 부분을 deep-dive하겠습니다." 실제 rubric은 조직마다 다르지만, 이런 오프닝은 문제 framing과 구조화 능력을 바로 보여줍니다.
 
-[다음 챕터](#/system-design/case-studies)의 모든 worked case는 이 동일한 spine 위에서 돌아갑니다. 한 번 익혀두면 압박 속에서도 곧바로 적용할 수 있어요. 여기 나오는 framework는 널리 인용되는 **9-step ML system design** 구조(alirezadir)를, 화이트보드에서 한 바퀴 돌 수 있는 loop로 압축한 것입니다.
+[다음 챕터](#/system-design/case-studies)의 worked case는 이 spine을 공통 출발점으로 씁니다. 여기의 framework는 [alirezadir의 9-step ML system-design outline](https://github.com/alirezadir/machine-learning-interviews/blob/main/src/MLSD/ml-system-design.md)을 화이트보드에서 한 바퀴 돌 수 있는 loop로 조정한 것입니다. 순서를 외우기보다 질문의 위험에 따라 시간을 재배분하세요.
 
 > [!WARNING] research/applied 관점의 반전
 > Product-MLE framing은 웬만한 infra가 이미 있다고 가정하고, 깔끔한 data→features→ranking→serve→A/B 파이프라인에 보상을 줍니다. **Research/applied framing은 무게중심을 옮겨서** *문제 정의, metric 설계, 실험적 엄밀성(ablation, baseline, failure analysis), 모델링의 새로움* 쪽으로 갑니다. 전체 시스템을 여전히 그리긴 하지만, 추가 시간은 과학자가 가치를 더하는 곳에 씁니다. **무엇을 측정할지, 그리고 내가 옳다는 걸 어떻게 알지.** *(방어 가능 — RS/AS loop 리포트에서 종합)*
@@ -55,7 +55,7 @@ flowchart TD
 | **Latency** | p50 / p99 목표? mobile인지 server인지? interactive인가? | on-device vs cloud; distillation 필요성 |
 | **Quality bar** | 허용 error rate? human in the loop? 비대칭 비용? | metric 선택; calibration; fail-open vs fail-closed |
 | **Data** | label이 있나? cold start? privacy/consent? | supervised vs weak/self-sup; data engine |
-| **Cost** | GPU budget? 1k requests당 비용? | quantization, cascade, caching |
+| **Cost** | GPU budget? 요청 1,000건당 비용? | quantization, cascade, caching |
 | **Scope / horizon** | 지금의 MVP인가, 18개월 비전인가? | 얼마나 야심찬 모델을 제안할지 |
 
 그다음 **ML framing**을 명시적으로 말하세요. binary/multi-label classification인가, dense prediction(segmentation/matting)인가, retrieval인가, ranking인가, regression인가, generation인가? framing을 이름 붙이는 것 — 그리고 당신이 고른 *reduction* — 이 research-taste 신호입니다. *"저라면 moderation을 하나의 binary head가 아니라 policy별 threshold를 가진 multi-label detection으로 framing하겠습니다. policy들은 서로 독립적인 비용 trade-off를 갖기 때문입니다."*
@@ -70,13 +70,17 @@ flowchart TD
 가장 흔한 실패는 이들을 뒤섞는 것입니다. 세 tier를 분리하고 hypothesis로 연결하세요.
 
 <dl class="kv">
-<dt>Offline ML metrics</dt><dd>배포 전에 최적화/선택 기준으로 삼는 것. 편의가 아니라 <b>decision</b>에 맞아야 합니다. Classification: PR-AUC(불균형) &gt; ROC-AUC; recall vs precision 가중을 위한 F<sub>β</sub>; safety-critical한 것엔 calibration(ECE). Dense prediction: mIoU, boundary-F, matting엔 SAD/MSE. Retrieval/ranking: Recall@k, nDCG, MRR. Generation: task-specific + human/LLM-judge.</dd>
+<dt>Offline ML metrics</dt><dd>배포 전에 선택 기준으로 삼되 <b>decision과 operating point</b>에 맞춥니다. 불균형·희귀 positive에서는 PR curve와 precision/recall@threshold가 흔히 더 직접적이지만 ROC-AUC가 항상 열등한 것은 아닙니다. calibration은 ECE 하나만 쓰지 말고 reliability diagram, NLL/Brier score, class·slice별 calibration과 목표 threshold의 risk/coverage를 봅니다. Dense prediction은 mIoU·boundary-F·SAD/MSE, retrieval/ranking은 Recall@k·nDCG·MRR, generation은 task metric과 검증된 human/judge 평가를 조합합니다.</dd>
 <dt>Online business metrics</dt><dd>제품이 실제로 신경 쓰는 것: edit-completion rate, retention, CTR, report rate, task success. ship하기 전엔 이걸로 A/B를 못 하므로, offline <b>proxy</b>와 이 둘을 잇는 명시적 hypothesis가 필요합니다.</dd>
 <dt>Guardrail metrics</dt><dd>절대 regress하면 안 되는 제약: p99 latency, cost/req, crash rate, slice별 fairness, safety violation rate. primary metric에서 이겼는데 guardrail을 건드렸다면 그건 승리가 <b>아닙니다</b>.</dd>
 </dl>
 
 > [!EXAMPLE] research 신호로서의 metric 설계
 > metric을 이름만 대지 말고 — **gaming에 맞서 방어하세요**. "mIoU는 픽셀 전체에 평균을 내기 때문에, 모델이 머리카락 같은 얇은 구조를 다 뭉개면서도 점수는 잘 받을 수 있습니다. 그래서 저는 **boundary-F** metric과 hard-case slice(미세 디테일, 투명도)를 추가해서, 제가 최적화하는 숫자가 사용자가 보는 품질과 일치하게 만들겠습니다." 이것이 바로 research panel이 탐침하는 판단력입니다. [Evaluation Metrics](#/foundations/evaluation-metrics)를 보세요.
+
+## Step 3 — Architecture / MVP
+
+입력→전처리→모델→후처리→저장/응답의 **online path**와 수집→label→학습→registry→배포의 **offline path**를 분리해 그립니다. 이때 auth, cache, queue, human-review와 fallback도 모델 바깥의 일급 component입니다. 각 화살표에 대략적인 QPS·payload·latency budget을 붙이고 single point of failure와 backpressure 경계를 표시하세요.
 
 ## Steps 4–5 — Data and features
 
@@ -85,12 +89,12 @@ flowchart TD
 - **Sources & labels** — licensed vs scraped vs synthetic; 누가 label하는지, guideline 버전 관리, inter-annotator agreement; label이 부족할 때의 weak/self-supervised 신호.
 - **The data engine** — 샘플링된 production 데이터 → hard-case mining → active learning → re-label → retrain. 이 loop를 그리세요. 종종 진짜 제품 해자입니다.
 - **Splits & leakage** — row가 아니라 *entity*(user/scene/identity) 기준으로 split하세요. 아니면 metric이 거짓말을 합니다. drift가 있는 것엔 temporal split.
-- **PII / consent / retention** — opt-in 샘플링, retention window, purpose limitation. 시키지 않아도 이걸 언급하면 integrity 신호입니다(그리고 Apple류 조직에서는 필수 요건이에요).
+- **PII / consent / retention** — lawful basis/동의, purpose limitation, 최소 수집, retention·삭제, 접근 감사를 설계합니다. 구체적 요구는 관할 법·데이터 종류·조직 정책에 따라 확인하세요.
 - **Representation** — 어떤 encoder/feature; normalization; class imbalance 처리(resampling, focal/reweighted loss).
 
 ## Step 6 — Model & offline evaluation
 
-항상 단일 모델이 아니라 **ladder**를 제안하세요:
+단일 후보만 던지기보다, 비교 가능한 **model ladder**를 자주 제안할 수 있습니다:
 
 ```mermaid
 flowchart LR
@@ -116,16 +120,51 @@ flowchart LR
 | --- | --- | --- |
 | Synchronous online API | interactive edit, auth, search | p99 폭발, capacity outage |
 | Async queue / batch | video, bulk indexing, offline scoring | staleness, backlog |
-| On-device | privacy, offline, 초저 latency | 모델 크기 상한, fragmentation, hotfix 불가 |
+| On-device | privacy, offline, 초저 latency | 모델 크기·열/배터리·기기 파편화; hotfix/rollback이 서버보다 느림 |
 | Cascade (cheap → expensive) | 대규모에서의 cost 제어 | router/threshold의 calibration |
 
-**Online testing**은 big-bang이 아니라 단계적 rollout입니다: **shadow**(트래픽 미러링, 사용자 영향 없음) → **canary**(1%, guardrail 위반 시 auto-rollback) → **A/B**(online metric에 대한 검정력 있는 실험) → ramp. ramp 전에 **hypothesis, primary metric, guardrail, stopping rule**을 말하세요.
+**Online testing/rollout**은 가능한 경우 단계적으로 진행합니다: **shadow**(안전·privacy가 허용하는 트래픽 미러링) → **canary**(작은 비율, guardrail 위반 시 rollback) → **A/B**(간섭·윤리·검정력 조건을 만족할 때) → ramp. 모든 제품이 이 순서를 그대로 쓸 수 있는 것은 아니므로, 고위험·저빈도 시스템은 simulation, prospective validation, human gate가 더 중요할 수 있습니다. 시작 전 **hypothesis, primary metric, guardrail, stopping rule**을 정하세요.
+
+<details class="concept-code">
+<summary>개념 코드로 보기</summary>
+
+> 아래는 배포와 실험 판단을 분리한 Python식 **의사코드**입니다. 실제 통계 검정·배포 플랫폼 API가 아닙니다.
+
+```python
+def staged_rollout(candidate, baseline, preregistered_plan):
+    plan = validate_plan(preregistered_plan)  # 분석 단위·primary·guardrail·기간 고정
+    verify_artifact_hash(candidate)
+
+    if privacy_and_side_effect_policy.allows_shadow:
+        shadow_report = shadow(candidate, sampled_traffic(), actions_disabled=True)
+        require_no_operational_regression(shadow_report)
+
+    deployment = canary(candidate, traffic_fraction=0.01)
+    while deployment.in_canary_window():
+        health = monitor_guardrails(deployment)  # latency, error, safety, cost
+        if health.crosses_emergency_boundary:    # 사전에 정한 즉시 중단 경계
+            deployment.rollback()
+            return "rolled_back"
+
+    experiment = assign_stably_by_unit(          # request가 아니라 user 등 분석 단위
+        units=eligible_population(), variants=[baseline, candidate], seed=plan.seed
+    )
+    results = run_until_planned_horizon(experiment, plan)  # 매일 보고 임의 조기종료 금지
+    effect, interval = paired_or_cluster_aware_estimate(results, plan)
+    if plan.primary_wins(effect, interval) and plan.guardrails_pass(results):
+        return deployment.ramp_with_monitoring()
+    deployment.rollback()
+    return "no_ship"
+```
+
+</details>
 
 **Monitoring & failure modes** — junior가 건너뛰고 senior가 앞세우는 box:
 
 - *Operational:* QPS, error rate, latency, GPU util, cost.
+- *Capacity & queues:* arrival rate, queue depth/age, saturation, admission control, timeout, retry storm. 과부하에서는 무한 대기보다 backpressure·load shedding·degraded mode를 명시합니다.
 - *ML health:* prediction distribution, confidence drift, training 대비 **data/concept drift**, slice별 metric.
-- *Failure modes & degraded mode:* 나쁜 모델(registry로 rollback), 나쁜 input(validation, fallback UI), abuse(rate limit + policy 모델), outage(더 싼 baseline을 serve) 시 무슨 일이 일어나는가. 항상 **더 나쁘지만 안전한 fallback**을 가지세요.
+- *Failure modes & degraded mode:* 나쁜 모델(registry로 rollback), 나쁜 input(validation, fallback UI), abuse(rate limit + policy 모델), outage 시 무슨 일이 일어나는가. 가능하면 **기능은 줄지만 더 안전한 fallback**을 두고, 안전한 fallback이 없다면 fail closed·human escalation·명시적 outage를 선택합니다.
 
 <details class="qa"><summary>어떤 design 라운드에서도 돌릴, 재사용 가능한 design checklist를 설명해 주세요.</summary>
 <div class="qa-body">
@@ -134,15 +173,15 @@ flowchart LR
 
 **Deep:**
 
-1. **Clarify** — users, scale, latency, quality bar, cost, privacy, horizon. 가정을 적어둡니다.
-2. **ML framing + objective** — classification / dense / retrieval / ranking / generation; 내가 고른 reduction과 그 이유.
-3. **Metrics** — offline(decision에 맞고, gaming에 견딤) · online(business) · guardrail(latency, cost, fairness, safety). proxy→KPI hypothesis를 말합니다.
-4. **Architecture** — box diagram 하나; request path; offline vs online 분리.
-5. **Data** — sources, labeling + guideline, splits/leakage, PII/consent, imbalance, data-engine loop.
-6. **Features/representation** — encoder, preprocessing, normalization.
-7. **Model ladder** — baseline → ambitious → distilled; **ablation + failure analysis**.
-8. **Serving** — batch/online/on-device/cascade; 대략적 latency & cost 계산.
-9. **Online eval + monitoring + failure** — shadow→canary→A/B; drift; rollback; degraded mode.
+1. **Problem formulation** — users, scale, latency, cost, privacy를 묻고 classification/dense/retrieval/ranking/generation 중 objective와 reduction을 정합니다.
+2. **Metrics** — offline(decision/operating point) · online(KPI) · guardrail(latency, cost, fairness, safety)을 proxy hypothesis로 연결합니다.
+3. **Architecture / MVP** — online request path와 offline train/data path, non-ML baseline, auth·queue·fallback을 그립니다.
+4. **Data** — sources, labeling guideline, entity/temporal split, leakage, PII/consent, data-engine loop.
+5. **Features / representation** — encoder, preprocessing, normalization, train/serve parity.
+6. **Model + offline eval** — baseline → ambitious → distilled; ablation, uncertainty, failure slice.
+7. **Serving** — batch/online/on-device/cascade; latency·capacity·cost와 backpressure.
+8. **Online testing** — shadow→canary→A/B; hypothesis, power, stopping rule, rollback.
+9. **Scale / monitor / update** — drift, queue·SLO, slice metric, retrain trigger, degraded mode와 governance.
 
 그다음: *"어느 box를 깊게 파볼까요?"*
 </div></details>
@@ -152,7 +191,7 @@ flowchart LR
 
 **Short:** 8분 clarify + metric, 8분 architecture, ~20분 data+model(ML 심장부), ~8분 serving+monitoring, 그리고 내내 trade-off를 내레이션합니다.
 
-**Deep:** 침묵은 보통 "계속 몰고 가라, 나는 구조를 평가 중이다"라는 뜻입니다. 다시 하기 어려운 부분 — 문제 framing과 metric — 을 앞에 배치합니다. objective가 틀리면 하류 전체가 무효가 되니까요. "데이터에 ~2분 더 쓰고 모델로 넘어가겠습니다"처럼 소리 내어 timebox를 걸어서 면접관이 방향을 다시 잡을 수 있게 합니다. 시간이 길어지면 serving을 pattern table로 압축하고 회수한 시간을 ablation에 씁니다. research role에서는 그게 제 신호가 있는 곳이니까요.
+**Deep:** 면접관의 침묵만으로 의도를 추측하지 말고, "Would you like me to go deeper here or continue end-to-end?"처럼 확인하세요. 다시 하기 어려운 problem framing과 metric을 앞에 배치하고, "데이터에 ~2분 더 쓰고 모델로 넘어가겠습니다"처럼 timebox를 소리 내어 공유합니다. 시간이 부족하면 역할과 질문에 맞춰 serving 또는 modeling detail을 압축합니다.
 </div></details>
 
 ### Follow-ups they'll push after your first answer
@@ -179,4 +218,4 @@ flowchart LR
 > [!TIP] 한 문장 마무리
 > "저라면 baseline을 shadow test 뒤에 ship하고, 야심찬 모델이 hard-case slice *와* guardrail에서 그걸 이긴다는 걸 증명하고, latency budget에 맞게 distill한 다음, slice별 monitoring이 다음에 무엇을 고칠지 알려주게 하겠습니다." 이 문장 하나에 아홉 단계가 다 들어 있습니다.
 
-**Related:** [Worked Case Studies](#/system-design/case-studies) · [Designing LLM/Agent Systems](#/system-design/llm-systems) · [Evaluation Metrics](#/foundations/evaluation-metrics) · [Mixed Precision & Efficiency](#/foundations/mixed-precision-efficiency) · [Distributed Training](#/foundations/distributed-training) · [Experiment Design & Ablations](#/research/experiment-design) · [The RS/AS Pipeline](#/process/pipeline)
+**Related:** [이력서 기반 단계별 예시 답변](#/resume/interview-stage-answers) · [Worked Case Studies](#/system-design/case-studies) · [Designing LLM/Agent Systems](#/system-design/llm-systems) · [Evaluation Metrics](#/foundations/evaluation-metrics) · [Mixed Precision & Efficiency](#/foundations/mixed-precision-efficiency) · [Distributed Training](#/foundations/distributed-training) · [Experiment Design & Ablations](#/research/experiment-design) · [The RS/AS Pipeline](#/process/pipeline)

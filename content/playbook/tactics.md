@@ -3,7 +3,7 @@
 <div class="tag-row"><span class="tag">pre-interview routine</span><span class="tag">energy & pacing</span><span class="tag">bombed-round recovery</span><span class="tag">note-taking</span><span class="tag">nerves</span><span class="tag">24h checklist</span></div>
 
 > [!TIP] The mindset that wins the day
-> A full RS/AS onsite is **4–6 rounds in one day** — a stamina event, not a sprint. Two truths follow: (1) rounds are scored *independently*, so a bombed round doesn't sink the loop unless you let it bleed into the next one; (2) your job by round 5 is to protect energy, not to be maximally clever. Prepare the routine so willpower isn't spent on logistics.
+> A full loop may consist of several conversations in succession, so it demands energy management and context switching as well as knowledge. The number of rounds and the decision process vary by application, but the principle of not carrying your self-assessment of a completed round into the next one remains useful. Prepare food, rest, travel, and connection routines around the actual schedule.
 
 ## The 24-hours-before checklist
 
@@ -41,9 +41,9 @@ A 5-round day has a predictable fatigue curve. Manage it deliberately.
 
 | Phase | Rounds | Risk | Tactic |
 | --- | --- | --- | --- |
-| **Opening** | 1–2 | over-caffeinated, rushing | slow down 10%; nail fundamentals cleanly |
+| **Opening** | first segment | over-caffeinated, rushing | go slightly slower than usual; execute the fundamentals cleanly |
 | **The dip** | midday / after lunch | energy crash, sloppiness | protein-light lunch; a real walk between rounds |
-| **The grind** | 4–5 | mental fatigue, short answers | lean harder on your *structure* — frameworks carry you when creativity flags |
+| **The grind** | later segment | mental fatigue, short answers | lean harder on your *structure* — frameworks carry you when creativity flags |
 | **The close** | last round + Q&A | relief-driven complacency | it still counts; ask your best questions with genuine energy |
 
 <dl class="kv">
@@ -54,7 +54,7 @@ A 5-round day has a predictable fatigue curve. Manage it deliberately.
 
 ## Recovering from a bombed round
 
-The single most valuable day-of skill. Since rounds are scored independently, **the only real damage a bad round does is the morale it drains into the next one.** Contain it.
+One of the most valuable day-of skills. You cannot know how feedback from individual rounds will be combined, but ruminating on an answer that is already over also costs focus in the next conversation. Redirect attention to the next controllable action.
 
 ```mermaid
 flowchart TB
@@ -65,8 +65,8 @@ flowchart TB
 ```
 
 - **Finish a weak round with grace, not apology.** If you didn't fully solve it, close cleanly: "I didn't get all the way there; my remaining plan would be X." Composure recovers signal; visible collapse loses more.
-- **Never editorialize your performance** to the interviewer or recruiter ("I think I bombed that"). You're often a worse judge than you feel, and it primes a negative read.
-- **One round rarely decides it.** Panels weigh the whole loop; a strong recovery after a stumble can *itself* be a positive signal about resilience.
+- **Do not share an improvised self-assessment.** Telling the interviewer or recruiter "I think I bombed that round" introduces an unverified negative interpretation first.
+- **Do not guess the decision process.** A round's weight varies by role and rubric. Stop trying to calculate the outcome and focus on the signal you can demonstrate in the next round.
 
 > [!EXAMPLE] The 90-second reset script
 > Between rounds, silently: "That's done and I can't change it. This next round is a fresh interviewer with zero context. I'll clarify, structure, and drive." Then a few slow breaths. Re-enter as if it's round 1.
@@ -107,14 +107,14 @@ Nerves are physiological; manage the body and the mind follows.
 > [!TIP] The physical tells to control
 > Speaking too fast, breath-holding, and a shrinking voice all spike under nerves. Consciously slow 10%, breathe between sentences, and project slightly. These are learnable in a few mock rounds.
 
-## If it's an in-person onsite (the 2026 return)
+## If it is an in-person onsite
 
-Several orgs have brought back in-person onsites. The stamina logic is the same, but a few physical variables change:
+If the schedule is confirmed as in person, add travel, access, and physical-whiteboard variables to the same stamina principles.
 
 - **Travel with margin.** Arrive the night before if flying; jet-lag on top of a 5-round day is brutal. Scout the building/route so the morning isn't a scramble.
 - **Bring the physical kit:** ID/badge as instructed, a printed copy of your résumé, a notebook and pen, water, a snack, a charger. Don't assume a whiteboard marker works — test it.
 - **Whiteboarding is back.** Practice writing code and drawing system diagrams *standing up* on a real board; it's a different motor skill than typing. Write large, leave whitespace, talk while you write.
-- **Use the walk-between-rooms** as your reset window; the escort chat still counts as signal, so stay warm.
+- <strong>Use the walk between rooms</strong> as your reset window; the escort chat still counts as signal, so stay warm.
 
 ## After each round / end of day
 
@@ -146,11 +146,11 @@ Several orgs have brought back in-person onsites. The stamina logic is the same,
 | --- | --- |
 | 24h before | confirm logistics, skim stories, 1–2 warm-ups, test setup, **sleep** |
 | Day-of AM | breakfast, light movement, warm up voice + hands, arrive early |
-| Pacing | slow 10% early; walk between rounds; frameworks carry the late rounds |
+| Pacing | go slightly slower early; reset between rounds; rely on frameworks later |
 | Between rounds | reset — don't replay the last one |
-| Bombed round | name it, 90-s reset, "independent scores," re-enter with structure |
-| Notes | components + names + their questions; never scripted reads |
+| Bombed round | name it, reset briefly, and re-enter with structure without guessing the outcome |
+| Notes | components + names + their questions; do not read long scripts |
 | Nerves | box-breathe; "excited" not "nervous"; structure beats blanking |
-| Never say | "I think I bombed that" to the interviewer or recruiter |
+| Avoid | improvising "I think I bombed that round" to the interviewer or recruiter |
 
 **Related:** [Communication & Whiteboarding](#/playbook/communication) · [Remote Interview Setup](#/playbook/remote-setup) · [Questions to Ask Them](#/playbook/questions-to-ask) · [STAR & The Story Bank](#/behavioral/star) · [The RS/AS Pipeline](#/process/pipeline) · [Common Mistakes & Red Flags](#/playbook/mistakes)

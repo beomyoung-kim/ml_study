@@ -1,22 +1,42 @@
 <div class="hero">
   <div class="eyebrow">Research &amp; Applied Scientist · Computer Vision · VLMs · Agents</div>
   <h1>The ML Interview Codex</h1>
-  <p class="sub">A comprehensive, continuously-updated field guide for landing a research or applied-scientist role at a top AI lab — from coding and ML foundations to VLMs, agents, system design, the research job talk, and CV-specific deep-dives. Current to <b>July 2026</b>.</p>
+  <p class="sub">A continuously revised field guide for preparing for research or applied-scientist interviews while studying ML — from coding and ML foundations through CV, LLMs, VLMs, system design, the research job talk, and defense of your own resume. Last comprehensively reviewed on <b>July 21, 2026</b>.</p>
   <div class="stat-row">
-    <div class="stat"><div class="n">13</div><div class="l">Parts</div></div>
-    <div class="stat"><div class="n">70+</div><div class="l">Chapters</div></div>
-    <div class="stat"><div class="n">2026</div><div class="l">Frontier-current</div></div>
+    <div class="stat"><div class="n">15</div><div class="l">Parts</div></div>
+    <div class="stat"><div class="n">105</div><div class="l">Chapters</div></div>
+    <div class="stat"><div class="n">2026.07</div><div class="l">Last reviewed</div></div>
     <div class="stat"><div class="n">∞</div><div class="l">Living document</div></div>
   </div>
 </div>
 
-> [!TIP] New here? Read **[How to Use This Book](#/start/how-to-use)** first, then skim **[The 2026 Landscape](#/start/landscape-2026)** to calibrate what interviewers now expect. If you have a loop next week, jump to the **[8-Week Prep Plan](#/start/prep-plan)** and triage.
+> [!TIP] New here? Read [How to Use This Book](#/start/how-to-use) first, then skim [The 2026 Landscape](#/start/landscape-2026) to calibrate expectations. Even if your loop is next week, use the two-week compressed path in the [Prep Plan](#/start/prep-plan).
 
 ## What this book is
 
-Most interview resources are either (a) coding-only grind lists or (b) generic ML-101 flashcards written for 2021. This one is built for the **research/applied scientist** track in 2026 — where you're expected to reason about reasoning models, RLVR, native multimodality, and agentic tool use *and* still whiteboard non-max suppression cleanly, present your own research convincingly, and pass a behavioral loop.
+This book centers the **research/applied scientist** track. You need to explain current reasoning, alignment, and agent systems *while still* implementing non-max suppression cleanly on a whiteboard, presenting your research persuasively, and passing a behavioral loop. Without an interview on the calendar, you can also read it in prerequisite order as a structured ML review.
 
-It's organized as a **book you can read front-to-back** or **dip into by topic**. Every chapter is self-contained, heavy on diagrams and worked examples, and honest about what's a verifiable fact versus a defensible opinion.
+It supports both a **front-to-back learning path** and an **interview path that targets only weak areas**. Each chapter stands alone, but the table of contents puts prerequisites first where possible. For fast-moving models, benchmarks, and hiring procedures, check the review date and source, and reconfirm the actual loop with your recruiter.
+
+## Three recommended paths
+
+| Goal | Recommended order | Deliverables |
+| --- | --- | --- |
+| **Interview in 2–8 weeks** | Process → execution playbook → weak technical axis → research/behavioral → personal deep-dives | mock log, story bank, two- and ten-minute answers per project |
+| **Systematic ML review** | Coding → ML/DL foundations → from-scratch work → CV → LLM → VLM → system design | hand-derived equations, reimplementations, failure-mode notes by concept |
+| **Urgent resume defense** | Resume map → stage-by-stage answers → project deep-dives → predicted questions → job talk/behavioral | 30- and 90-second answers, claim–evidence table, disclosure boundary, I-vs-we answers |
+
+## The book's overall flow
+
+```mermaid
+flowchart LR
+  A["① Map · diagnose<br/>start · process"] --> B["② Shared foundation<br/>coding · ML/DL · implementation"]
+  B --> C["③ Specialize<br/>CV · LLM · VLM · systems"]
+  C --> D["④ Evidence · delivery<br/>research · behavioral"]
+  D --> E["⑤ Personalize · execute<br/>resume packet · day-of · offer"]
+```
+
+The Resources part is a lookup reference, not a linear learning step. The personal resume packet is candidate-specific, so readers interested only in general study can skip it.
 
 ## The four axes of a research-scientist loop
 
@@ -58,7 +78,7 @@ It's organized as a **book you can read front-to-back** or **dip into by topic**
     <text x="626" y="140" text-anchor="middle" font-size="11" fill="#98a3b2">STAR stories</text>
   </g>
 </svg>
-<figcaption>The four evaluation axes. Research roles weight the right two far more than a standard MLE loop does.</figcaption>
+<figcaption>Four evaluation axes. Their weights vary by role and team, so confirm the actual loop with the recruiter.</figcaption>
 </figure>
 
 ## Start reading
@@ -69,8 +89,8 @@ It's organized as a **book you can read front-to-back** or **dip into by topic**
   <a class="card" href="#/foundations/optimization"><div class="card-emoji">📐</div><div class="card-title">DL Foundations</div><div class="card-desc">Optimization, normalization, architectures — with interactive visualizations.</div></a>
   <a class="card" href="#/llm/reasoning"><div class="card-emoji">🤖</div><div class="card-title">Reasoning &amp; Agents</div><div class="card-desc">Test-time compute, RLVR, tool use, visual agents — the 2026 hot zone.</div></a>
   <a class="card" href="#/system-design/framework"><div class="card-emoji">🏗️</div><div class="card-title">ML System Design</div><div class="card-desc">A repeatable framework plus worked case studies for research/applied roles.</div></a>
-  <a class="card" href="#/resume/predicted-questions"><div class="card-emoji">🎯</div><div class="card-title">Your CV Q&amp;A</div><div class="card-desc">Predicted questions from Beomyoung's CV, with multiple strong model answers.</div></a>
+  <a class="card" href="#/resume/interview-stage-answers"><div class="card-emoji">🎯</div><div class="card-title">Optional: Personalized Answers by Stage</div><div class="card-desc">Click-to-reveal drafts grounded in the current resume, from recruiter screens through job talks and behavioral rounds. Verify facts and disclosure boundaries before use.</div></a>
 </div>
 
 > [!NOTE] A living document
-> Content is revised continuously as models, benchmarks, and hiring bars move. Each part has a "last-reviewed" note, and the [Changelog](#/resources/changelog) tracks what's new. Found something stale or wrong? It's one Markdown file — fix it and push.
+> Models, benchmarks, and hiring procedures keep moving. The comprehensive review date appears at the top of this page, and the [Changelog](#/resources/changelog) records major updates. Before using a number or company-specific process for a real decision, recheck the primary source's date and evaluation protocol.

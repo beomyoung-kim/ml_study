@@ -1,7 +1,7 @@
 # The Core Patterns
 
 > [!TIP] The thesis
-> You don't memorize problems — you internalize **~15 reusable patterns**, drill 5–10 problems each, and then recognize the pattern behind an unseen problem in the first minute. This is the NeetCode/Grokking bet, and it holds: almost every interview question is a known pattern in disguise. This chapter is the **hub** — start here, then drill each linked chapter.
+> Do not memorize problems. Internalize **frequently reusable patterns**, apply each one across several problems, and practice classifying the structure of an unseen problem quickly. Many coding-interview questions combine or vary these patterns, but check input constraints, invariants, and complexity before forcing a fit. This chapter is the **hub**—start here, then drill each linked chapter.
 
 The skill under test is *recognition*. Given a problem, you want a fast map from a surface **cue** ("input is sorted", "top-k", "shortest path in an unweighted grid") to the **pattern** that solves it. Below is that lookup table, then a card grid to every pattern chapter, then a recommended drill order.
 
@@ -26,6 +26,7 @@ Read the cue in the problem statement; jump to the pattern. Adapted from the sea
 | **Dynamic connectivity**, "are these merged?", count components | Union-Find (DSU) | [Union-Find](#/coding/union-find) |
 | Tree traversal, **BST** property, LCA, path sums | DFS/BFS on trees | [Trees & BSTs](#/coding/trees-bst) |
 | **All permutations / subsets / combinations** | Backtracking | [Trees & BSTs](#/coding/trees-bst) |
+| Reverse / merge / remove in a **linked list** | Pointer rewiring + dummy sentinel | [Two Pointers](#/coding/two-pointers-sliding-window) |
 | **Count ways / min-max cost / can-you-reach**, overlapping subproblems | Dynamic programming | [Dynamic Programming](#/coding/dynamic-programming) |
 | **Overlapping / merge intervals**, meeting rooms | Sort + sweep | [Greedy & Intervals](#/coding/greedy-intervals) |
 | **Locally optimal → globally optimal**, "min number of…" | Greedy | [Greedy & Intervals](#/coding/greedy-intervals) |
@@ -39,7 +40,7 @@ Read the cue in the problem statement; jump to the pattern. Adapted from the sea
 
 <div class="card-grid">
 <a class="card" href="#/coding/arrays-strings"><div class="card-emoji">🔢</div><div class="card-title">Arrays & Strings</div><div class="card-desc">In-place manipulation, prefix products, reversal tricks. The warm-up and the base of everything.</div></a>
-<a class="card" href="#/coding/two-pointers-sliding-window"><div class="card-emoji">↔️</div><div class="card-title">Two Pointers & Sliding Window</div><div class="card-desc">Converge from both ends, or expand/shrink a window. Turns O(N²) scans into O(N).</div></a>
+<a class="card" href="#/coding/two-pointers-sliding-window"><div class="card-emoji">↔️</div><div class="card-title">Two Pointers, Window & Linked List</div><div class="card-desc">Converge from both ends, expand/shrink a window, or use fast/slow pointers and rewiring. Solve in O(N) through invariants.</div></a>
 <a class="card" href="#/coding/hashing"><div class="card-emoji">🗂️</div><div class="card-title">Hashing</div><div class="card-desc">Buy O(1) lookup to kill a nested loop. Complements, frequencies, prefix-sum counts.</div></a>
 <a class="card" href="#/coding/stack-queue"><div class="card-emoji">🥞</div><div class="card-title">Stacks & Queues</div><div class="card-desc">LIFO for nesting and nearest-greater; monotonic stack/deque for spans and window maxima.</div></a>
 <a class="card" href="#/coding/binary-search"><div class="card-emoji">🎯</div><div class="card-title">Binary Search</div><div class="card-desc">Halve a sorted array — or binary-search the answer on any monotone predicate.</div></a>
@@ -78,9 +79,9 @@ Each topic unlocks the next (the NeetCode "roadmap-as-dependency-graph" idea). D
 
 | Phase | Patterns | Why this order |
 | --- | --- | --- |
-| 1 · Foundations | [Arrays & Strings](#/coding/arrays-strings) → [Two Pointers & Sliding Window](#/coding/two-pointers-sliding-window) → [Hashing](#/coding/hashing) | Highest-frequency entry patterns; rebuild the reflex. |
+| 1 · Foundations | [Arrays & Strings](#/coding/arrays-strings) → [Two Pointers, Sliding Window & Linked List](#/coding/two-pointers-sliding-window) → [Hashing](#/coding/hashing) | Highest-frequency entry patterns; establish array invariants and pointer manipulation first. |
 | 2 · Linear structures | [Stacks & Queues](#/coding/stack-queue) → [Binary Search](#/coding/binary-search) → [Heaps](#/coding/heap-priority-queue) | Core data structures; monotonic stack and "search the answer" show up everywhere. |
-| 3 · Non-linear | [Trees & BSTs](#/coding/trees-bst) → [Graphs (BFS/DFS)](#/coding/graphs-bfs-dfs) → [Union-Find](#/coding/union-find) | Recursion first on trees, then generalize to graphs. |
+| 3 · Non-linear | [Trees, BSTs & Backtracking](#/coding/trees-bst) → [Graphs (BFS/DFS)](#/coding/graphs-bfs-dfs) → [Union-Find](#/coding/union-find) | Establish recursion and undo steps on search trees, then generalize to graphs. |
 | 4 · Optimization | [Dynamic Programming](#/coding/dynamic-programming) → [Greedy & Intervals](#/coding/greedy-intervals) | Hardest; needs the earlier structures as building blocks. |
 
 > [!TIP] Before you start drilling
@@ -101,6 +102,8 @@ Each topic unlocks the next (the NeetCode "roadmap-as-dependency-graph" idea). D
 | shortest path, unweighted | BFS | O(V+E) |
 | prerequisites / ordering | topological sort | O(V+E) |
 | dynamic connectivity | union-find | ~O(α(N)) |
+| reverse/merge linked list | pointer rewiring + dummy | O(N) |
+| subsets/permutations | backtracking | O(N2^N) / O(N·N!) |
 | count ways / optimal cost | dynamic programming | O(states×transition) |
 | merge/overlap intervals | sort + sweep | O(N log N) |
 

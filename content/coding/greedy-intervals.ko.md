@@ -91,6 +91,7 @@ Greedy는 빠르지만(보통 정렬 한 번 + 순회 한 번) greedy-choice 속
 {"func": "min_meeting_rooms", "starter": "import heapq\n\ndef min_meeting_rooms(intervals: list[list[int]]) -> int:\n    # process by start; a min-heap of end-times tracks rooms in use\n    pass", "tests": [{"args": [[[0, 30], [5, 10], [15, 20]]], "expect": 2}, {"args": [[[7, 10], [2, 4]]], "expect": 1}, {"args": [[[1, 5], [8, 9], [8, 9]]], "expect": 2}, {"args": [[[13, 15], [1, 13]]], "expect": 1}], "solution": "import heapq\n\ndef min_meeting_rooms(intervals):\n    intervals.sort(key=lambda iv: iv[0])\n    ends = []\n    for start, end in intervals:\n        if ends and ends[0] <= start:\n            heapq.heappop(ends)\n        heapq.heappush(ends, end)\n    return len(ends)"}
 </script>
 </div>
+
 `O(N log N)`. 대안: 정렬된 start/end 이벤트에 대한 sweep-line, `+1`/`−1`, 최대값 추적 — 같은 복잡도, heap 없음. [Heaps](#/coding/heap-priority-queue)로 연결됩니다.
 
 ### 5. Jump Game <span class="badge badge-med">Medium</span> · [LeetCode ↗](https://leetcode.com/problems/jump-game/) — greedy 도달 가능성

@@ -2,7 +2,10 @@
 
 <div class="tag-row"><span class="tag">DDP</span><span class="tag">FSDP2</span><span class="tag">ZeRO</span><span class="tag">tensor/pipeline parallel</span><span class="tag">context parallel</span><span class="tag">3D parallelism</span></div>
 
-> [!TIP] Say this first
+> [!NOTE] This chapter is advanced—you may skip it for now
+> **One-line intuition:** when a model is too large or a dataset is too extensive for one GPU, distribute the **work across several GPUs through parallelism**. Every strategy makes the same trade-off: **saving memory increases communication between GPUs.** The strategies below differ in what they divide. If you are just starting out, it is enough to study through [Optimization](#/foundations/optimization) and return to this chapter later.
+
+> [!TIP] Interview one-liner
 > The core sentence: *"Every parallelism strategy trades memory for communication — I pick the cheapest strategy that makes the model fit and keeps the GPUs busy."* Interviewers care less about the largest cluster you've touched than about whether you can map a symptom (OOM, hang, low MFU) to the right lever — and be honest about scale.
 
 ## The parallelism zoo
@@ -23,7 +26,7 @@ flowchart TB
 
 | Strategy | Splits | Communication | Use when |
 | --- | --- | --- | --- |
-| **DDP** | data (model replicated) | grad all-reduce (once/step) | model fits on one GPU |
+| **DDP** | data (model replicated) | all-reduce each gradient bucket during backward | model fits on one GPU |
 | **FSDP / ZeRO-3** | data + params/grads/opt state | all-gather + reduce-scatter | model doesn't fit |
 | **Tensor (TP)** | matrices within a layer | all-reduce per layer | huge layers, intra-node (NVLink) |
 | **Pipeline (PP)** | layers into stages | activations across stages | very deep, cross-node |
@@ -34,13 +37,38 @@ Real large-scale runs compose these into **3D (or 4D) parallelism**: e.g., TP wi
 
 ## Data parallel & DDP
 
-Each rank runs forward/backward on a different micro-batch, then **all-reduces (averages) gradients** so every replica applies the identical update — effectively one large-batch step:
+Each rank runs forward/backward on a different micro-batch, then **all-reduces and averages gradients** so every replica applies the identical update—effectively one large-batch step:
 
 $$
 B_{\text{eff}}=B_{\text{local}}\times N_{\text{GPU}}\times N_{\text{accum}}
 $$
 
-Ring all-reduce is bandwidth-optimal and overlaps with backward via **gradient bucketing** (reduce early-computed grads while later layers still compute). Classic bugs: forgetting `DistributedSampler` (duplicated data), not scaling LR to the effective batch, or freezing params that then miss the reduce.
+Ring all-reduce is a representative bandwidth-efficient implementation for large messages, and **gradient bucketing** can overlap it with backward: once the gradients for an earlier bucket are ready, its collective can run alongside the remaining backward computation. Classic bugs include forgetting `DistributedSampler` and duplicating data, failing to revalidate LR and warmup after changing the global batch, or allowing rank-dependent control flow to misalign collective ordering. Linear LR scaling after a batch-size increase is a starting heuristic, not a law that must always be applied.
+
+<details class="concept-code"><summary>View as concept code</summary>
+
+> **PyTorch-style pseudocode—DDP + gradient accumulation**
+
+```python
+optimizer.zero_grad(set_to_none=True)
+for epoch in range(num_epochs):
+    sampler.set_epoch(epoch)                    # shuffle a different shard on every rank
+    assert len(loader) % accum_steps == 0       # this example excludes a partial window
+    for micro_step, (x, y) in enumerate(loader):
+        last = (micro_step + 1) % accum_steps == 0
+        sync_context = nullcontext() if last else ddp_model.no_sync()
+
+        with sync_context:                      # suppress all-reduce on intermediate backward passes
+            logits = ddp_model(x)               # rank-local batch
+            loss = criterion(logits, y) / accum_steps
+            loss.backward()
+
+        if last:                                # every rank must enter the same branch
+            optimizer.step()
+            optimizer.zero_grad(set_to_none=True)
+```
+
+</details>
 
 <details class="qa"><summary>How does DDP overlap communication with computation, and why does that matter?</summary>
 <div class="qa-body">
@@ -61,7 +89,7 @@ Ring all-reduce is bandwidth-optimal and overlaps with backward via **gradient b
 | 2 | + gradients | ↓↓ | ++ |
 | 3 | + parameters | ~1/N | all-gather each layer |
 
-PyTorch **FSDP** implements ZeRO-style sharding. `FULL_SHARD` ≈ ZeRO-3; `SHARD_GRAD_OP` ≈ ZeRO-2. **FSDP2** (the DTensor-based rewrite, `fully_shard`) replaced FSDP1's FlatParameter: per-parameter `DTensor` sharding gives more deterministic memory, cleaner composability with TP/`torch.compile`, and simpler distributed checkpointing. Key knob: `reshard_after_forward` — `True` frees params after forward (less memory, re-gather in backward → more comm); `False` keeps them (ZeRO-2-like). A 2D `DeviceMesh` enables **hybrid shard** (shard within a node, replicate across nodes).
+PyTorch **FSDP** implements ZeRO-style sharding. FSDP1's `FULL_SHARD` is conceptually close to ZeRO-3, and `SHARD_GRAD_OP` to ZeRO-2. **FSDP2**, the DTensor-based `fully_shard`, uses `DTensor` shards that preserve the original parameter structure instead of FlatParameter, making it easier to compose with TP, `torch.compile`, and Distributed Checkpoint. With the key knob `reshard_after_forward=True`, unsharded parameters are released after the forward pass and all-gathered again before backward, saving memory at the cost of more communication. `False` retains unsharded parameters through backward, avoiding the second gather but increasing peak memory. Defaults also differ between root and non-root modules, so do not describe all of FSDP2 with a single global True or False. A 2D `DeviceMesh` supports **hybrid sharding**, replicating on one axis and sharding on the other.
 
 > [!NOTE] Memory is bought with communication
 > If the model fits on one GPU, **DDP is usually faster** than FSDP. Only shard when you must. Then reach for tensor/pipeline parallel when even sharded DP is communication-bound or a single layer is too big.
@@ -71,35 +99,35 @@ PyTorch **FSDP** implements ZeRO-style sharding. `FULL_SHARD` ≈ ZeRO-3; `SHARD
 
 **Short:** ZeRO-3/`FULL_SHARD` re-gathers parameters every layer, so it's communication-bound; for models that already fit, DDP (or ZeRO-1/2) is faster.
 
-**Deep:** the memory saving is real (~1/N per rank) but every forward and backward layer now needs an all-gather of that layer's weights, plus a reduce-scatter of grads. On slow inter-node links this dominates step time. The decision tree: does it fit under DDP? → DDP. Fits under ZeRO-1/2 (shard opt/grads only)? → do that. Only params don't fit? → ZeRO-3, and consider TP so the gathers stay intra-node. **Follow-up:** *CPU/NVMe offload?* — ZeRO-Infinity / FSDP offload cuts memory further but is bottlenecked by PCIe bandwidth.
+**Deep:** Persistent sharded model state ideally falls toward roughly $1/N$ per rank, but total peak memory is not exactly $1/N$ because the active layer's unsharded parameters, activations, and communication buffers still occupy memory. Each parameter group is all-gathered before forward and its gradient is reduce-scattered; if it is resharded after forward, it must be gathered again before backward. On slow inter-node links, this can dominate step time. Decision tree: does it fit under DDP? → DDP. Do sharding only optimizer state and gradients suffice? → a ZeRO-1/2-style method. Must parameters also be sharded? → ZeRO-3/FSDP, then compare topology-aware hybrid sharding and TP. **Follow-up:** *CPU/NVMe offload?* It saves more memory but can become bottlenecked by PCIe or storage bandwidth and by how well transfers overlap compute.
 </div></details>
 
 ## Tensor, pipeline, sequence & context parallelism
 
 <dl class="kv">
 <dt>Tensor parallel (TP)</dt><dd>Split weight matrices across GPUs (column/row partition); needs an all-reduce per layer, so keep it <b>intra-node</b> over NVLink. Megatron-style.</dd>
-<dt>Pipeline parallel (PP)</dt><dd>Assign layer ranges to stages; stream micro-batches through. Introduces a <b>bubble</b> (idle time at fill/drain) ≈ $(P-1)/(M+P-1)$ for $P$ stages, $M$ micro-batches — so use many micro-batches and interleaved schedules (1F1B).</dd>
+<dt>Pipeline parallel (PP)</dt><dd>Assign layer ranges to stages and stream micro-batches through them. For a simple non-interleaved schedule, the fill/drain <b>bubble</b> is roughly $(P-1)/(M+P-1)$ for $P$ stages and $M$ micro-batches, so increase the micro-batch count and use schedules such as 1F1B or interleaved 1F1B.</dd>
 <dt>Sequence parallel (SP)</dt><dd>Shards only the LayerNorm/Dropout activations along the sequence dim, complementing TP to cut activation memory.</dd>
 <dt>Context parallel (CP)</dt><dd>Shards <b>all</b> activations along the sequence dimension for long-context training; ring/all-gather attention exchanges K/V across ranks. This is the long-context enabler.</dd>
 </dl>
 
-> [!IMPORTANT] SP vs CP (a 2026 favorite)
-> **Sequence parallelism** only shards the *norm/dropout* activations (an add-on to tensor parallelism). **Context parallelism** shards *every* activation along the sequence axis so no single GPU holds the full sequence — this is what makes 100K–1M-token training feasible. Megatron-Core and long-context training stacks lean on CP. *(verifiable mechanism; confirm exact APIs against current Megatron-Core docs.)*
+> [!IMPORTANT] SP vs CP (a common 2026 topic)
+> In the Megatron family, **sequence parallelism** is a TP add-on that shards the *norm/dropout-region activations* that TP would otherwise replicate. **Context parallelism** keeps inputs and layer activations partitioned along the sequence axis and exchanges K/V or related state only where attention needs global context. It can therefore reduce per-rank activation memory with the CP degree, but the maximum usable context still depends on attention kernels, communication, and total GPU memory. Check the documentation for the Megatron-Core version you use for supported models and communication modes such as `p2p`, `all_gather`, and `a2a`.
 
 <details class="qa"><summary>How would you train a 1M-token-context model that won't fit the sequence on one GPU?</summary>
 <div class="qa-body">
 
 **Short:** use **context parallelism** — shard activations along the sequence dimension across GPUs and compute attention with a ring/all-gather over K/V — combined with FSDP for weights and activation checkpointing.
 
-**Deep:** activation memory scales with sequence length, so even a small model can't hold a 1M-token sequence. CP splits the sequence across the CP group; each rank owns a chunk of queries and exchanges keys/values (ring attention) so every query still attends globally, at $O(n)$ memory per rank. Layer on FSDP (weights), TP if layers are large, and activation checkpointing (recompute in backward). Sequence parallelism additionally shards the norm/dropout activations that TP leaves replicated. **Follow-up:** *Cost?* — extra K/V communication per attention layer; overlap it with compute and keep the CP group on fast links.
+**Deep:** Stored Transformer activations generally grow linearly with sequence length, while a naively materialized attention-score matrix grows quadratically. CP splits the sequence across a CP group. Each rank owns a query chunk and exchanges K/V through a ring, all-gather, or all-to-all to compute global attention. Combined with Flash or online attention, it avoids storing the score matrix while reducing sequence-shaped activation memory per rank by roughly the CP degree. Add FSDP for weights, TP for very large layers, and activation checkpointing to recompute during backward. **Follow-up:** *Cost?* Every attention layer adds K/V-related communication, and overlap potential depends on the communication pattern and topology.
 </div></details>
 
 ## Expert parallelism & MoE <span class="badge badge-2026">2026</span>
 
-Since nearly every 2025–2026 frontier model is Mixture-of-Experts, **expert parallelism (EP)** is now a first-class dimension. Each token is routed (top-k) to a few experts; experts are distributed across GPUs, so the forward pass needs an **all-to-all** to send tokens to their experts and another to gather results.
+In Mixture-of-Experts models, **expert parallelism (EP)** is an important parallelism dimension. Each token is routed top-k to a few experts; because experts are distributed across GPUs, the forward pass needs one **all-to-all** to send tokens to their experts and another to collect the results.
 
 <dl class="kv">
-<dt>Load balancing</dt><dd>Uneven routing overloads some experts and starves others → stragglers. Auxiliary load-balancing loss (or aux-loss-free bias tricks) + <b>capacity factor</b> (drop/pad overflow tokens) keep it even.</dd>
+<dt>Load balancing</dt><dd>Uneven routing overloads some experts and starves others, creating stragglers. Use an auxiliary load-balancing loss or an auxiliary-loss-free bias method. Depending on the implementation, a <b>capacity factor</b> drops or pads overflow tokens, while dropless routing accepts the load.</dd>
 <dt>All-to-all cost</dt><dd>The routing all-to-all is the MoE-specific bottleneck; keep the EP group on fast intra-node links and overlap dispatch with compute.</dd>
 <dt>Composition</dt><dd>EP multiplies with DP/TP/PP — a 4D layout. <b>Megatron-Core</b> is the reference implementation for combining TP + PP + DP + EP at scale; DeepSpeed and FSDP2 cover the PyTorch-native middle ground.</dd>
 </dl>
@@ -148,7 +176,7 @@ A strong answer separates **model-state OOM** (fix with sharding/precision) from
 | --- | --- |
 | DDP | Replicate model, shard data, all-reduce grads; effective batch = local × GPUs × accum. |
 | ZeRO 1/2/3 | Shard optimizer → +grads → +params; more comm for less memory. |
-| FSDP2 | DTensor `fully_shard`; `FULL_SHARD`≈ZeRO-3; `reshard_after_forward` = memory↔comm knob. |
+| FSDP2 | Shard parameters, gradients, and optimizer state with DTensor `fully_shard`; `reshard_after_forward` trades peak memory for an extra gather. |
 | TP vs PP | TP splits matrices (intra-node, all-reduce/layer); PP splits layers (bubble ∝ stages). |
 | SP vs CP | SP shards norm/dropout activations; CP shards *all* activations on seq → long context. |
 | 3D parallelism | TP intra-node × PP across nodes × DP/FSDP over the rest (+ EP for MoE). |

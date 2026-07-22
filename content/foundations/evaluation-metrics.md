@@ -1,30 +1,94 @@
 # Evaluation Metrics
 
-<div class="tag-row"><span class="tag">precision/recall/F1</span><span class="tag">ROC vs PR AUC</span><span class="tag">imbalance</span><span class="tag">calibration</span><span class="tag">regression</span><span class="tag">mAP / mIoU</span></div>
+> [!NOTE] Goal of this chapter
+> Once you have trained a model, you need a number that says, "How well does it work?" But **which number you measure** changes everything. This chapter begins with the most common trap—looking only at accuracy—then builds precision and recall visually and shows how to choose a metric for each situation. The opening sections are for complete beginners; the later sections marked Advanced are for interviews and practice.
 
-> [!TIP] The bar for a CV/VLM candidate
-> Fluency in precision/recall *and* the vision extensions — mAP for detection, mIoU for segmentation — plus a clear sense of *when ROC lies*, *how to pick an operating threshold*, and *why a benchmark number might be untrustworthy in 2026*. Metrics are the contract for "what did we improve," so treat metric choice as part of the design.
+## §0 · Why accuracy can be misleading
 
-## Try the threshold
+The most natural metric is **accuracy** = number correct / total. But when the data is **imbalanced**, accuracy can lie.
 
-Every point/score model becomes a set of decisions only after you pick a threshold. Slide it and watch precision, recall, and the confusion matrix move.
+> [!EXAMPLE] Fraud-detection example
+> Suppose only 1 of 1,000 transactions is fraudulent (0.1%). A model that **always predicts "legitimate"** still achieves **99.9%** accuracy. The number looks impressive, but the model catches none of the fraud it is supposed to find. Accuracy alone would make this useless model look "nearly perfect."
+
+We therefore distinguish **what kind of mistake** the model made. The starting point is the **confusion matrix**.
+
+## §1 · The confusion matrix—four cells determine everything
+
+Crossing the prediction (positive/negative) with the truth (positive/negative) gives four cases:
+
+<figure>
+<svg viewBox="0 0 480 260" xmlns="http://www.w3.org/2000/svg" font-family="Inter, sans-serif" font-size="13">
+  <text x="250" y="24" text-anchor="middle" fill="#98a3b2">Actual (ground truth)</text>
+  <text x="160" y="52" text-anchor="middle" fill="#12a150" font-weight="700">Positive (P)</text>
+  <text x="330" y="52" text-anchor="middle" fill="#e0533f" font-weight="700">Negative (N)</text>
+  <text x="24" y="130" text-anchor="middle" fill="#98a3b2" transform="rotate(-90 24 150)">Prediction</text>
+  <text x="70" y="105" text-anchor="middle" fill="currentColor">Positive</text>
+  <text x="70" y="195" text-anchor="middle" fill="currentColor">Negative</text>
+  <!-- TP -->
+  <rect x="95" y="70" width="130" height="80" rx="8" fill="#12a150" opacity="0.85"/>
+  <text x="160" y="105" text-anchor="middle" fill="#fff" font-weight="700">TP</text>
+  <text x="160" y="128" text-anchor="middle" fill="#fff" font-size="11">True positive ✓</text>
+  <!-- FP -->
+  <rect x="235" y="70" width="130" height="80" rx="8" fill="#e0533f" opacity="0.55"/>
+  <text x="300" y="105" text-anchor="middle" fill="#fff" font-weight="700">FP</text>
+  <text x="300" y="128" text-anchor="middle" fill="#fff" font-size="11">False alarm</text>
+  <!-- FN -->
+  <rect x="95" y="160" width="130" height="80" rx="8" fill="#e0533f" opacity="0.55"/>
+  <text x="160" y="195" text-anchor="middle" fill="#fff" font-weight="700">FN</text>
+  <text x="160" y="218" text-anchor="middle" fill="#fff" font-size="11">Missed positive</text>
+  <!-- TN -->
+  <rect x="235" y="160" width="130" height="80" rx="8" fill="#12a150" opacity="0.85"/>
+  <text x="300" y="195" text-anchor="middle" fill="#fff" font-weight="700">TN</text>
+  <text x="300" y="218" text-anchor="middle" fill="#fff" font-size="11">True negative ✓</text>
+</svg>
+<figcaption>The four cells: <b>TP</b> (true positive) · <b>FP</b> (false positive or false alarm) · <b>FN</b> (false negative or miss) · <b>TN</b> (true negative). Green cells are correct; red cells are two different kinds of error.</figcaption>
+</figure>
+
+The key is that **the two errors have different consequences**. For a spam filter, an FP sends a legitimate email to spam, while an FN lets spam through. Which one is more costly depends on the situation.
+
+### Precision and recall
+
+These four cells give us two central metrics:
+
+$$
+\text{Precision}=\frac{TP}{TP+FP},\qquad
+\text{Recall}=\frac{TP}{TP+FN}
+$$
+
+<dl class="kv">
+<dt>Precision</dt><dd>"Of everything predicted positive, what fraction was truly positive?" Low precision means <b>many false alarms</b> (legitimate email marked as spam).</dd>
+<dt>Recall</dt><dd>"Of all true positives, what fraction did I find?" Low recall means <b>many misses</b> (undetected fraud or disease).</dd>
+<dt>F1</dt><dd>The harmonic mean, $F_1=\dfrac{2PR}{P+R}$. It prevents one high value from hiding the other—both must be high for F1 to be high.</dd>
+</dl>
+
+> [!NOTE] Precision and recall trade off
+> If you label anything suspicious as positive, recall rises because you catch nearly everything, but precision falls as false alarms surge. If you predict positive only when certain, precision rises while recall falls. The **threshold** determines this balance.
+
+## §2 · Move the threshold yourself
+
+Most models produce a score between 0 and 1. Where you cut that score—the threshold—changes all four confusion-matrix cells in real time. Move the slider and observe precision and recall moving in opposite directions:
 
 <div class="widget" data-widget="metrics-threshold"></div>
 
-## Confusion-matrix core
+## §3 · Compute the metrics yourself
 
-$$
-\text{Precision}=\frac{TP}{TP+FP},\quad
-\text{Recall}=\frac{TP}{TP+FN},\quad
-F1=\frac{2\,PR}{P+R}
-$$
+Let us implement a confusion matrix and precision, recall, and F1 directly. Given a ground-truth list `y_true` (1 = positive, 0 = negative) and a prediction list `y_pred`, compute the three metrics.
 
-Precision↓ means false alarms (a spam filter deleting good mail); recall↓ means misses (undetected fraud or spoofing). **Accuracy is a trap under imbalance**: predict "negative" always on a 0.1%-positive problem and you score 99.9% while being useless. $F_\beta$ weights recall by $\beta$; macro-F1 averages per-class F1 equally, micro-F1 pools all samples.
+<div class="widget" data-widget="code">
+<script type="application/json" class="code-config">
+{"func":"prf1","packages":["numpy"],"approx":true,"starter":"def prf1(y_true, y_pred):\n    # y_true and y_pred are 0/1 lists. Return [precision, recall, f1] in that order.\n    # TP = actual 1 & predicted 1, FP = actual 0 & predicted 1, FN = actual 1 & predicted 0\n    # precision = TP/(TP+FP), recall = TP/(TP+FN), f1 = 2PR/(P+R)\n    # If a denominator is zero, use 0.0.\n    pass","tests":[{"args":[[1,1,0,0],[1,0,0,0]],"expect":[1.0,0.5,0.6666666666666666]},{"args":[[1,1,1,0],[1,1,1,1]],"expect":[0.75,1.0,0.8571428571428571]},{"args":[[0,0,0],[0,0,0]],"expect":[0.0,0.0,0.0]}],"solution":"import numpy as np\n\ndef prf1(y_true, y_pred):\n    y = np.asarray(y_true); p = np.asarray(y_pred)\n    TP = int(np.sum((y == 1) & (p == 1)))\n    FP = int(np.sum((y == 0) & (p == 1)))\n    FN = int(np.sum((y == 1) & (p == 0)))\n    precision = TP / (TP + FP) if (TP + FP) else 0.0\n    recall = TP / (TP + FN) if (TP + FN) else 0.0\n    f1 = 2 * precision * recall / (precision + recall) if (precision + recall) else 0.0\n    return [precision, recall, f1]"}
+</script>
+</div>
 
-## ROC-AUC vs PR-AUC
+> [!TIP] One-line interview answer
+> "Accuracy is a trap on imbalanced data. I first compare the costs of FP and FN, then choose the matching metric—such as precision at a target recall, PR-AUC, or F1—and treat the operating threshold as part of the design." For a CV role, naturally connecting this to **mAP** for detection and **mIoU** for segmentation makes the answer stronger.
 
-- **ROC:** TPR vs FPR $=FP/(FP+TN)$. AUC = P(a random positive scores above a random negative). Because FPR has the *large* negative set in its denominator, ROC can look **optimistically flat** when positives are rare.
-- **PR:** precision vs recall — focused entirely on the positive class, so it exposes the pain when positives are scarce.
+## §4 · ROC-AUC vs PR-AUC (Advanced)
+
+Sweeping the threshold from 0 to 1 produces a curve and a threshold-independent summary.
+
+- **ROC:** TPR (= recall) versus FPR $=FP/(FP+TN)$. AUC can be interpreted as the probability that a random positive receives a higher score than a random negative. But because the FPR denominator contains the *large* negative set, ROC can look **overly optimistic** when positives are rare.
+- **PR:** precision versus recall. It focuses entirely on the positive class, so it exposes the pain of scarce positives more honestly.
 
 ```mermaid
 flowchart TD
@@ -36,10 +100,10 @@ flowchart TD
   E -->|no| G["ROC-AUC fine too"]
 ```
 
-> [!NOTE] AUC is not the operating point
-> A high AUC only says the ranking is good on average. Deployment lives at *one* threshold, so also report the operating-point metric that matters: precision@recall, recall@fixed-FPR, or EER for biometrics.
+> [!NOTE] AUC is not an operating point
+> A high AUC says only that the ranking is good on average. Deployment operates at *one* threshold, so report an operating-point metric as well: precision@recall, recall@fixed-FPR, or EER (equal error rate) for biometrics.
 
-## Imbalance & threshold selection
+## §5 · Choosing metrics by situation (Advanced)
 
 | Situation | Primary metric |
 | --- | --- |
@@ -49,101 +113,117 @@ flowchart TD
 | Segmentation, background-dominated | mIoU, per-class IoU |
 | Retrieval / ranking | Recall@k, nDCG, mAP |
 
-Choose the threshold on validation under the real constraint (e.g. max TPR subject to FPR ≤ 0.1%), or minimize expected cost $C_{FP}\cdot FP + C_{FN}\cdot FN$ when you know the costs.
+Choose the threshold on validation under the real constraint—for example, maximize TPR while FPR ≤ 0.1%—or, when costs are known, minimize expected cost $C_{FP}\cdot FP + C_{FN}\cdot FN$. **Macro-F1** averages class-wise F1 equally and protects rare classes; **micro-F1** pools every sample and is dominated by majority classes.
 
-## Regression metrics
+> **Concept code—the threshold is also a decision learned on validation**
+
+```python
+val_score = model.predict_score(X_val)           # raw score/probability
+candidates = np.linspace(0.0, 1.0, 1001)
+valid = [t for t in candidates
+         if false_positive_rate(y_val, val_score >= t) <= 0.001]
+if not valid:
+    raise RuntimeError("No threshold satisfies the constraint on validation")
+threshold = max(valid, key=lambda t:
+                recall(y_val, val_score >= t))
+
+# Choosing the threshold again after seeing test labels causes leakage
+test_score = model.predict_score(X_test)
+report = metrics(y_test, test_score >= threshold)
+```
+
+## §6 · Regression metrics (Advanced)
 
 <dl class="kv">
-<dt>MAE</dt><dd>$\frac1n\sum|y-\hat y|$ — robust to outliers, in target units.</dd>
-<dt>MSE / RMSE</dt><dd>$\frac1n\sum(y-\hat y)^2$ — penalizes large errors quadratically; RMSE is back in target units.</dd>
-<dt>R²</dt><dd>$1-\text{SS}_\text{res}/\text{SS}_\text{tot}$ — fraction of variance explained; can go negative for a bad model.</dd>
-<dt>MAPE</dt><dd>percentage error — interpretable but explodes near zero targets.</dd>
+<dt>MAE</dt><dd>$\frac1n\sum|y-\hat y|$—robust to outliers and expressed in target units.</dd>
+<dt>MSE / RMSE</dt><dd>$\frac1n\sum(y-\hat y)^2$—penalizes large errors quadratically; RMSE returns to target units.</dd>
+<dt>R²</dt><dd>$1-\text{SS}_\text{res}/\text{SS}_\text{tot}$—fraction of variance explained; it can be negative for a poor model.</dd>
+<dt>MAPE</dt><dd>Percentage error—easy to interpret, but it explodes when targets are near zero.</dd>
 </dl>
 
-## Calibration
+## §7 · Calibration—is confidence trustworthy? (Advanced)
 
 $$
 \text{ECE}=\sum_{m=1}^{M}\frac{|B_m|}{n}\,\big|\text{acc}(B_m)-\text{conf}(B_m)\big|
 $$
 
-Bin predictions by confidence and compare accuracy to confidence per bin. **Temperature scaling** (fit one scalar $T$ on validation, use logits $z/T$) is a cheap, effective post-hoc fix. Caveats: ECE is sensitive to binning, and *group-wise* calibration (per subpopulation) is a separate concern. Accuracy can improve while ECE worsens — monitor both. (See the probabilistic view in [Probability & Statistics](#/foundations/probability-statistics).)
+Bin predictions by confidence and compare the actual accuracy with confidence in each bin. A model is well calibrated if predictions made with "90% confidence" are correct about 90% of the time. **Temperature scaling**—fit one scalar $T$ on validation and divide logits as $z/T$—is a cheap and effective post-hoc correction. Accuracy can improve while ECE worsens, so monitor both. See [Probability & Statistics](#/foundations/probability-statistics) for the probabilistic perspective.
 
-## Connecting to CV metrics
+## §8 · Connecting to CV metrics (Advanced)
 
-**Detection — mAP.** Match predictions to ground truth by IoU; a match with IoU ≥ $t$ is a TP, else FP; unmatched GT are FN. Sort by confidence, trace a PR curve, integrate for AP per class, then average → mAP. VOC uses IoU=0.5; **COCO averages IoU 0.5:0.05:0.95** (mAP@[.5:.95]) plus size-stratified AP$_{S/M/L}$. NMS threshold and TTA affect AP, so fix the protocol before comparing.
+**Detection—mAP.** Match predictions to ground truth by IoU: a match with IoU ≥ $t$ is a TP, otherwise it is an FP, and unmatched GT boxes are FNs. Sort by confidence, trace the PR curve, integrate it for AP per class, then average to obtain mAP. VOC uses IoU = 0.5; **COCO averages IoU thresholds from 0.5 to 0.95 in steps of 0.05** (mAP@[.5:.95]) and reports size-specific AP$_{S/M/L}$.
 
-**Segmentation — mIoU.** Per class $c$: $\text{IoU}_c = TP_c/(TP_c+FP_c+FN_c)$, and $\text{mIoU}=\frac1C\sum_c \text{IoU}_c$. **Dice** relates by $\text{Dice}_c = 2\,\text{IoU}_c/(1+\text{IoU}_c)$ and equals the pixel F1. Pixel accuracy over-flatters background-dominated scenes; matting/fine boundaries need **Boundary IoU** or trimap-band metrics (SAD, Grad, Conn).
+**Segmentation—mIoU.** For each class $c$, $\text{IoU}_c = TP_c/(TP_c+FP_c+FN_c)$ and $\text{mIoU}=\frac1C\sum_c \text{IoU}_c$. **Dice** $= 2\,\text{IoU}/(1+\text{IoU})$ is pixel-level F1. Pixel accuracy overstates performance in background-dominated scenes; fine boundaries need **Boundary IoU** or trimap-band metrics such as SAD, Grad, and Conn.
 
-> The from-scratch implementation of both lives in **[mAP & mIoU](#/ml-coding/metrics-map-miou)** — this chapter is the "why," that one is the "how."
+> The from-scratch implementations of both are in **[mAP & mIoU](#/ml-coding/metrics-map-miou)**—this chapter explains "why," while that one explains "how."
 
-## Is the difference real?
+## §9 · Is the difference real? (Advanced)
 
-A single-number improvement ("+0.4 mIoU") is not a result until you quantify noise. Two reflexes that separate strong candidates:
+A single-number improvement such as "+0.4 mIoU" is not a result until you quantify the noise.
 
-- **Report variance across seeds.** Train ≥3 seeds and report mean ± std; a gain smaller than the seed-to-seed spread is not a gain.
-- **Bootstrap the test set.** Resample the test examples with replacement, recompute the metric, and take the 2.5/97.5 percentiles for a confidence interval — no distributional assumption needed. This is how you defend "significant" for metrics like mAP where a closed-form test doesn't exist. (See the significance discipline in [Probability & Statistics](#/foundations/probability-statistics).)
-- **Paired comparison.** Evaluate both models on the *same* examples and test the per-example differences — far more powerful than comparing two independent averages.
+- **Report variance across seeds:** train with at least three seeds and report mean ± standard deviation. A gain smaller than the seed-to-seed variation is not a gain.
+- **Bootstrap the test set:** resample with replacement, recompute the metric, and use the 2.5th and 97.5th percentiles as a confidence interval. This is how you defend significance for a metric such as mAP without a closed-form test.
+- **Paired comparison:** evaluate both models on the *same* examples and test their per-example differences. This is far more powerful.
 
-## 2026: trusting the number
+## §10 · 2026: trusting the number (Advanced)
 
 > [!WARNING] Evaluation is in crisis
-> As scores saturate, *trusting* them is the hard part: leaderboard-tuned variants (the Llama 4 LMArena episode), automated **harness attacks** that break agent benchmarks by hacking the eval rig rather than solving the task, and test-set contamination. The reflex answers: private held-out sets, report per-task **cost and reliability** (not just top-1, since test-time compute makes accuracy a function of spend), multiple seeds with variance, and leakage audits. This is now a favorite interview topic — see **[The 2026 Landscape](#/start/landscape-2026)**.
+> As scores saturate, *trusting* them becomes the hard part: variants tuned to a leaderboard, **harness attacks** that hack an evaluation rig instead of solving the task, and test-set contamination. The responses are private held-out sets; reporting task-level **cost and reliability**, not only top-1, because test-time compute makes accuracy a function of spending; multiple seeds and variance; and leakage audits. See **[The 2026 Landscape](#/start/landscape-2026)**.
 
 ## Interview Q&A
 
 <details class="qa"><summary>When do you prefer PR-AUC over ROC-AUC?</summary>
 <div class="qa-body">
 
-**Short:** when positives are rare and you care about positive-class performance — ROC's FPR denominator (huge negative set) hides many false positives, so ROC-AUC looks deceptively high.
+**Short:** When positives are rare and positive-class performance matters. ROC's FPR denominator—the huge negative set—can hide many false positives, making ROC-AUC look deceptively high.
 
-**Deep:** on a 1:1000 problem, thousands of false positives barely move FPR but crush precision; PR makes that visible. ROC is fine when classes are balanced or the negative class matters and you want threshold-independent ranking quality. Either way, follow up with the operating-point metric, because AUC says nothing about the single threshold you deploy at.
+**Deep:** In a 1:1000 problem, thousands of false positives barely move FPR but crush precision; PR makes that visible. ROC is still reasonable when classes are balanced or when you want threshold-independent ranking quality. In either case, follow with an operating-point metric—AUC says nothing about the single threshold you deploy.
 </div></details>
 
 <details class="qa"><summary>Walk me through computing mAP by hand.</summary>
 <div class="qa-body">
 
-**Short:** per class, sort predictions by confidence; greedily match each to the highest-IoU unmatched GT; TP if IoU ≥ threshold else FP; accumulate to get precision/recall sequences; integrate the PR curve for AP; average over classes → mAP.
+**Short:** For each class, sort predictions by confidence → greedily match each to the unmatched GT with the highest IoU → mark it TP if IoU ≥ the threshold and FP otherwise → accumulate the precision/recall sequence → integrate the PR curve for AP → average across classes for mAP.
 
-**Deep:** the running precision is $\text{cumsum}(TP)/(\text{cumsum}(TP)+\text{cumsum}(FP))$ and recall is $\text{cumsum}(TP)/n_{GT}$. VOC/COCO interpolate the PR curve differently, and COCO averages AP across IoU 0.5:0.05:0.95. Gotchas: a second prediction on an already-matched GT is an FP; crowd/ignore regions follow dataset rules; NMS and TTA change the curve, so hold the protocol fixed. Implementation in [mAP & mIoU](#/ml-coding/metrics-map-miou).
+**Deep:** Running precision is $\text{cumsum}(TP)/(\text{cumsum}(TP)+\text{cumsum}(FP))$, and recall is $\text{cumsum}(TP)/n_{GT}$. VOC and COCO interpolate the PR curve differently, and COCO averages IoU thresholds from 0.5 to 0.95 in steps of 0.05. A second prediction for an already matched GT is an FP; NMS and TTA change the curve, so hold the protocol fixed. See [mAP & mIoU](#/ml-coding/metrics-map-miou) for an implementation.
 </div></details>
 
-<details class="qa"><summary>"mIoU went up but users say quality dropped." Diagnose it.</summary>
+<details class="qa"><summary>"mIoU went up, but users say quality dropped." Diagnose it.</summary>
 <div class="qa-body">
 
-**Short:** a metric–perception mismatch — decompose per-class IoU, boundary quality, resolution, post-processing, and latency instead of trusting the scalar.
+**Short:** This is a metric–perception mismatch. Instead of trusting one scalar, break the result down by per-class IoU, boundary quality, resolution, post-processing, and latency.
 
-**Deep:** a large easy background class can lift mIoU while thin structures (hair, fingers in matting) fail — check per-class and **Boundary IoU**. Confirm you're evaluating at deployment resolution (downsampled eval flatters). Watch for post-processing (CRF/morphology) that games the metric without helping perception, and for latency/jitter that hurts usability. Bring in side-by-side human judgments (Bradley–Terry). Score competitors under an *identical* preprocessing/protocol. This is exactly why matting work reports SAD/Grad/Conn alongside region IoU.
+**Deep:** A large, easy background class can lift mIoU while thin structures such as hair or fingers fail—check per-class IoU and **Boundary IoU**. Confirm evaluation uses the deployment resolution; downsampled evaluation can overstate quality. Watch for post-processing that games the metric without helping perception and for latency or jitter that hurts usability. Add side-by-side human judgments, for example with a Bradley–Terry model. This is why matting reports SAD, Grad, and Conn alongside region IoU.
 </div></details>
 
-<details class="qa"><summary>How do you pick a decision threshold for deployment?</summary>
+<details class="qa"><summary>How do you choose a decision threshold for deployment?</summary>
 <div class="qa-body">
 
-**Short:** on a validation set, optimize the metric under the real business constraint — e.g. maximize recall subject to FPR ≤ target — rather than defaulting to 0.5.
+**Short:** Optimize a metric on the validation set under the real constraint—for example, maximize recall subject to FPR ≤ a target. Do not default to 0.5.
 
-**Deep:** if false-positive and false-negative costs are known, minimize expected cost $C_{FP}FP+C_{FN}FN$; the optimal threshold follows from the cost ratio and the score distribution. For safety systems, fix a tolerable FPR and report TPR (or EER). Re-check the threshold after any calibration change or data shift, and keep the validation set that set it leak-free.
+**Deep:** If FP and FN costs are known, minimize expected cost $C_{FP}FP+C_{FN}FN$; the optimal threshold follows from the cost ratio and score distribution. A safety system fixes a tolerable FPR and reports TPR, or uses EER. Re-check the threshold after calibration changes or data shift, and keep the validation set used to choose it leak-free.
 </div></details>
 
-**Follow-ups you should expect**
+**Expected follow-ups**
 
-- *Macro vs micro F1?* Equal per-class weight vs. sample-pooled (majority-dominated).
-- *Dice vs IoU?* Monotonically related; Dice = pixel F1, weights TPs more.
+- *Macro vs micro F1?* Equal per-class weighting versus sample pooling, which is majority-dominated.
+- *Dice vs IoU?* They are monotonically related; Dice is pixel F1 and gives TP more weight.
 - *Panoptic Quality?* PQ = SQ × RQ (segmentation quality × recognition quality).
-- *Accuracy↑ but ECE↑?* Possible — accuracy and calibration are largely independent; report both.
-- *BLEU/CIDEr for VLMs?* Caption-only; grounding and reasoning need task-specific suites plus hallucination metrics.
+- *Accuracy↑ but ECE↑?* Possible—accuracy and calibration are largely independent; report both.
+- *BLEU/CIDEr for VLMs?* Caption-specific; grounding and reasoning need a task-specific suite plus hallucination metrics.
 
-## Cheat-sheet
+## Cheat sheet
 
-| Task | Primary | Complement |
+| Situation | Primary metric | Complement |
 | --- | --- | --- |
+| Accuracy trap | Avoid accuracy under imbalance | precision/recall/F1 |
 | Binary, imbalanced | PR-AUC, F1 | precision@recall, FPR@TPR |
-| Multi-class | macro-F1 / balanced acc | calibration (ECE) |
+| Multi-class | macro-F1 / balanced accuracy | calibration (ECE) |
 | Detection | COCO mAP@[.5:.95] | AP$_S$, AR |
-| Semantic seg | mIoU | per-class IoU, Boundary IoU |
-| Instance seg | mask AP | PQ (panoptic) |
-| Matting | SAD, MSE, Grad, Conn | human eval |
+| Semantic segmentation | mIoU | per-class IoU, Boundary IoU |
+| Instance segmentation | mask AP | PQ (panoptic) |
+| Matting | SAD, MSE, Grad, Conn | human evaluation |
 | Regression | RMSE / MAE | R² |
 | Retrieval | Recall@k, mAP | nDCG |
 
-> "A metric is a proxy for the objective, so I design failure-case analysis and product constraints alongside it — and in 2026 I question whether the benchmark number can even be trusted."
-
-**Related:** [mAP & mIoU](#/ml-coding/metrics-map-miou) · [Probability & Statistics](#/foundations/probability-statistics) · [Regularization & Generalization](#/foundations/regularization-generalization) · [The 2026 Landscape](#/start/landscape-2026) · [Segmentation](#/cv/segmentation)
+**Next:** [Implement mAP & mIoU](#/ml-coding/metrics-map-miou) · [Probability & Statistics](#/foundations/probability-statistics) · [Regularization & Generalization](#/foundations/regularization-generalization) · [The 2026 Landscape](#/start/landscape-2026) · [Segmentation](#/cv/segmentation)

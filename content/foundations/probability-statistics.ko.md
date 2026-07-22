@@ -1,11 +1,59 @@
-# Probability & Statistics
+# 확률 & 통계
 
-<div class="tag-row"><span class="tag">Bayes</span><span class="tag">MLE/MAP</span><span class="tag">KL & cross-entropy</span><span class="tag">CLT</span><span class="tag">A/B testing</span><span class="tag">calibration</span></div>
+<div class="tag-row"><span class="tag">random variable</span><span class="tag">distribution</span><span class="tag">Bayes</span><span class="tag">MLE/MAP</span><span class="tag">KL & cross-entropy</span><span class="tag">CLT</span><span class="tag">A/B testing</span></div>
 
-> [!TIP] 실제로 테스트되는 것
-> 정의가 아니라 *연결*입니다. cross-entropy가 categorical MLE임을, L2가 Gaussian prior임을, NLL을 최소화하는 것이 데이터 분포에 대한 KL을 최소화하는 것임을 보일 수 있나요? A/B test에서 peeking 버그를 잡아낼 수 있나요? CV/VLM 후보자에게 이 장은 **calibration, soft label, offline-vs-online evaluation**이 있는 곳이기도 합니다 — model을 배포하는 일의 statistical한 척추죠.
+> [!NOTE] 이 챕터의 목표
+> "확률" 하면 겁부터 나는 분이 많지만, 머신러닝에 필요한 건 몇 가지 직관뿐입니다: **불확실한 값(random variable)** 을 숫자로 다루는 법, 그 값이 어떻게 퍼져 있는지(**distribution**), 평균적으로 어떤 값인지(**expectation**). 이 직관은 MSE·BCE·cross-entropy처럼 자주 쓰는 손실이 어떤 **확률 모델**에서 나오는지 설명해 줍니다. 앞부분(§0)은 완전 입문, 뒤로 갈수록 면접 심화입니다.
 
-## 단 하나의 다이어그램: likelihood → loss
+## §0 · 가장 먼저: 확률 변수와 분포
+
+**확률 변수(random variable)** 는 "아직 정해지지 않은, 불확실한 값"입니다. 주사위 눈, 내일 기온, 이미지가 고양이일 확률처럼요. 이 값이 **어떤 값을 얼마나 자주 갖는지**를 알려주는 것이 **확률 분포(probability distribution)** 입니다.
+
+<div class="proscons"><div><div class="pros-t">이산(discrete) 분포</div>
+
+값이 딱딱 떨어짐. 예: 동전(**Bernoulli**), 주사위, 클래스 라벨(**Categorical**). "각 값의 확률"을 표로 적을 수 있고, 다 더하면 1.
+
+</div><div><div class="cons-t">연속(continuous) 분포</div>
+
+값이 실수 전체. 예: 키, 온도(**Gaussian/정규분포**). 한 점의 확률은 0이고, 대신 "밀도(density)"로 구간의 확률을 잽니다.
+
+</div></div>
+
+### 평균(expectation)과 분산(variance)
+
+- **기댓값/평균(expectation)** $\mathbb{E}[X]$: 값들을 확률로 가중평균한 것 — "평균적으로 어디쯤?"
+- **분산(variance)** $\operatorname{Var}(X)$: 평균에서 얼마나 흩어져 있나 — "얼마나 들쭉날쭉?"
+
+$$
+\mathbb E[X]=\sum_x x\,P(x),\qquad \operatorname{Var}(X)=\mathbb E[(X-\mathbb EX)^2]
+$$
+
+가장 중요한 연속 분포인 **정규분포(Gaussian)** $\mathcal N(\mu,\sigma^2)$는 딱 두 숫자로 정해집니다: 중심 $\mu$(평균)와 폭 $\sigma$(표준편차). 그림으로 보면 직관이 확실해집니다.
+
+<figure>
+<svg viewBox="0 0 640 230" xmlns="http://www.w3.org/2000/svg" font-family="Inter, sans-serif" font-size="12">
+  <line x1="30" y1="190" x2="610" y2="190" stroke="#98a3b2" stroke-width="1.4"/>
+  <!-- narrow gaussian (small sigma), centered left -->
+  <path d="M120 190 C 180 190, 200 40, 240 40 C 280 40, 300 190, 360 190" fill="none" stroke="#0ea5e9" stroke-width="2.5"/>
+  <line x1="240" y1="190" x2="240" y2="40" stroke="#0ea5e9" stroke-width="1" stroke-dasharray="4 3"/>
+  <text x="240" y="30" text-anchor="middle" fill="#0ea5e9">작은 σ (뾰족)</text>
+  <!-- wide gaussian (large sigma), centered right -->
+  <path d="M330 190 C 400 190, 420 110, 460 110 C 500 110, 520 190, 600 190" fill="none" stroke="#e0533f" stroke-width="2.5"/>
+  <line x1="460" y1="190" x2="460" y2="110" stroke="#e0533f" stroke-width="1" stroke-dasharray="4 3"/>
+  <text x="460" y="100" text-anchor="middle" fill="#e0533f">큰 σ (넓음)</text>
+  <text x="240" y="208" text-anchor="middle" fill="#98a3b2">μ₁</text>
+  <text x="460" y="208" text-anchor="middle" fill="#98a3b2">μ₂</text>
+  <text x="320" y="225" text-anchor="middle" fill="#98a3b2">μ(평균)가 중심 위치를, σ(표준편차)가 폭을 결정 · 곡선 아래 넓이 = 1</text>
+</svg>
+<figcaption>정규분포는 평균 μ가 좌우 위치를, σ가 퍼짐 정도를 정합니다. 딥러닝에서 "가중치를 작은 정규분포로 초기화", "출력에 Gaussian noise 가정 → MSE 손실" 등 어디에나 등장합니다.</figcaption>
+</figure>
+
+> [!TIP] 면접 한 줄
+> 이 챕터의 진짜 포인트는 정의 암기가 아니라 **연결**입니다: cross-entropy가 categorical MLE임을, L2가 Gaussian prior임을, NLL 최소화가 데이터 분포로의 KL 최소화임을 보일 수 있는가? A/B test의 peeking 버그를 잡아낼 수 있는가? CV/VLM 후보라면 **calibration, soft label, offline↔online 평가**가 배포의 통계적 척추입니다.
+
+## §1 · 핵심 통찰: 손실 = 음의 로그가능도(NLL)
+
+많이 쓰이는 지도학습 손실은 **"어떤 관측·noise 모델 아래에서의 음의 로그가능도(negative log-likelihood, NLL)"** 로 유도할 수 있고, 일부 regularizer는 **prior(사전 믿음)** 를 둔 MAP 추정으로 해석할 수 있습니다. 모든 목적함수·정규화가 이 틀에 들어가는 것은 아니지만, MSE·BCE·cross-entropy·L2를 외우지 않고 연결하는 데 유용합니다.
 
 ```mermaid
 flowchart LR
@@ -18,34 +66,30 @@ flowchart LR
   M --> L1["Laplace prior → L1"]
 ```
 
-거의 모든 supervised loss는 어떤 noise model 하에서의 NLL이고, 거의 모든 regularizer는 prior입니다. 이걸 체화하면 loss를 외우는 대신 *유도*할 수 있습니다.
+| Model (가정한 분포) | Density | 대응 손실 (NLL) |
+| --- | --- | --- |
+| Bernoulli, $p=\sigma(z)$ | $p^y(1-p)^{1-y}$ | binary cross-entropy $-[y\log p+(1-y)\log(1-p)]$ |
+| Categorical, softmax $p$ | $\prod_k p_k^{y_k}$ | cross-entropy $-\sum_k y_k\log p_k$ |
+| Gaussian (고정 $\sigma$) | $\mathcal N(y;\hat y,\sigma^2 I)$ | $\propto\|y-\hat y\|_2^2$ (MSE) |
+| Gaussian (학습 $\sigma$) | $\mathcal N(y;\hat y,\sigma_\theta^2)$ | heteroscedastic NLL (불확실성 추정) |
 
-## Bayes, MLE, MAP를 한 흐름으로
+즉, **"출력이 정규분포로 흩어진다"고 가정하면 MSE, "클래스 확률"이라 가정하면 cross-entropy**가 자동으로 나옵니다.
+
+## §2 · Bayes, MLE, MAP를 한 흐름으로
 
 $$
 \underbrace{P(\theta\mid\mathcal D)}_{\text{posterior}}=\frac{\overbrace{P(\mathcal D\mid\theta)}^{\text{likelihood}}\ \overbrace{P(\theta)}^{\text{prior}}}{\underbrace{P(\mathcal D)}_{\text{evidence}}}
 $$
 
-$$
-\hat\theta_\text{MLE}=\arg\min_\theta \sum_i -\log P(x_i\mid\theta),\qquad
-\hat\theta_\text{MAP}=\arg\min_\theta \Big[\sum_i -\log P(x_i\mid\theta) \;-\;\log P(\theta)\Big]
-$$
+- **MLE(최대가능도)**: 데이터를 가장 잘 설명하는 $\theta$. $\hat\theta_\text{MLE}=\arg\min_\theta \sum_i -\log P(x_i\mid\theta)$
+- **MAP(최대사후)**: 거기에 사전 믿음(prior)을 곱함. $\hat\theta_\text{MAP}=\arg\min_\theta [\sum_i -\log P(x_i\mid\theta) -\log P(\theta)]$
 
-Gaussian prior $P(\theta)\propto e^{-\frac{\lambda}{2}\|\theta\|_2^2}$는 objective에 $\tfrac{\lambda}{2}\|\theta\|_2^2$를 기여합니다 — **Gaussian prior를 쓴 MAP = MLE + L2**. Laplace prior $\propto e^{-\lambda\|\theta\|_1}$는 L1을 줍니다.
+Gaussian prior $P(\theta)\propto e^{-\frac{\lambda}{2}\|\theta\|_2^2}$는 목적함수에 $\tfrac{\lambda}{2}\|\theta\|_2^2$를 더합니다 — **Gaussian prior MAP = MLE + L2(weight decay)**. Laplace prior는 L1을 줍니다.
 
-> [!NOTE] 비유에 대해 정직해라
-> SGD의 해가 문자 그대로 MAP 추정치인 것은 아닙니다 — optimizer와 initialization에서 오는 implicit regularization도 중요합니다. "equals"가 아니라 "corresponds to / is analogous to"라고 말하세요. 그런 균형 감각이 성숙함으로 읽힙니다.
+> [!NOTE] 비유에 대해 정직하기
+> SGD의 해가 문자 그대로 MAP 추정치인 것은 아닙니다 — optimizer/초기화에서 오는 implicit regularization도 큽니다. "equals"가 아니라 "corresponds to / is analogous to"라고 말하세요. 그 균형 감각이 성숙함으로 읽힙니다.
 
-## Distribution ↔ loss
-
-| Model | Density | NLL loss |
-| --- | --- | --- |
-| Bernoulli, $p=\sigma(z)$ | $p^y(1-p)^{1-y}$ | binary cross-entropy $-[y\log p+(1-y)\log(1-p)]$ |
-| Categorical, softmax $p$ | $\prod_k p_k^{y_k}$ | cross-entropy $-\sum_k y_k\log p_k$ |
-| Gaussian (fixed $\sigma$) | $\mathcal N(y;\hat y,\sigma^2 I)$ | $\propto\|y-\hat y\|_2^2$ (MSE) |
-| Gaussian (learned $\sigma$) | $\mathcal N(y;\hat y,\sigma_\theta^2)$ | heteroscedastic NLL (uncertainty) |
-
-## Entropy, cross-entropy, KL
+## §3 · Entropy, cross-entropy, KL
 
 $$
 H(p)=-\sum_k p_k\log p_k,\quad
@@ -53,105 +97,126 @@ H(p,q)=-\sum_k p_k\log q_k,\quad
 D_{\mathrm{KL}}(p\|q)=\sum_k p_k\log\frac{p_k}{q_k}=H(p,q)-H(p)
 $$
 
-핵심 성질: $D_{\mathrm{KL}}\ge 0$이며 $p=q$일 때만 등호; 그리고 **비대칭**입니다. Forward KL $D_{\mathrm{KL}}(p_\text{data}\|q)$는 *mode-covering*이고, reverse KL은 *mode-seeking*입니다(VAE / variational-inference에서 반복적으로 나오는 논점). classifier를 학습하는 것은 $H(p_\text{data},q_\theta)$를 최소화하는 것이며, hard one-hot label에서는 $H(p)=0$이므로 **cross-entropy = 상수 차이의 KL = 올바른 class의 log-prob 최대화**입니다.
+직관: **entropy** $H(p)$는 "불확실성의 양"(동전이 공정할수록 큼), **cross-entropy** $H(p,q)$는 "$p$가 진실인데 $q$라고 믿을 때의 평균 놀람", **KL** $D_{\mathrm{KL}}(p\|q)$는 "$q$가 $p$에서 얼마나 떨어졌나"입니다.
 
-> [!EXAMPLE] Softmax 수치 안정성
-> $\operatorname{softmax}(z)_k=e^{z_k}/\sum_j e^{z_j}$는 큰 $z$에서 overflow합니다. log-sum-exp 트릭은 max를 빼줍니다: $\log\sum_j e^{z_j}=m+\log\sum_j e^{z_j-m}$, $m=\max_j z_j$. Temperature $T$($z/T$ 사용)는 argmax($T\to0$)에서 uniform($T\to\infty$)까지 보간합니다 — distillation과 sampling 뒤에 있는 손잡이죠.
+핵심 성질: $D_{\mathrm{KL}}\ge 0$이고 $p=q$일 때만 0, 그리고 **비대칭**($D_{\mathrm{KL}}(p\|q)\ne D_{\mathrm{KL}}(q\|p)$). classifier 학습은 $H(p_\text{data},q_\theta)$ 최소화이고, hard one-hot label에서는 $H(p)=0$이라 **cross-entropy = 상수 차이의 KL = 정답 클래스의 log-prob 최대화**입니다.
 
-## Expectation, variance, 그리고 CLT
+### 직접 돌려보기 — KL divergence 구현
 
-$$
-\mathbb E[X]=\sum_x xP(x),\quad \operatorname{Var}(X)=\mathbb E[(X-\mathbb EX)^2],\quad \operatorname{Cov}(X,Y)=\mathbb E[(X-\mu_x)(Y-\mu_y)]
-$$
+두 이산 분포 사이의 KL을 직접 구현해 봅시다. 주의할 점: $p_k=0$인 항은 $0\log 0 = 0$으로 처리해야 합니다(로그 폭발 방지).
 
-- **Law of large numbers:** sample mean이 $\mathbb E[X]$로 수렴합니다 — 그래서 empirical risk $\hat R=\frac1n\sum_i \ell_i$가 true risk를 근사합니다.
-- **Central limit theorem:** (정규화된) mean의 *분포*가 Gaussian으로 향합니다, $\frac1n\sum X_i \approx \mathcal N(\mu,\sigma^2/n)$, $X_i$의 분포와 무관하게(유한 variance). 이것이 $\pm 1.96\,\sigma/\sqrt n$ confidence interval과 아래의 z-test를 뒷받침합니다.
-- Minibatch gradient는 full-batch gradient의 (unbiased) noisy estimate이고, 그 variance는 $1/B$처럼 줄어듭니다 — [Optimization](#/foundations/optimization)에서 나오는 batch-size 효과의 statistical한 근거입니다.
+<div class="widget" data-widget="code">
+<script type="application/json" class="code-config">
+{"func":"kl_divergence","packages":["numpy"],"approx":true,"starter":"def kl_divergence(p, q):\n    # 두 이산 확률분포 p, q (각각 합이 1인 리스트) 사이의 KL: sum_k p_k * log(p_k / q_k)\n    # 자연로그(np.log) 사용.  p_k == 0 인 항은 0 으로 건너뛰세요 (0*log0 = 0).\n    pass","tests":[{"args":[[0.5,0.5],[0.5,0.5]],"expect":0.0,"tol":1e-4},{"args":[[1.0,0.0],[0.5,0.5]],"expect":0.6931,"tol":1e-3},{"args":[[0.7,0.3],[0.5,0.5]],"expect":0.0823,"tol":1e-3}],"solution":"import numpy as np\n\ndef kl_divergence(p, q):\n    p = np.asarray(p, float); q = np.asarray(q, float)\n    mask = p > 0                      # 0*log0 = 0 처리\n    return float(np.sum(p[mask] * np.log(p[mask] / q[mask])))"}
+</script>
+</div>
 
-## Hypothesis testing & A/B, footgun 없이
+첫 테스트에서 같은 분포는 KL=0입니다. 두 번째는 **target 분포 $p=(1,0)$가 첫 클래스를 확실한 정답으로 두는데 모델 분포 $q=(0.5,0.5)$가 반반을 예측한 경우**라서 $\log 2\approx0.693$의 벌점을 냅니다. KL은 방향이 중요하므로 어느 분포가 기준 $p$이고 어느 분포가 근사 $q$인지 항상 함께 말해야 합니다.
+
+> [!EXAMPLE] Softmax 수치 안정성 & KL의 비대칭
+> $\operatorname{softmax}(z)_k=e^{z_k}/\sum_j e^{z_j}$는 큰 $z$에서 overflow합니다 — **log-sum-exp 트릭**으로 max를 빼세요: $\log\sum_j e^{z_j}=m+\log\sum_j e^{z_j-m}$. Temperature $T$($z/T$)는 argmax($T\to0$)에서 uniform($T\to\infty$)까지 보간하는 손잡이(distillation·sampling). **KL 비대칭**: forward KL $D_{\mathrm{KL}}(p_\text{data}\|q)$는 *mode-covering*(모든 mode를 덮어 흐릿), reverse KL은 *mode-seeking*(한 mode에 집중) — VAE/variational inference의 단골 논점.
+
+## §4 · Expectation, variance, 그리고 CLT (심화)
+
+- **큰 수의 법칙(LLN):** 표본 평균이 $\mathbb E[X]$로 수렴 — 그래서 empirical risk $\hat R=\frac1n\sum_i \ell_i$가 true risk를 근사합니다.
+- **중심극한정리(CLT):** 독립·동일분포이고 분산이 유한하다는 등의 조건 아래, 정규화된 표본 평균의 분포가 Gaussian으로 향합니다. $\sigma$를 알고 있거나 표본이 충분히 클 때 $\pm1.96\,\sigma/\sqrt n$ 같은 근사를 쓰며, 작은 표본에서 $\sigma$를 추정하면 보통 t interval을 씁니다.
+- **Minibatch gradient**는 샘플을 균등하게 뽑고 loss가 샘플별로 분해된다는 조건에서 full-data gradient의 unbiased estimate입니다. 독립 표본 근사에서는 분산이 대략 $1/B$로 줄지만, without-replacement sampling에는 finite-population correction이 있고 BatchNorm처럼 배치 샘플을 결합하는 연산은 이 단순한 주장을 깨뜨립니다.
+
+## §5 · Hypothesis testing & A/B, 함정 없이 (심화)
 
 <dl class="kv">
 <dt>p-value</dt><dd>P(적어도 이만큼 극단적인 데이터 | $H_0$). <b>$P(H_0\mid\text{data})$가 아닙니다.</b></dd>
-<dt>Type I / II</dt><dd>$\alpha$ = 참인 $H_0$를 기각(false positive); $\beta$ = 거짓인 $H_0$를 기각하지 못함; power $=1-\beta$.</dd>
-<dt>Effect size</dt><dd>큰 $n$에서는 사소한 차이도 "significant"해집니다. 유의성만이 아니라 항상 크기를 보고하세요.</dd>
+<dt>Type I / II</dt><dd>$\alpha$ = 참인 $H_0$를 기각(false positive); $\beta$ = 거짓 $H_0$를 못 기각; power $=1-\beta$.</dd>
+<dt>Effect size</dt><dd>큰 $n$에서는 사소한 차이도 "significant". 유의성만이 아니라 항상 크기를 보고하세요.</dd>
 </dl>
 
-conversion에 대한 two-proportion z-test:
-
-$$
-z=\frac{\hat p_A-\hat p_B}{\sqrt{\hat p(1-\hat p)(1/n_A+1/n_B)}}
-$$
+conversion에 대한 two-proportion z-test: $z=\dfrac{\hat p_A-\hat p_B}{\sqrt{\hat p(1-\hat p)(1/n_A+1/n_B)}}$
 
 > [!WARNING] Peeking 함정
-> 실험을 반복적으로 들여다보다 $p<0.05$를 넘는 순간 멈추면 false-positive rate가 $\alpha$보다 훨씬 부풀어 오릅니다. power/MDE 계산으로 sample size를 미리 고정하거나, **sequential test**(always-valid p-value, mSPRT)를 쓰세요. 또 **sample-ratio mismatch (SRM)**를 확인하고 **multiple comparison**을 보정하세요(Bonferroni/FDR). **CUPED** 같은 variance-reduction은 실험 전 covariate를 이용해 공짜로 power를 벌어줍니다.
+> 실험을 반복적으로 들여다보다 $p<0.05$를 넘는 순간 멈추면 false-positive rate가 $\alpha$보다 크게 부풀어 오릅니다. power/MDE 계산으로 sample size를 미리 고정하거나 **sequential test**(always-valid p-value, mSPRT)를 쓰세요. **SRM(sample-ratio mismatch)** 을 확인하고 **multiple comparison**을 보정(Bonferroni/FDR)하세요. **CUPED** 같은 variance reduction은 실험 전 covariate로 공짜 power를 벌어줍니다.
 
-## Sampling & estimation
+> **개념 코드 — fixed-horizon A/B의 순서**
 
-진짜 분포를 아는 경우는 드뭅니다 — 가진 건 sample이죠. 반복해서 등장하는 두 아이디어:
+```python
+plan = design_ab_test(alpha=0.05, power=0.80, mde=0.01)
+assignment = randomize(users, ratio=(0.5, 0.5))
+events = collect_until_n(assignment, plan.sample_size)  # 중간 결과로 중단 금지
 
-- **Monte Carlo estimation:** $x_i\sim p$로 $\mathbb E_{p}[f(x)]\approx\frac1N\sum_i f(x_i)$를 근사합니다. 오차는 $1/\sqrt N$처럼 줄고, *차원과 무관*합니다 — 고차원에서 MC가 grid quadrature를 이기는 이유죠(dropout-MC uncertainty, RL return, VAE ELBO에 사용).
-- **Importance sampling:** $p$를 sampling할 수 없지만 $q$는 sampling할 수 있을 때 reweight합니다: $\mathbb E_p[f]=\mathbb E_q[f\,\tfrac{p}{q}]$. $q$가 $p$와 어긋나면 variance가 큽니다 — off-policy RL의 핵심 난점입니다.
-- **Reparameterization trick:** $x\sim\mathcal N(\mu,\sigma^2)$를 $x=\mu+\sigma\epsilon,\ \epsilon\sim\mathcal N(0,1)$로 다시 써서 무작위성을 parameter에서 떼어내면 gradient가 sample을 통과해 흐릅니다(VAE). Discrete 대응물: **Gumbel-Softmax**.
-- **Estimator 품질:** estimator의 오차는 bias² + variance로 분해됩니다; sample mean은 unbiased이고, MLE는 *consistent하고 asymptotically efficient*하지만 small sample에서는 biased일 수 있습니다(예: variance estimator의 $1/n$ vs $1/(n-1)$).
+assert sample_ratio_test(events).p_value > 0.001        # logging/배정 검사
+effect, ci, p_value = two_sample_test(events)
+ship = (p_value < plan.alpha
+        and ci.low > business_minimum
+        and guardrails_are_safe(events))
+```
 
-## Calibration
+## §6 · Sampling & estimation (심화)
 
-model은 $P(Y=\hat Y \mid \hat P=p)\approx p$이면 *well-calibrated*됐다고 합니다. Softmax confidence는 기본적으로 calibrated가 **아닙니다**(현대 net은 보통 over-confident). 이를 **Expected Calibration Error**로 측정하고 **temperature scaling**(validation set에서 scalar $T$ 하나를 fit)으로 값싸게 고칩니다. 더 자세한 내용은 [Evaluation Metrics](#/foundations/evaluation-metrics)에 있습니다.
+- **Monte Carlo:** $x_i\sim p$로 $\mathbb E_{p}[f(x)]\approx\frac1N\sum_i f(x_i)$. 표준오차의 수렴 차수는 보통 $1/\sqrt N$이라 격자법처럼 차원이 지수에 직접 들어가지는 않지만, 분산이라는 상수는 차원·분포·integrand에 따라 매우 커질 수 있습니다.
+- **Importance sampling:** $p$ 대신 $q$로 샘플하고 reweight, $\mathbb E_p[f]=\mathbb E_q[f\,\tfrac{p}{q}]$. $q$가 $p$와 어긋나면 분산 폭발 — off-policy RL의 핵심 난점.
+- **Reparameterization trick:** $x=\mu+\sigma\epsilon,\ \epsilon\sim\mathcal N(0,1)$로 무작위성을 parameter에서 떼어 gradient가 sample을 통과(VAE). 이산 대응물은 **Gumbel-Softmax**.
+- **Estimator 품질:** squared-error 기준의 MSE는 $\mathrm{bias}^2+\mathrm{variance}$로 분해됩니다(관측 noise를 예측하는 문제라면 irreducible noise 항도 구분). sample mean은 unbiased이고, MLE는 정규성 조건 아래 consistent·asymptotically efficient하지만 작은 표본에서는 biased일 수 있습니다.
 
-## Interview Q&A
+## §7 · Calibration (심화)
+
+model은 $P(Y=\hat Y \mid \hat P=p)\approx p$이면 *well-calibrated*입니다. Softmax confidence는 기본적으로 calibrated가 **아니며**(현대 net은 대개 over-confident) **Expected Calibration Error(ECE)** 로 측정하고 **temperature scaling**(validation에서 scalar $T$ 하나 fit)으로 값싸게 고칩니다. 자세히는 [Evaluation Metrics](#/foundations/evaluation-metrics).
+
+## 면접 Q&A
 
 <details class="qa"><summary>Classification에 왜 cross-entropy이고 MSE가 아닌가?</summary>
 <div class="qa-body">
 
-**Short:** cross-entropy는 categorical model의 MLE이고, 이를 최소화하는 것은 model에서 데이터 분포로의 KL을 최소화합니다. MSE는 Gaussian noise를 가정하는데 — discrete label에는 틀린 likelihood입니다.
+**Short:** cross-entropy는 categorical model의 NLL이고, 최소화하면 $D_{\mathrm{KL}}(p_{\text{data}}\Vert q_\theta)$를 최소화합니다. 확률 벡터에 대한 MSE/Brier score도 유효한 proper scoring rule이지만, softmax와 결합한 gradient 및 probabilistic model이 달라 보통 CE가 더 자연스럽습니다.
 
-**Deep:** logit 위에 softmax를 얹어 $q_\theta(y\mid x)$를 얻으면, one-hot label의 NLL이 정확히 cross-entropy입니다. 그 logit에 대한 gradient는 깔끔한 $p-y$입니다. Softmax output에 대한 MSE는 예측이 자신 있게 틀렸을 때 vanishing gradient를 주고(logistic-MSE saturation 문제) 합리적인 label noise model에 대응하지도 않습니다. 유도는 [Linear Algebra & Calculus](#/foundations/linear-algebra-calculus)를 보세요.
+**Deep:** softmax로 $q_\theta(y\mid x)$를 얻으면 one-hot label의 NLL이 정확히 cross-entropy이고 logit gradient는 깔끔한 $q-y$입니다. MSE/Brier도 확률 예측을 학습할 수 있지만 softmax Jacobian을 한 번 더 거치므로 포화 영역의 gradient가 작아질 수 있습니다. "MSE는 틀렸다"가 아니라 **categorical likelihood와 최적화 geometry 때문에 CE를 기본으로 고른다**고 설명하세요. 유도는 [선형대수 & 미적분](#/foundations/linear-algebra-calculus).
 </div></details>
 
 <details class="qa"><summary>MLE, MAP, L2 regularization을 연결하라.</summary>
 <div class="qa-body">
 
-**Short:** MLE는 likelihood를 최대화하고, MAP는 likelihood × prior를 최대화합니다. zero-mean Gaussian prior는 MAP penalty를 $\tfrac{\lambda}{2}\|\theta\|_2^2$로 만듭니다 — 즉 L2 / weight decay죠.
+**Short:** MLE는 likelihood를, MAP는 likelihood×prior를 최대화합니다. zero-mean Gaussian prior는 MAP 목적에 $\tfrac{\lambda}{2}\|\theta\|_2^2$라는 L2 penalty를 더합니다. 이는 SGD류에서는 weight decay와 같은 형태지만 AdamW의 decoupled decay와는 일반적으로 같은 최적화 궤적이 아닙니다.
 
-**Deep:** Gaussian에 대한 $-\log P(\theta)$는 $\theta$에 대해 quadratic이고, Laplace prior에서는 $|\theta|$가 되어 L1과 sparsity를 줍니다. MLE 단독은 small-sample 영역에서 overfit하는 경향이 있는데(high-variance estimate), prior/regularizer는 약간의 bias를 내주고 큰 variance 감소를 얻습니다. Fully-Bayesian 예측은 posterior에 대해 적분합니다, $P(x_*\mid\mathcal D)=\int P(x_*\mid\theta)P(\theta\mid\mathcal D)\,d\theta$, point estimate는 이를 근사한 것입니다.
+**Deep:** Gaussian의 $-\log P(\theta)$는 quadratic, Laplace는 $|\theta|$라 L1·sparsity. MLE 단독은 small-sample에서 overfit(high variance)하고, prior/regularizer는 약간의 bias로 큰 variance 감소를 얻습니다. Fully-Bayesian 예측은 posterior에 대해 적분하며 point estimate는 그 근사입니다.
 </div></details>
 
 <details class="qa"><summary>KL divergence와 그 비대칭성을 ML 예시로 설명하라.</summary>
 <div class="qa-body">
 
-**Short:** $D_{\mathrm{KL}}(p\|q)=H(p,q)-H(p)\ge0$, $p=q$일 때만 0이며, $D_{\mathrm{KL}}(p\|q)\ne D_{\mathrm{KL}}(q\|p)$.
+**Short:** $D_{\mathrm{KL}}(p\|q)=H(p,q)-H(p)\ge0$, $p=q$일 때만 0, 비대칭.
 
-**Deep:** forward KL $D_{\mathrm{KL}}(p_\text{data}\|q_\theta)$를 최소화하면(max-likelihood 학습처럼) $q$가 $p$의 모든 mode를 덮게 됩니다 — $p>0$인데 $q\approx0$인 곳마다 막대한 penalty를 물어서 mass를 퍼뜨립니다(mode-covering, 때로 흐릿한 생성). 일부 variational/RL objective에서 쓰이는 reverse KL $D_{\mathrm{KL}}(q_\theta\|p)$는 $q$가 하나의 mode에 집중하고 나머지를 무시하게 합니다(mode-seeking). Distillation은 soft teacher 분포에 대해 $H(p_T,p_S)$를 최소화합니다.
+**Deep:** forward KL $D_{\mathrm{KL}}(p_\text{data}\|q_\theta)$ 최소화(max-likelihood)는 $q$가 $p$의 모든 mode를 덮게 합니다($p>0,q\approx0$인 곳마다 큰 penalty → mode-covering, 흐릿한 생성). reverse KL은 $q$가 한 mode에 집중(mode-seeking). Distillation은 soft teacher 분포에 대해 $H(p_T,p_S)$를 최소화.
 </div></details>
 
 <details class="qa"><summary>이틀 만에 A/B test가 p<0.05를 찍었다. 배포할까?</summary>
 <div class="qa-body">
 
-**Short:** 아직입니다 — 그건 peeking artifact일 가능성이 큽니다. 사전 등록한 sample size에 도달했는지 확인하고, SRM을 검증하고, effect size와 guardrail metric을 보세요.
+**Short:** 아직입니다 — peeking artifact일 가능성이 큽니다. 사전 등록한 sample size 도달 여부, SRM, effect size, guardrail을 보세요.
 
-**Deep:** threshold를 넘는 순간 멈추면 Type I error가 극적으로 부풀어 오릅니다. power/MDE 계산으로 크기를 정한 fixed-horizon test에 전념하거나, 연속 모니터링을 *허용*하는 always-valid sequential 절차로 전환하세요. 그다음 sample-ratio mismatch가 없는지 확인하고(logging/assignment 버그의 신호), lift에 대한 confidence interval을 보고하며, offline 승리(예: 더 높은 mIoU)가 실제로 online guardrail을 움직이는지 확인하세요 — latency와 비용이 품질 이득을 지워버릴 수 있습니다. 고위험 표면(결제, face auth)에는 raw A/B보다 staged canary를 선호하세요. [Evaluation Metrics](#/foundations/evaluation-metrics)를 참고하세요.
+**Deep:** threshold를 넘는 순간 멈추면 Type I error가 부풀어 오릅니다. fixed-horizon test에 전념하거나 연속 모니터링을 허용하는 always-valid sequential 절차로 전환하세요. SRM(logging/assignment 버그 신호)을 확인하고 lift의 신뢰구간을 보고하며, offline 승리(예: 높은 mIoU)가 실제 online guardrail(latency·비용)을 움직이는지 확인하세요. 고위험(결제·face auth)은 raw A/B보다 staged canary. [Evaluation Metrics](#/foundations/evaluation-metrics).
 </div></details>
 
-**예상해야 할 follow-up**
+**예상 follow-up**
 
-- *Conjugate prior?* Posterior가 prior와 같은 family에 머뭅니다(Beta–Bernoulli, Normal–Normal) — closed-form 업데이트.
-- *LLN vs CLT?* Mean → expectation vs. distribution-of-mean → Gaussian.
-- *Sigmoid+BCE vs softmax+CE?* Independent multi-label vs. mutually-exclusive single label.
-- *Label smoothing을 정보이론적으로?* One-hot target을 부드러워진 $p$로 대체해 $H(p)>0$이 되고, model이 무한대 logit을 향하지 못하게 억제합니다.
-- *Perplexity?* $\exp(\text{mean token NLL})$ — language model의 cross-entropy를 지수화한 것.
+- *Conjugate prior?* Posterior가 prior와 같은 family(Beta–Bernoulli, Normal–Normal) — closed-form 업데이트.
+- *LLN vs CLT?* Mean → expectation vs. 평균의 분포 → Gaussian.
+- *Sigmoid+BCE vs softmax+CE?* 독립 multi-label vs. 상호배타 single label.
+- *Label smoothing을 정보이론으로?* one-hot을 부드러운 $p$로 → $H(p)>0$, 무한대 logit을 억제.
+- *Perplexity?* $\exp(\text{평균 token NLL})$ — language model cross-entropy의 지수화.
 
 ## Cheat-sheet
 
-| Fact | One-liner |
+| Fact | 한 줄 |
 | --- | --- |
-| Bayes | posterior ∝ likelihood × prior. |
-| MLE vs MAP | max likelihood vs max likelihood×prior; Gaussian prior ⇒ L2, Laplace ⇒ L1. |
-| Loss = NLL | Gaussian→MSE, Bernoulli→BCE, Categorical→cross-entropy. |
-| CE = KL + H(p) | hard labels ⇒ CE = KL up to a constant. |
-| KL | ≥0, asymmetric; forward mode-covering, reverse mode-seeking. |
-| log-sum-exp | subtract max before exp for stability; fuse into `cross_entropy`. |
-| CLT | mean ≈ $\mathcal N(\mu,\sigma^2/n)$; basis of CIs & z-tests. |
-| p-value | P(data\|H₀), not P(H₀\|data); watch peeking, SRM, multiplicity. |
-| Calibration | softmax ≠ calibrated; fix with temperature scaling. |
+| random variable / distribution | 불확실한 값 / 그 값의 확률 지형 |
+| expectation / variance | 평균 위치 / 흩어진 정도 |
+| Gaussian | 평균 μ·표준편차 σ 두 숫자로 결정 |
+| Bayes | posterior ∝ likelihood × prior |
+| MLE vs MAP | max likelihood vs likelihood×prior; Gaussian prior ⇒ L2, Laplace ⇒ L1 |
+| 손실 = NLL | Gaussian→MSE, Bernoulli→BCE, Categorical→cross-entropy |
+| CE = KL + H(p) | hard label ⇒ CE = 상수 차이의 KL |
+| KL | ≥0, 비대칭; forward mode-covering, reverse mode-seeking |
+| log-sum-exp | exp 전에 max 빼기; `cross_entropy`로 fuse |
+| CLT | mean ≈ $\mathcal N(\mu,\sigma^2/n)$; CI·z-test의 근거 |
+| p-value | P(data\|H₀) — peeking·SRM·multiplicity 주의 |
+| calibration | softmax ≠ calibrated; temperature scaling으로 교정 |
 
-**Related:** [Optimization](#/foundations/optimization) · [Regularization & Generalization](#/foundations/regularization-generalization) · [Evaluation Metrics](#/foundations/evaluation-metrics) · [Linear Algebra & Calculus](#/foundations/linear-algebra-calculus)
+**다음:** [Optimization](#/foundations/optimization) · [Regularization & 일반화](#/foundations/regularization-generalization) · [평가 지표](#/foundations/evaluation-metrics) · [선형대수 & 미적분](#/foundations/linear-algebra-calculus)

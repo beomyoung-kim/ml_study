@@ -1,7 +1,7 @@
 # Union-Find (Disjoint Set Union)
 
 > [!TIP] Say this first
-> "When the problem is about **dynamic connectivity** — edges arrive and I keep asking 'are these two in the same group?' — Union-Find answers both `union` and `connected` in near-`O(1)` amortized." With path compression *and* union by rank, operations are `O(α(N))`, where `α` (inverse Ackermann) is ≤ 4 for any conceivable input.
+> “When the problem is about **dynamic connectivity**—edges arrive and I repeatedly ask ‘are these two in the same group?’—Union-Find answers `union` and `connected` in near-`O(1)` amortized time.” With path compression *and* union by rank, operations take `O(α(N))`. The inverse Ackermann function grows extraordinarily slowly; saying it is treated as effectively constant is safer than claiming it is exactly at most 4 for every conceivable input.
 
 DSU maintains a forest where each tree is one set. Two optimizations make it effectively constant time: **path compression** flattens trees during `find`, **union by rank/size** keeps them shallow. It's the right tool when DFS/BFS would need re-running as edges are added.
 
@@ -133,9 +133,11 @@ def kruskal_mst(n: int, edges: list[tuple[int, int, int]]) -> int:
             total += w
             if uf.count == 1:
                 break                       # spanning tree complete
+    if n > 0 and uf.count != 1:
+        raise ValueError("graph is disconnected; only a spanning forest exists")
     return total
 ```
-`O(E log E)` from the sort; the DSU work is effectively linear. Compare to Prim's (heap-based) — Kruskal wins on sparse graphs and edge-list inputs.
+`O(E log E)` from the sort; the DSU work is effectively linear. Without the final connectivity check, a disconnected graph returns the weight of a minimum spanning forest, not an MST.
 
 ## Variations to name
 

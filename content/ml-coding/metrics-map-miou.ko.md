@@ -1,55 +1,108 @@
 # mAP & mIoU 밑바닥부터
 
-> [!TIP] 이렇게 먼저 말하세요
-> "mIoU는 confusion-matrix reduction입니다 — 모든 픽셀을 `bincount` 하나로 누적한 뒤, 클래스별 $\text{IoU} = \text{TP}/(\text{TP}+\text{FP}+\text{FN})$를 계산해 평균 냅니다. mAP는 클래스별입니다: detection을 score로 정렬하고, IoU로 ground truth에 greedy하게 매칭하고, precision–recall 곡선을 만들어 그 아래 넓이를 적분합니다." 매우 다른 두 파이프라인 — 어느 것이 어느 것인지 먼저 말하세요.
+> [!NOTE] 무엇을, 왜
+> 모델이 "얼마나 잘하는지"를 하나의 숫자로 재는 게 **지표(metric)** 입니다. 비전에서 가장 많이 쓰는 둘을 직접 구현합니다: **mIoU**(segmentation — 픽셀이 얼마나 겹치나)와 **mAP**(detection — 박스를 얼마나 잘 찾나). 정밀도(precision)·재현율(recall) 기초는 [평가 지표](#/foundations/evaluation-metrics)에서 먼저 잡고 오면 훨씬 쉽습니다.
 
-mIoU(semantic segmentation)와 AP/mAP(detection)를 구현합니다. 이는 지표를 논문 속 숫자로서가 아니라 *정의 그대로* 안다는 것을 증명합니다 — ablation을 발표할 때의 신뢰도 차이입니다. Box IoU는 [IoU & NMS](#/ml-coding/nms-iou)에서 정의되고, 개념적 설명은 [Evaluation Metrics](#/foundations/evaluation-metrics)에 있습니다.
+**두 지표를 한 문장으로:**
+- **mIoU** = 클래스마다 "정답 영역과 예측 영역이 얼마나 겹치나(IoU)"를 재서, 클래스별로 평균낸 값. → segmentation 품질.
+- **mAP** = detection을 confidence(확신도) 순으로 세우고, precision–recall 곡선을 그린 뒤 **그 아래 넓이(AP)** 를 클래스마다 평균낸 값. → detection 품질.
+
+<figure>
+<svg viewBox="0 0 640 220" xmlns="http://www.w3.org/2000/svg" font-family="Inter, sans-serif" font-size="12">
+  <!-- IoU illustration (left) -->
+  <text x="110" y="20" text-anchor="middle" font-weight="700" fill="#0ea5e9">IoU = 겹침 ÷ 합집합</text>
+  <rect x="45" y="40" width="90" height="90" rx="4" fill="rgba(14,165,233,.18)" stroke="#0ea5e9" stroke-width="1.6"/>
+  <rect x="95" y="65" width="90" height="90" rx="4" fill="rgba(224,83,63,.18)" stroke="#e0533f" stroke-width="1.6"/>
+  <rect x="95" y="65" width="40" height="65" fill="rgba(18,161,80,.45)"/>
+  <text x="60" y="55" fill="#0ea5e9">정답</text><text x="165" y="150" fill="#e0533f">예측</text>
+  <text x="115" y="180" text-anchor="middle" fill="#12a150">교집합 ÷ 합집합 = IoU</text>
+  <!-- PR curve (right) -->
+  <text x="470" y="20" text-anchor="middle" font-weight="700" fill="#6366f1">AP = PR 곡선 아래 넓이</text>
+  <line x1="360" y1="160" x2="600" y2="160" stroke="#98a3b2" stroke-width="1.5"/>
+  <line x1="360" y1="40" x2="360" y2="160" stroke="#98a3b2" stroke-width="1.5"/>
+  <text x="600" y="178" text-anchor="end" fill="#98a3b2">recall(재현율) →</text>
+  <text x="352" y="45" text-anchor="end" fill="#98a3b2">precision</text>
+  <path d="M360 55 L420 58 L420 95 L500 100 L500 135 L580 140 L580 160 L360 160 Z" fill="rgba(99,102,241,.22)"/>
+  <path d="M360 55 L420 58 L420 95 L500 100 L500 135 L580 140" fill="none" stroke="#6366f1" stroke-width="2.2"/>
+  <text x="480" y="120" text-anchor="middle" fill="#6366f1">넓이 = AP</text>
+</svg>
+<figcaption>왼쪽: IoU(Intersection over Union, 합집합 대비 교집합)는 두 영역이 얼마나 겹치는지를 0~1로 잰다. 오른쪽: detection의 AP는 precision–recall 곡선 아래 넓이다. mIoU/mAP는 이걸 클래스마다 평균낸 것.</figcaption>
+</figure>
+
+이 지표들을 논문 속 숫자가 아니라 *정의 그대로* 구현해 두면, 나중에 실험 결과를 발표할 때 신뢰도가 다릅니다. Box IoU 자체는 [IoU & NMS](#/ml-coding/nms-iou)에서도 다룹니다.
+
+> [!TIP] 면접 한 줄
+> "mIoU는 confusion-matrix(혼동 행렬) reduction입니다 — 모든 픽셀을 `bincount` 하나로 누적한 뒤 클래스별 $\text{TP}/(\text{TP}+\text{FP}+\text{FN})$를 평균. mAP는 detection을 score로 정렬하고 IoU로 greedy 매칭해 PR 곡선을 만든 뒤 그 아래를 적분합니다." 매우 다른 두 파이프라인 — 어느 게 어느 건지 먼저 구분해 말하세요.
 
 ## Practice — 직접 구현하고 실행·테스트
 
 > [!TIP] 이 섹션 사용법
-> 아래 각 문제에는 NumPy가 미리 로드된 **라이브 Python 에디터**가 있습니다. 직접 풀이를 작성하고 **▶ Run tests**를 누르면 어떤 케이스가 통과하는지 보여줍니다. 막히면 참고용 **Solution**을 열어볼 수 있지만, 먼저 직접 시도하세요 — 그 씨름이 곧 연습입니다. 첫 Run에서 작은 Python 런타임과 NumPy(~15 MB)를 내려받고, 이후 실행은 즉시입니다. 밑바닥부터 구현하는 지표들이라 입력은 작고 결정적이며, `numpy.allclose`로 비교합니다.
+> 아래 각 문제에는 NumPy가 미리 로드된 **라이브 Python 에디터**가 있습니다. 직접 풀이를 작성하고 **▶ Run tests**를 누르면 어떤 케이스가 통과하는지 보여줍니다. 막히면 참고용 **Solution**을 열어볼 수 있지만, 먼저 직접 시도하세요. 첫 Run에서 작은 Python 런타임과 NumPy(~15 MB)를 내려받고, 이후 실행은 즉시입니다. 입력은 작고 결정적이며 `numpy.allclose`로 비교합니다. NumPy가 처음이면 [NumPy 프라이머](#/ml-coding/numpy-primer)를 먼저 보세요.
 
 순서대로 진행하세요 — segmentation 지표(Part 1)를 먼저, 그다음 detection AP 기계(Part 2)를 만듭니다.
 
 ### Part 1 — confusion matrix를 통한 mIoU
 
-클래스별로 $\text{IoU}_c = \dfrac{\text{TP}_c}{\text{TP}_c + \text{FP}_c + \text{FN}_c}$이고, mIoU는 클래스에 대한 평균입니다. 우아한 트릭: 모든 (gt, pred) 픽셀 쌍을 하나의 정수로 인코딩하고 `bincount`로 한 방에 $C\times C$ 행렬로 만드는 것입니다.
+**혼동 행렬(confusion matrix)** 은 "정답이 A인데 B로 예측한 픽셀이 몇 개"를 $C\times C$ 표로 센 것입니다(행 = 정답, 열 = 예측). 대각선이 맞힌 것(TP), 나머지가 틀린 것입니다. 클래스별로 $\text{IoU}_c = \dfrac{\text{TP}_c}{\text{TP}_c + \text{FP}_c + \text{FN}_c}$이고, mIoU는 클래스에 대한 평균입니다.
 
-먼저 confusion matrix — 모든 `(gt, pred)` 픽셀 쌍을 `gt*C + pred`로 인코딩하고 `bincount`로 $C\times C$ 표(행 = gt, 열 = pred)에 누적하되, `ignore_index` 픽셀은 제외합니다.
-
-<div class="widget" data-widget="code">
-<script type="application/json" class="code-config">
-{"func":"confusion_matrix","packages":["numpy"],"approx":true,"starter":"import numpy as np\n\ndef confusion_matrix(pred, target, num_classes, ignore_index=255):\n    # flatten both, drop ignore_index pixels, then bincount(gt*C + pred) -> (C,C)\n    pass","tests":[{"args":[[[0,0,1],[1,1,1]],[[0,1,1],[1,1,0]],2,-1],"expect":[[1,1],[1,3]]},{"args":[[[0,1],[1,0]],[[0,255],[1,255]],2,255],"expect":[[1,0],[0,1]]},{"args":[[[0,0],[1,2]],[[0,1],[1,2]],3],"expect":[[1,0,0],[1,1,0],[0,0,1]]}],"solution":"import numpy as np\n\ndef confusion_matrix(pred, target, num_classes, ignore_index=255):\n    pred = np.asarray(pred); target = np.asarray(target)\n    pred, target = pred.reshape(-1), target.reshape(-1)\n    keep = target != ignore_index\n    pred, target = pred[keep], target[keep]\n    cm = np.bincount(target * num_classes + pred, minlength=num_classes ** 2).reshape(num_classes, -1)\n    return cm.astype(np.float64)"}
-</script>
-</div>
-
-그다음 mIoU: confusion matrix로부터 클래스별 $\text{TP}=\text{diag}$, $\text{FP}=\text{열 합}-\text{TP}$, $\text{FN}=\text{행 합}-\text{TP}$를 구하고, 등장한 클래스에 대해 $\text{TP}/(\text{TP}+\text{FP}+\text{FN})$를 평균 냅니다.
+우아한 트릭: 모든 `(gt, pred)` 픽셀 쌍을 `gt*C + pred`라는 정수 하나로 인코딩하고 `bincount`로 한 방에 $C\times C$ 행렬을 만듭니다(클래스별 반복문 없이 — [브로드캐스팅/벡터화](#/ml-coding/numpy-primer) 사고방식). `ignore_index` 픽셀은 제외합니다.
 
 <div class="widget" data-widget="code">
 <script type="application/json" class="code-config">
-{"func":"mean_iou","packages":["numpy"],"approx":true,"starter":"import numpy as np\n\ndef mean_iou(pred, target, num_classes, ignore_index=255):\n    # build the confusion matrix, then per-class TP/(TP+FP+FN); mean over present classes\n    pass","tests":[{"args":[[[0,0,1],[1,1,1]],[[0,1,1],[1,1,0]],2,-1],"expect":0.4666666666666667},{"args":[[[0,1],[1,0]],[[0,1],[1,0]],2,-1],"expect":1.0},{"args":[[[0,0]],[[0,0]],2,-1],"expect":1.0}],"solution":"import numpy as np\n\ndef confusion_matrix(pred, target, num_classes, ignore_index=255):\n    pred = np.asarray(pred); target = np.asarray(target)\n    pred, target = pred.reshape(-1), target.reshape(-1)\n    keep = target != ignore_index\n    pred, target = pred[keep], target[keep]\n    return np.bincount(target * num_classes + pred, minlength=num_classes ** 2).reshape(num_classes, -1).astype(np.float64)\n\ndef mean_iou(pred, target, num_classes, ignore_index=255):\n    cm = confusion_matrix(pred, target, num_classes, ignore_index)\n    tp = np.diag(cm)\n    fp = cm.sum(0) - tp\n    fn = cm.sum(1) - tp\n    denom = tp + fp + fn\n    iou = np.where(denom > 0, tp / np.maximum(denom, 1e-8), np.nan)\n    return float(np.nanmean(iou))"}
+{"func":"confusion_matrix","packages":["numpy"],"approx":true,"starter":"import numpy as np\n\ndef confusion_matrix(pred, target, num_classes, ignore_index=255):\n    # flatten both, drop ignore_index pixels, then bincount(gt*C + pred) -> (C,C)\n    pass","tests":[{"args":[[[0,0,1],[1,1,1]],[[0,1,1],[1,1,0]],2,-1],"expect":[[1,1],[1,3]]},{"args":[[[0,1],[1,0]],[[0,255],[1,255]],2,255],"expect":[[1,0],[0,1]]},{"args":[[[0,0],[1,2]],[[0,1],[1,2]],3],"expect":[[1,0,0],[1,1,0],[0,0,1]]}],"solution":"import numpy as np\n\ndef confusion_matrix(pred, target, num_classes, ignore_index=255):\n    pred = np.asarray(pred, dtype=np.int64); target = np.asarray(target, dtype=np.int64)\n    if pred.shape != target.shape or num_classes <= 0:\n        raise ValueError('pred/target shapes must match and num_classes must be positive')\n    pred, target = pred.reshape(-1), target.reshape(-1)\n    keep = target != ignore_index\n    pred, target = pred[keep], target[keep]\n    if np.any((target < 0) | (target >= num_classes) | (pred < 0) | (pred >= num_classes)):\n        raise ValueError('class index out of range')\n    cm = np.bincount(target * num_classes + pred, minlength=num_classes ** 2).reshape(num_classes, -1)\n    return cm.astype(np.float64)"}
 </script>
 </div>
 
-**왜 confusion matrix인가:** 이미지에 걸쳐 additive하므로, 전체 validation set에 대해 `cm`을 누적하고 마지막에 IoU를 한 번만 계산합니다. `bincount`는 모든 $HW$ 픽셀을 벡터화합니다 — 클래스별 loop가 없습니다. **복잡도:** 이미지당 $O(HW)$.
+그다음 mIoU: confusion matrix로부터 클래스별 $\text{TP}=\text{대각선}$, $\text{FP}=\text{열 합}-\text{TP}$, $\text{FN}=\text{행 합}-\text{TP}$를 구하고, 등장한 클래스에 대해 $\text{TP}/(\text{TP}+\text{FP}+\text{FN})$를 평균 냅니다.
 
-> [!WARNING] 이미지별 IoU를 평균 내지 마세요
-> mIoU는 각 이미지의 IoU를 평균 내는 게 아니라 **데이터셋 전체로 집계된** TP/FP/FN으로 계산합니다. 이미지별 평균은 특정 클래스가 픽셀을 적게 차지하는 이미지에 과도한 가중치를 주며, 이것이 전형적인 보고 수치 불일치의 원인입니다.
+<div class="widget" data-widget="code">
+<script type="application/json" class="code-config">
+{"func":"mean_iou","packages":["numpy"],"approx":true,"starter":"import numpy as np\n\ndef mean_iou(pred, target, num_classes, ignore_index=255):\n    # build the confusion matrix, then per-class TP/(TP+FP+FN); mean over present classes\n    pass","tests":[{"args":[[[0,0,1],[1,1,1]],[[0,1,1],[1,1,0]],2,-1],"expect":0.4666666666666667},{"args":[[[0,1],[1,0]],[[0,1],[1,0]],2,-1],"expect":1.0},{"args":[[[0,0]],[[0,0]],2,-1],"expect":1.0}],"solution":"import numpy as np\n\ndef confusion_matrix(pred, target, num_classes, ignore_index=255):\n    pred = np.asarray(pred, dtype=np.int64); target = np.asarray(target, dtype=np.int64)\n    if pred.shape != target.shape or num_classes <= 0:\n        raise ValueError('pred/target shapes must match and num_classes must be positive')\n    pred, target = pred.reshape(-1), target.reshape(-1)\n    keep = target != ignore_index\n    pred, target = pred[keep], target[keep]\n    if np.any((target < 0) | (target >= num_classes) | (pred < 0) | (pred >= num_classes)):\n        raise ValueError('class index out of range')\n    return np.bincount(target * num_classes + pred, minlength=num_classes ** 2).reshape(num_classes, -1).astype(np.float64)\n\ndef mean_iou(pred, target, num_classes, ignore_index=255):\n    cm = confusion_matrix(pred, target, num_classes, ignore_index)\n    tp = np.diag(cm)\n    fp = cm.sum(0) - tp\n    fn = cm.sum(1) - tp\n    denom = tp + fp + fn\n    iou = np.where(denom > 0, tp / np.maximum(denom, 1e-8), np.nan)\n    return float(np.nanmean(iou))"}
+</script>
+</div>
+
+**왜 confusion matrix인가:** 이미지에 걸쳐 더하기가 되므로(additive), 전체 validation set에 대해 `cm`을 누적하고 마지막에 IoU를 한 번만 계산합니다. `bincount`는 모든 $HW$ 픽셀을 벡터화합니다 — 클래스별 loop가 없습니다. **복잡도:** 이미지당 $O(HW)$.
+
+> [!WARNING] benchmark의 aggregation contract를 먼저 확인하세요
+> MMSeg류 semantic-segmentation benchmark는 보통 데이터셋 전체 confusion matrix를 합친 뒤 class IoU를 냅니다. 그러나 일부 의료·영상 benchmark는 image/case별 Dice·IoU 평균을 명시합니다. 둘은 다른 지표이므로 이름만 보고 섞지 말고 공식 evaluator와 동일한 단위로 집계하세요.
 
 ### Part 2 — AP / mAP
 
-AP는 한 클래스에 대한 precision–recall 곡선 아래 넓이입니다. Detection은 confidence로 순위를 매기고, 각각은 아직 매칭되지 않은 ground-truth box에 IoU $\ge$ threshold로 매칭되면 **true positive**, 아니면 **false positive**입니다.
+AP(Average Precision, 평균 정밀도)는 한 클래스에 대한 precision–recall 곡선 아래 넓이입니다. Detection을 confidence(확신도)로 순위를 매기고, 각각은 아직 매칭되지 않은 정답 박스에 IoU $\ge$ threshold(임계값)로 매칭되면 **true positive(참 양성)**, 아니면 **false positive(거짓 양성)** 입니다.
 
-먼저 box IoU — xyxy 포맷의 box 하나를 `N`개 box와 비교해 `N`개의 overlap을 반환합니다.
+AP 매칭에는 box IoU가 필요합니다. IoU/NMS의 전체 취급(벡터화된 `iou_matrix`, edge case, greedy `nms`)은 canonical owner인 [IoU & NMS 구현](#/ml-coding/nms-iou)에 있으니, 여기서는 mAP 파이프라인이 그대로 돌아가도록 **최소 인라인 버전**만 둡니다 — 박스 하나를 `N`개 박스와 비교해 `N`개 overlap을 반환합니다.
 
-<div class="widget" data-widget="code">
-<script type="application/json" class="code-config">
-{"func":"box_iou","packages":["numpy"],"approx":true,"starter":"import numpy as np\n\ndef box_iou(box, boxes):\n    # box:(4,) vs boxes:(N,4) xyxy -> (N,); intersection area over union area\n    pass","tests":[{"args":[[0,0,10,10],[[0,0,10,10]]],"expect":[1.0]},{"args":[[0,0,10,10],[[0,0,10,10],[5,5,15,15]]],"expect":[1.0,0.14285714285714285]},{"args":[[0,0,10,10],[[20,20,30,30]]],"expect":[0.0]},{"args":[[0,0,10,10],[]],"expect":[]}],"solution":"import numpy as np\n\ndef box_iou(box, boxes):\n    box = np.asarray(box, float); boxes = np.asarray(boxes, float)\n    if boxes.size == 0:\n        return np.zeros(0)\n    lt = np.maximum(box[:2], boxes[:, :2])\n    rb = np.minimum(box[2:], boxes[:, 2:])\n    wh = np.maximum(0.0, rb - lt)\n    inter = wh[:, 0] * wh[:, 1]\n    a1 = np.prod(np.maximum(0.0, box[2:] - box[:2]))\n    a2 = np.prod(np.maximum(0.0, boxes[:, 2:] - boxes[:, :2]), axis=1)\n    return inter / np.maximum(a1 + a2 - inter, 1e-8)"}
-</script>
-</div>
+```python
+import numpy as np
 
-그다음 VOC all-point AP: PR 곡선을 pad하고, precision을 오른쪽에서부터 단조로 만든 뒤(envelope), 각 recall step에서 넓이를 합산합니다.
+def box_iou(box, boxes):
+    """box:(4,) vs boxes:(N,4) xyxy -> (N,). Minimal inline copy; full treatment in nms-iou."""
+    box = np.asarray(box, float); boxes = np.asarray(boxes, float)
+    if boxes.size == 0:
+        return np.zeros(0)
+    lt = np.maximum(box[:2], boxes[:, :2])
+    rb = np.minimum(box[2:], boxes[:, 2:])
+    wh = np.maximum(0.0, rb - lt)
+    inter = wh[:, 0] * wh[:, 1]
+    a1 = np.prod(np.maximum(0.0, box[2:] - box[:2]))
+    a2 = np.prod(np.maximum(0.0, boxes[:, 2:] - boxes[:, :2]), axis=1)
+    return inter / np.maximum(a1 + a2 - inter, 1e-8)
+```
+
+그다음 VOC all-point AP: PR 곡선을 pad하고, precision을 오른쪽에서부터 단조(monotone)로 만든 뒤(**envelope, 포락선**), 각 recall step에서 넓이를 합산합니다.
+
+<figure>
+<svg viewBox="0 0 640 190" xmlns="http://www.w3.org/2000/svg" font-family="Inter, sans-serif" font-size="12">
+  <text x="160" y="18" text-anchor="middle" fill="#98a3b2">원래 PR (출렁임)</text>
+  <line x1="40" y1="150" x2="300" y2="150" stroke="#98a3b2"/><line x1="40" y1="40" x2="40" y2="150" stroke="#98a3b2"/>
+  <polyline points="40,55 100,65 100,110 170,95 170,130 250,120 250,145" fill="none" stroke="#e0533f" stroke-width="2"/>
+  <text x="480" y="18" text-anchor="middle" fill="#98a3b2">오른쪽부터 최댓값 (envelope)</text>
+  <line x1="360" y1="150" x2="620" y2="150" stroke="#98a3b2"/><line x1="360" y1="40" x2="360" y2="150" stroke="#98a3b2"/>
+  <polyline points="360,55 420,55 420,95 490,95 490,120 570,120 570,145" fill="none" stroke="#12a150" stroke-width="2.4"/>
+  <text x="490" y="175" text-anchor="middle" fill="#12a150">각 recall에서 도달 가능한 최선의 precision</text>
+</svg>
+<figcaption>precision envelope: recall이 커질 때 precision을 단조 비증가하게 만들어 "출렁임"을 제거한다. 그러면 AP가 각 recall 수준에서 달성 가능한 최선의 precision을 측정한다.</figcaption>
+</figure>
 
 <div class="widget" data-widget="code">
 <script type="application/json" class="code-config">
@@ -57,9 +110,9 @@ AP는 한 클래스에 대한 precision–recall 곡선 아래 넓이입니다. 
 </script>
 </div>
 
-precision envelope(recall이 커질 때 precision을 단조 비증가하게 만드는 것)는 "출렁임"을 제거하여, AP가 각 recall 수준에서 달성 가능한 최선의 precision을 측정하게 합니다.
-
 #### 이미지별 greedy 매칭 후 적분
+
+마지막 조각은 detection을 실제로 TP/FP로 라벨링하는 부분입니다(길어서 참고용 정적 코드로 둡니다). 핵심 규칙만 기억하세요: **detection을 score 내림차순으로 전역 정렬 → 각자 자기 이미지의 정답에만 매칭 → 정답 하나는 한 번만 차지 → 누적 precision/recall로 곡선을 그려 `average_precision`에 넣기.**
 
 ```python
 def mean_average_precision(preds, gts, num_classes, iou_thr=0.5):
@@ -99,7 +152,9 @@ def mean_average_precision(preds, gts, num_classes, iou_thr=0.5):
     return float(np.mean(aps)) if aps else 0.0
 ```
 
-**결정적 디테일:** 매칭은 **이미지별**이고 각 ground-truth box는 **한 번만** 차지될 수 있습니다 — 같은 객체에 대한 두 번째 detection은 false positive입니다(그래서 NMS가 중요합니다). Detection을 score로 전역 정렬하면 PR 곡선을 생성하는 순위가 나옵니다. **복잡도:** 클래스당 $O(P\log P)$ 정렬 + $O(P\cdot G)$ 매칭.
+**결정적 디테일:** 매칭은 **이미지별**이고 각 정답 박스는 **한 번만** 차지될 수 있습니다 — 같은 객체에 대한 두 번째 detection은 false positive입니다(그래서 [NMS](#/ml-coding/nms-iou)가 중요합니다). **복잡도:** 클래스당 $O(P\log P)$ 정렬 + $O(P\cdot G)$ 매칭.
+
+또 하나의 함정: 이미 recall=1에 도달한 뒤 붙는 낮은-score FP는 interpolated AP를 낮추지 않을 수 있습니다. 따라서 "FP 하나를 추가했으니 AP가 반드시 감소" 같은 테스트는 틀립니다. FP를 TP보다 앞에 두거나, 아직 recall이 남은 구간에 넣어 ranking을 검증하세요.
 
 ## Sanity check
 
@@ -112,9 +167,10 @@ if __name__ == "__main__":
     perfect = [{"boxes": np.array([[0, 0, 10, 10.]]),
                 "scores": np.array([0.9]), "labels": np.array([0])}]
     assert abs(mean_average_precision(perfect, gt, 1) - 1.0) < 1e-6
-    with_fp = [{"boxes": np.array([[0, 0, 10, 10.], [50, 50, 60, 60.]]),
-                "scores": np.array([0.9, 0.8]), "labels": np.array([0, 0])}]
-    assert mean_average_precision(with_fp, gt, 1) < 1.0   # FP lowers AP
+    with_early_fp = [{"boxes": np.array([[0, 0, 10, 10.], [50, 50, 60, 60.]]),
+                      "scores": np.array([0.8, 0.9]), "labels": np.array([0, 0])}]
+    assert mean_average_precision(with_early_fp, gt, 1) < 1.0
+    # full recall 뒤의 낮은-score FP는 interpolated AP를 낮추지 않을 수도 있다.
     print("mIoU/mAP sanity OK")
 ```
 
@@ -124,8 +180,8 @@ if __name__ == "__main__":
 ## 면접관이 지켜보는 흔한 버그
 
 - **이미지별 IoU를 평균 냄** — confusion matrix 집계 대신(위 warning 참고).
-- **ground truth를 두 번 매칭** — 첫 매칭 후 used로 표시해야 함.
-- **전역 vs 이미지별 매칭:** detection은 *자기 이미지 내의* ground truth에만 매칭 가능.
+- **정답을 두 번 매칭** — 첫 매칭 후 used로 표시해야 함.
+- **전역 vs 이미지별 매칭:** detection은 *자기 이미지 내의* 정답에만 매칭 가능.
 - **`argsort` 방향:** detection을 *내림차순* score로 순위 매김.
 - **`ignore_index`** 픽셀은 confusion matrix에서 제외해야 함.
 
@@ -144,7 +200,7 @@ if __name__ == "__main__":
 
 **짧게:** 전체 집합에 대해 TP/FP/FN을 집계하면 이미지와 무관하게 각 클래스에 동등한 가중치를 주지만, 드문 클래스도 여전히 *평균*을 지배할 수 있는 단일 IoU를 갖습니다.
 
-**깊게:** mIoU가 클래스별 IoU를 동등하게 평균 내기 때문에, 몇 개 이미지에만 존재하는 클래스도 여전히 점수의 $\frac1C$를 차지합니다 — tail-class 실패를 드러내는 데는 좋지만, 클래스의 픽셀이 적으면 noisy합니다. 대안: frequency-weighted IoU(각 클래스를 픽셀 수로 가중)는 tail 실패를 숨기고, pixel accuracy는 다수 클래스에 지배됩니다. mIoU와 함께 클래스별 IoU를 보고하는 것이 best practice이며, segmentation 결과를 발표할 때 면접관이 파고드는 바로 그 nuance입니다.
+**깊게:** mIoU가 클래스별 IoU를 동등하게 평균 내기 때문에, 몇 개 이미지에만 존재하는 클래스도 여전히 점수의 $\frac1C$를 차지합니다 — tail-class 실패를 드러내는 데는 좋지만, 클래스의 픽셀이 적으면 noisy합니다. 대안: frequency-weighted IoU(각 클래스를 픽셀 수로 가중)는 tail 실패를 숨기고, pixel accuracy는 다수 클래스에 지배됩니다. mIoU와 함께 클래스별 IoU를 보고하는 것이 best practice입니다.
 </div></details>
 
 <details class="qa"><summary>mask AP는 box AP와 어떻게 다른가?</summary>
@@ -159,19 +215,19 @@ if __name__ == "__main__":
 - **Precision–recall vs ROC?** 불균형 detection(positive가 적음)에는 PR이 맞는 곡선입니다. negative가 지배할 때 ROC의 FPR은 오해를 부릅니다.
 - **왜 나쁜 NMS가 mAP를 해치나?** 한 객체의 중복 detection이 false positive가 되어 모든 recall 수준에서 precision을 끌어내립니다.
 - **배치에 걸쳐 mIoU를 벡터화?** confusion matrix를 합산; `bincount`가 이미 모든 픽셀을 한 번에 처리합니다.
-- **Panoptic quality (PQ)?** segmentation IoU와 recognition(TP/FP/FN)을 하나의 숫자로 결합하여 panoptic segmentation에 사용.
+- **Panoptic quality (PQ)?** segmentation IoU와 recognition(TP/FP/FN)을 하나의 숫자로 결합 — [Segmentation](#/cv/segmentation) 참고.
 
 ## Cheat-sheet
 
 | Item | Value |
 | --- | --- |
 | IoU (class) | $\text{TP}/(\text{TP}+\text{FP}+\text{FN})$ |
-| mIoU | mean of per-class IoU, **dataset-aggregated** |
+| mIoU | 클래스별 IoU의 평균, **데이터셋 전체 집계** |
 | Confusion trick | `bincount(gt*C + pred)` → $C\times C$ |
-| AP | area under PR curve (VOC all-point / COCO 101-pt) |
-| TP rule | IoU $\ge$ thr **and** gt unmatched, per image |
-| Duplicate detection | false positive → motivates NMS |
-| COCO mAP | avg over IoU 0.50:0.05:0.95, per class |
-| Mask AP | same pipeline, mask IoU for matching |
+| AP | PR 곡선 아래 넓이 (VOC all-point / COCO 101-pt) |
+| TP 규칙 | IoU $\ge$ thr **그리고** gt 미매칭, 이미지별 |
+| 중복 detection | false positive → NMS가 필요한 이유 |
+| COCO mAP | IoU 0.50:0.05:0.95 평균, 클래스별 |
+| Mask AP | 동일 파이프라인, 매칭에 mask IoU |
 
-**Cross-links:** [IoU & NMS](#/ml-coding/nms-iou) · [Evaluation Metrics](#/foundations/evaluation-metrics) · [Object Detection](#/cv/detection) · [Segmentation](#/cv/segmentation) · [The ML Coding Round](#/ml-coding/intro)
+**다음:** [IoU & NMS](#/ml-coding/nms-iou) · [평가 지표](#/foundations/evaluation-metrics) · [객체 검출](#/cv/detection) · [Segmentation](#/cv/segmentation) · [ML 코딩 라운드](#/ml-coding/intro)

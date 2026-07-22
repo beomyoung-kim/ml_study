@@ -3,13 +3,13 @@
 <div class="tag-row"><span class="tag">CVPR 2023 · CVPR 2022</span><span class="tag">weakly / semi-supervised</span><span class="tag">point supervision</span><span class="tag">instance seg</span><span class="tag">first author</span></div>
 
 > [!TIP] 30-second pitch
-> Two first-author CVPR papers that cut annotation cost for instance segmentation by **attacking the proposal bottleneck**. **BESTIE** (CVPR 2022) transfers image-level (WSSS) knowledge into instances and fixes *semantic drift* with self-refinement — no off-the-shelf proposals. **PointWSSIS** (CVPR 2023) proposes the **weakly-semi (few full + many point) setting** and directly removes the proposal false-negative/false-positive bottleneck, hitting near-fully-supervised AP with a fraction of the masks. Both are one fight: **control pseudo-label noise while spending less on labels.**
+> Two first-author CVPR papers that reduce instance-segmentation annotation cost at the **proposal bottleneck**. **BESTIE** (CVPR 2022) transfers image-level knowledge into instances and uses self-refinement to reduce semantic drift. **PointWSSIS** (CVPR 2023) uses points to reduce proposal ambiguity and refine masks in a few-full + many-point setting. The paper reports AP close to a fully supervised reference with 50% full labels on COCO, and AP above the compared semi-supervised baseline at 5%. Their shared question is **how to control pseudo-label noise while reducing the label budget**.
 
 **Public references:** BESTIE [arXiv 2109.09477](https://arxiv.org/abs/2109.09477) / [code](https://github.com/clovaai/BESTIE); PointWSSIS [arXiv 2303.15062](https://arxiv.org/abs/2303.15062) / [code](https://github.com/clovaai/PointWSSIS). Backing chapter: [Weak & Semi-Supervised](#/cv/weak-semi-supervised).
 
 ## Why the proposal is the bottleneck
 
-Almost every instance segmenter is **proposal → mask** (box, point, or query, then a mask head). If the proposal stage misses an object (false negative), the mask head — however good — **cannot emit that instance**. If you lower the confidence threshold to catch more, you flood false positives. In semi-supervised instance seg (SSIS), pseudo-labels sit exactly on this FN↔FP trade-off. Both papers reframe the task as *"get the right proposals cheaply, then refine,"* rather than *"improve the mask head."*
+Many instance-segmentation pipelines produce proposals, queries, or candidates before predicting masks. If the candidate stage misses an object, the later mask head has difficulty recovering it; lowering the confidence threshold can increase false positives. The two papers recast this SSIS trade-off as candidate selection and pseudo-label refinement.
 
 ## BESTIE (CVPR 2022) — semantic → instance under weak labels
 
@@ -23,6 +23,7 @@ Almost every instance segmenter is **proposal → mask** (box, point, or query, 
 <dt>Instance-Aware Guidance (IAG)</dt><dd>Apply center/offset losses <b>only on labeled instance regions</b>, so unlabeled/missing objects don't get pulled to background.</dd>
 <dt>Self-refinement</dt><dd><b>Online</b> (per mini-batch) grouping of the network's own outputs into refined labels, fed back with soft weights — promotes FN→TP without offline iteration.</dd>
 </dl>
+
 Optional Mask R-CNN refinement stage. **Result:** VOC mAP50 **51.0%** (with MRCNN refine); COCO AP50 ~28.0% at image-level; swapping in point cues lifts it further.
 
 ## PointWSSIS (CVPR 2023) — the weakly-semi setting
@@ -32,11 +33,12 @@ Optional Mask R-CNN refinement stage. **Result:** VOC mAP50 **51.0%** (with MRCN
 **Method (teacher → filter → refine → student).**
 <dl class="kv">
 <dt>1. Teacher</dt><dd>Train a SOLOv2 teacher on the few full labels.</dd>
-<dt>2. Point-guided proposal filtering</dt><dd>Use the point to keep only <b>true-positive</b> proposals — the point tells you <i>where</i>, killing the FN/FP dilemma.</dd>
+<dt>2. Point-guided proposal filtering</dt><dd>Select proposals matching the point location to reduce the false-positive/false-negative trade-off. Points do not completely eliminate annotation noise or proposal misses, so explain this only within the paper's protocol.</dd>
 <dt>3. Adaptive Pyramid-Level Selection (APS)</dt><dd>A point has no size, so pick the FPN level by <b>confidence argmax</b> across levels; small gap to a GT-size oracle.</dd>
 <dt>4. MaskRefineNet</dt><dd>Input = concat(image crop, rough teacher mask, point Gaussian heatmap) → refined mask. All three inputs are necessary (ablation); without the rough mask it fails to converge. This is the key module when full labels are tiny (1–5%).</dd>
 <dt>5. Student</dt><dd>Retrain on full + high-quality pseudo-labels.</dd>
 </dl>
+
 **Results:** COCO **50%** full → **38.8 AP** ≈ fully-supervised 39.7; COCO **5%** full → **33.7** vs SSIS baseline 24.9. On BDD100K, fixing 7k full and growing points 20k→67k lifts AP 22.1→27.9. On a budget–AP Pareto it beats box-only weak supervision and SSIS.
 
 ```mermaid
@@ -84,7 +86,7 @@ flowchart TB
 
 **Short:** A point adds *location*, which lets you select a true-positive proposal; image-level only lets you reject misclassified ones.
 
-**Deep:** Annotation cost for a point is only seconds more than image-level (literature estimates put both well below box/mask). But that location signal turns the FN/FP proposal dilemma into a clean selection: keep the proposal the point lands in. That's why the AP gap (e.g., COCO 5%: 33.7 vs 24.9) is large despite the tiny cost gap.
+**Deep:** Under the annotation-cost assumptions used by the paper, a point is cheaper than a box or mask while adding location information. That location reduces ambiguity by filtering proposals more directly than an image-level label. Actual cost varies with the annotation UI, quality bar, and domain, so state the assumption alongside the COCO 5% result—33.7 versus 24.9 for the compared baseline—rather than asserting an absolute number of seconds.
 </div></details>
 
 <details class="qa"><summary>Why does MaskRefineNet need all three inputs?</summary>
@@ -126,7 +128,7 @@ The claim isn't "points are free," it's a **budget–AP Pareto** win: 5% full + 
 <details class="qa"><summary>Which one would you present, and why?</summary>
 <div class="qa-body">
 
-For a **product/data-efficiency** audience, PointWSSIS (near-full AP at 5% masks). For a **weak-supervision/theory** audience, BESTIE (drift, cue extraction). Best of all: present the **arc** — both redefine the bottleneck (proposal vs. cue) and win by controlling pseudo-label noise, which is the reusable idea.
+For a **product/data-efficiency** audience, distinguish PointWSSIS's baseline improvement in the 5% setting from its near-fully-supervised-reference result in the 50% setting. For a **weak-supervision** audience, emphasize BESTIE's drift and cue extraction. Their shared idea is redefining the candidate/cue bottleneck and controlling pseudo-label noise.
 </div></details>
 
 ## Honest limitations
@@ -135,13 +137,13 @@ For a **product/data-efficiency** audience, PointWSSIS (near-full AP at 5% masks
 - **PointWSSIS:** still needs *some* points — pure unlabeled web-scale extension is future work.
 - Both predate query-based universal segmenters; the transfer is argued, not benchmarked.
 
-## Which JD this connects to
+## Which JD signals this connects to
 
-| Company | Connection |
+| JD signal | Evidence to connect |
 | --- | --- |
-| Apple / Meta | Large-scale data curation with weak/cheap signals |
-| Adobe | Mask quality under limited annotation |
-| NVIDIA | Efficient labeling pipelines for robotics/AV data |
+| Low-label data curation | Image/point/full-label budgets and the AP Pareto frontier |
+| Weak/semi-supervised segmentation | Proposal FN/FP, semantic drift, and pseudo-label refinement |
+| Robotics/AV labeling pipeline | Point-annotation assumptions together with domain-transfer limitations |
 
 ## Cheat-sheet
 
@@ -151,8 +153,8 @@ For a **product/data-efficiency** audience, PointWSSIS (near-full AP at 5% masks
 | PointWSSIS | CVPR 2023, first author; COCO 5% **33.7** vs 24.9; 50% **38.8** ≈ full 39.7 |
 | PointWSSIS modules | point filter → **APS** (FPN level by confidence) → **MaskRefineNet** (img + rough mask + point heatmap) |
 | Prequel | **DRS** (AAAI 2021): suppress discriminative regions to spread CAM |
-| One idea | Redefine the **proposal/cue bottleneck**; win by controlling **pseudo-label noise** |
+| One idea | Redefine the **proposal/cue bottleneck** and control **pseudo-label noise** |
 
 ## Cross-links
 - Topical: [Weak & Semi-Supervised](#/cv/weak-semi-supervised) · [Segmentation](#/cv/segmentation) · [Object Detection](#/cv/detection)
-- Deep-dives: [ECLIPSE](#/resume/eclipse) · [ZIM](#/resume/zim) · back to the [CV → Interview Map](#/resume/overview)
+- Deep-dives: [ECLIPSE](#/resume/eclipse) · [ZIM](#/resume/zim) · [Phoenix (ECCV'26 mask refinement)](#/resume/phoenix-mask-refinement) — generalizing the MaskRefineNet line · back to the [CV → Interview Map](#/resume/overview)

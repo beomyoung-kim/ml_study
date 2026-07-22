@@ -1,170 +1,232 @@
-# Segmentation
+# Segmentation (분할)
 
-<div class="tag-row"><span class="tag">semantic</span><span class="tag">instance</span><span class="tag">panoptic</span><span class="tag">mask classification</span><span class="tag">mIoU / PQ</span><span class="tag">Mask2Former</span></div>
+> [!NOTE] 이 챕터의 목표
+> Detection이 물체를 **네모 상자**로 잡았다면, segmentation은 한 걸음 더 나아가 **픽셀 하나하나에 라벨을 붙입니다**. "이 픽셀은 사람, 저 픽셀은 도로." 여기서는 그림으로 semantic/instance/panoptic의 차이부터 잡고, 그다음 현대 모델(Mask2Former, SAM)이 어떻게 이를 푸는지, 그리고 mIoU·PQ로 어떻게 채점하는지까지 갑니다.
 
-> [!TIP] 이 챕터가 중요한 이유
-> Segmentation은 **지원자의 홈그라운드**입니다 (DRS, BESTIE, PointWSSIS, SSUL, ECLIPSE, ZIM 전부 여기서 출발합니다). 면접관은 per-pixel classification에서 **mask classification**으로 넘어간 *패러다임 전환*, mIoU와 PQ의 차이, 그리고 soft mask(matting)가 hard mask와 갈라지는 지점을 파고들 겁니다. 정의만 나열하지 말고 계보와 trade-off로 답하세요.
+세그멘테이션은 이 자료를 만든 사람의 **홈그라운드**입니다(ZIM·ECLIPSE·PointWSSIS·BESTIE 등). 그만큼 계보와 trade-off를 그림처럼 설명할 수 있으면 강력합니다.
 
-## The task taxonomy in one table
+## 1 · 세 가지 분할, 그림으로
 
-| Task | Output | Instances? | `stuff` handled? | Metric |
+같은 장면(사람 둘 + 하늘 + 도로)을 세 방식으로 라벨링한 그림입니다. **무엇이 다른지**가 핵심입니다.
+
+<figure>
+<svg viewBox="0 0 660 210" xmlns="http://www.w3.org/2000/svg" font-family="Inter, sans-serif" font-size="12">
+  <!-- semantic -->
+  <text x="105" y="16" text-anchor="middle" font-weight="700" fill="#0ea5e9">Semantic</text>
+  <rect x="20" y="26" width="170" height="150" rx="8" fill="none" stroke="#98a3b2"/>
+  <rect x="22" y="28" width="166" height="70" fill="#0ea5e9" opacity="0.25"/><text x="105" y="60" text-anchor="middle" fill="#0ea5e9">sky</text>
+  <rect x="22" y="128" width="166" height="46" fill="#12a150" opacity="0.3"/><text x="105" y="158" text-anchor="middle" fill="#12a150">road</text>
+  <rect x="60" y="90" width="40" height="55" rx="6" fill="#e0533f" opacity="0.6"/><rect x="115" y="95" width="40" height="50" rx="6" fill="#e0533f" opacity="0.6"/>
+  <text x="105" y="196" text-anchor="middle" fill="#98a3b2">둘 다 "person" (같은 색)</text>
+  <!-- instance -->
+  <text x="330" y="16" text-anchor="middle" font-weight="700" fill="#e0533f">Instance</text>
+  <rect x="245" y="26" width="170" height="150" rx="8" fill="none" stroke="#98a3b2"/>
+  <rect x="285" y="90" width="40" height="55" rx="6" fill="#e0533f" opacity="0.7"/><text x="305" y="122" text-anchor="middle" fill="#fff">1</text>
+  <rect x="340" y="95" width="40" height="50" rx="6" fill="#6366f1" opacity="0.7"/><text x="360" y="124" text-anchor="middle" fill="#fff">2</text>
+  <text x="330" y="196" text-anchor="middle" fill="#98a3b2">person #1, #2 구분 · 배경 무시</text>
+  <!-- panoptic -->
+  <text x="555" y="16" text-anchor="middle" font-weight="700" fill="#12a150">Panoptic</text>
+  <rect x="470" y="26" width="170" height="150" rx="8" fill="none" stroke="#98a3b2"/>
+  <rect x="472" y="28" width="166" height="70" fill="#0ea5e9" opacity="0.25"/><text x="555" y="60" text-anchor="middle" fill="#0ea5e9">sky</text>
+  <rect x="472" y="128" width="166" height="46" fill="#12a150" opacity="0.3"/><text x="555" y="158" text-anchor="middle" fill="#12a150">road</text>
+  <rect x="510" y="90" width="40" height="55" rx="6" fill="#e0533f" opacity="0.7"/><text x="530" y="122" text-anchor="middle" fill="#fff">1</text>
+  <rect x="565" y="95" width="40" height="50" rx="6" fill="#6366f1" opacity="0.7"/><text x="585" y="124" text-anchor="middle" fill="#fff">2</text>
+  <text x="555" y="196" text-anchor="middle" fill="#98a3b2">전부 + instance 구분 (합집합)</text>
+</svg>
+<figcaption><b>Semantic(의미 분할)</b>: 픽셀마다 클래스만 — 같은 클래스의 개체 ID는 없음. <b>Instance(개체 분할)</b>: thing 객체를 개별로 구분(person #1 ≠ #2). <b>Panoptic(파놉틱/전장면 분할)</b>: 둘의 통합 — 평가 대상 픽셀은 겹치지 않는 하나의 segment에 속하고 thing에는 instance ID가 붙습니다. Dataset에 따라 void/ignore 영역은 평가에서 제외됩니다.</figcaption>
+</figure>
+
+<dl class="kv">
+<dt>stuff (배경 물질)</dt><dd>형태가 불분명하고 셀 수 없는 영역 — sky, road, grass.</dd>
+<dt>things (개체)</dt><dd>셀 수 있는 물체 — person, car, dog.</dd>
+</dl>
+
+| Task | 출력 | 개체 구분? | stuff 처리? | 지표(metric) |
 | --- | --- | --- | --- | --- |
-| **Semantic** | per-pixel class map | no (same class merges) | yes | mIoU |
-| **Instance** | per-object masks | yes (things only) | no | mask AP (COCO) |
-| **Panoptic** | (class, instance-id) per pixel | things yes, stuff merged | yes | PQ = SQ × RQ |
-| **Promptable / foundation** | prompt → mask (class-agnostic) | per-prompt | n/a | mIoU / boundary / SAD |
+| **Semantic** | 픽셀별 클래스 맵 | ✗ (같은 클래스 병합) | ✓ | mIoU |
+| **Instance** | 물체별 mask | ✓ (things만) | ✗ | mask AP (COCO) |
+| **Panoptic** | 픽셀별 (클래스, id) | ✓ things · stuff 병합 | ✓ | PQ = SQ × RQ |
+| **Promptable interface** | prompt → mask/segment | prompt·모델 정의에 따라 | class-agnostic 또는 concept-aware | IoU·boundary·task별 지표 |
 
-- **stuff** = 형태가 불분명하고 셀 수 없는 영역 (sky, road, grass); **things** = 셀 수 있는 객체 (person, car).
-- Panoptic은 이 둘을 통합합니다: 모든 픽셀이 정확히 하나의 `(class, id)`를 받고 겹침이 없습니다 — "완전한 scene parse"입니다.
+> [!TIP] 면접 한 줄
+> 정의만 나열하지 말고 **출력 표현의 변화**로 답하세요: "per-pixel class map과 object별 mask를 query 기반 **mask classification**으로 통합할 수 있게 됐다." 모든 모델이 이 방식으로 대체된 것은 아니며, mIoU와 PQ의 차이, soft alpha(matting)가 hard mask와 갈라지는 지점까지 짚으면 강합니다.
+
+세그멘테이션은 픽셀 단위 출력이라 **해상도를 복원**하는 [업샘플링 & U-Net](#/cv/upsampling-unet)이 필수 전제입니다. 채점 구현은 [mAP & mIoU 밑바닥](#/ml-coding/metrics-map-miou)에서 직접 짜 봅니다.
+
+## 2 · 두 가지 패러다임
+
+<div class="proscons"><div><div class="pros-t">Per-pixel classification (픽셀별 분류)</div>
+FCN, DeepLab, U-Net, PSPNet. Context를 공유하는 feature에서 각 픽셀의 <code>C</code>개 class logit을 내고 보통 pixel-wise CE로 학습합니다. 픽셀 예측이 계산적으로 독립인 것은 아니지만 출력에는 instance identity가 없어, 같은 클래스의 서로 다른 개체를 구분하지 못합니다. Closed-set head는 고정된 클래스 목록을 가정합니다.
+</div><div><div class="cons-t">Mask classification (마스크 분류)</div>
+MaskFormer / Mask2Former. <code>N</code>개의 binary <b>mask</b>를 예측하고 각각에 클래스 라벨을 붙입니다(집합 예측). <i>어디(mask)</i>와 <i>무엇(label)</i>을 분리해 한 구조로 semantic·instance·panoptic을 처리할 수 있습니다. 강력한 현대 패러다임이지만 CNN pixel decoder도 latency·도메인 제약에 따라 여전히 유효합니다.
+</div></div>
+
+MaskFormer의 통찰은 semantic segmentation도 class-labeled mask의 집합으로 표현할 수 있다는 것입니다. `N`개의 query가 각각 mask + class를 내고 **이분 매칭**으로 정답과 짝지으면, 별도의 per-pixel closed-set head 없이 여러 segmentation task를 통합할 수 있습니다. Instance 분리가 "공짜"인 것은 아니며 query decoder·matching·mask loss가 그 구조를 학습합니다.
+
+## 3 · 고전 계보 (이름이 아니라 메커니즘을 아세요)
 
 ```mermaid
 flowchart LR
-  subgraph legacy ["Per-pixel classification (2015–2019)"]
-    FCN --> DeepLab --> UNet[U-Net]
-    DeepLab --> MRCNN[Mask R-CNN]
+  subgraph dense ["Dense prediction families"]
+    FCN --> DeepLab
+    UNet[U-Net]
   end
-  subgraph modern ["Mask classification (2021–2023)"]
-    MF[MaskFormer] --> M2F[Mask2Former] --> OF[OneFormer]
+  subgraph instance ["Proposal-based instance"]
+    FRCNN[Faster R-CNN] --> MRCNN[Mask R-CNN]
+  end
+  subgraph modern ["Query / mask classification"]
+    DETR --> MF[MaskFormer] --> M2F[Mask2Former]
+    M2F --> OF[OneFormer]
     M2F --> MDINO[Mask DINO]
   end
-  subgraph foundation ["Promptable / open-vocab (2023–2026)"]
-    SAM --> SAM2 --> SAM3
-    SAM --> ZIM
+  subgraph promptable ["Promptable interfaces"]
+    SAM --> SAM2
+    SAM -. prompt interface .-> ZIM
   end
-  MRCNN --> MF
-  M2F --> SAM
+  MRCNN -. object masks .-> MF
   style ZIM fill:#e0533f,color:#fff
 ```
 
-## 1 · The two paradigms
-
-<div class="proscons"><div><div class="pros-t">Per-pixel classification</div>
-FCN, DeepLab, U-Net, PSPNet. 모든 픽셀은 <code>C</code>개 클래스에 대한 softmax를 통해 독립적으로 클래스가 할당됩니다. 단순하고 dense하지만, 같은 클래스의 <b>겹치는 instance를 분리하지 못하고</b> 마지막 레이어에 고정된 클래스 vocabulary를 강제합니다.
-</div><div><div class="cons-t">Mask classification</div>
-MaskFormer / Mask2Former. <code>N</code>개의 binary <b>mask</b>를 예측하고 각각에 클래스 레이블을 붙입니다 (set prediction). <i>where</i>(mask)와 <i>what</i>(label)을 분리 → 하나의 architecture로 semantic, instance, panoptic을 모두 처리합니다. 현재 지배적인 패러다임입니다.
-</div></div>
-
-Mask-classification의 통찰 (MaskFormer, NeurIPS 2021): per-pixel loss는 mask 예측의 특수한 경우일 뿐입니다. `N`개의 query가 각각 mask + class를 내보내고 이를 bipartite matching (DETR 스타일)으로 ground truth와 매칭하면, instance 분리를 *공짜로* 얻고 하나의 모델로 세 가지 task를 모두 할 수 있습니다.
-
-## 2 · Classic lineage (know the mechanisms, not just names)
+화살표는 논문 전체의 직접 계보가 아니라 **명시된 메커니즘의 영향·확장**만 나타냅니다. 특히 SAM은 Mask2Former의 단순 후속 모델이 아닙니다.
 
 <dl class="kv">
-<dt>FCN (2015)</dt><dd>classifier의 fully-connected head를 <b>1×1 convs</b>로 교체 → dense per-pixel 예측; <b>skip connection</b>으로 coarse-semantic feature와 fine-spatial feature를 결합합니다. dense labeling의 시초.</dd>
-<dt>U-Net (2015)</dt><dd>모든 scale에서 <b>skip connection</b>을 갖는 대칭 encoder–decoder; medical / low-data segmentation을 장악합니다. 그 decoder 패턴은 (diffusion U-Net 포함) 곳곳에서 다시 등장합니다.</dd>
-<dt>DeepLab v1→v3+</dt><dd><b>Atrous (dilated) convolution</b>으로 해상도를 잃지 않으면서 receptive field를 키우고; <b>ASPP</b> (atrous spatial pyramid pooling)로 multi-scale context를 잡습니다; v3+는 더 선명한 경계를 위해 decoder를 추가합니다.</dd>
-<dt>PSPNet</dt><dd><b>Pyramid pooling</b> 모듈이 여러 region scale에서 global context를 집계합니다.</dd>
-<dt>Mask R-CNN (2017)</dt><dd>Faster R-CNN + mask branch + <b>RoIAlign</b>. 수년간 사실상 표준이던 two-stage instance segmenter. per-RoI mask head.</dd>
+<dt>FCN (2015)</dt><dd>분류기의 fully-connected head를 <b>1×1 conv</b>로 교체 → dense 픽셀 예측; <b>skip connection(스킵 연결)</b>으로 거친 의미 정보와 세밀한 공간 정보를 결합. dense labeling의 시초.</dd>
+<dt>U-Net (2015)</dt><dd>모든 scale에 skip connection을 갖는 대칭 encoder–decoder; 의료/저데이터 분할을 장악. 그 decoder 패턴은 diffusion 등 곳곳에 재등장 — [업샘플링 & U-Net](#/cv/upsampling-unet).</dd>
+<dt>DeepLab v1→v3+</dt><dd><b>Atrous(dilated) convolution(팽창 합성곱)</b>으로 해상도를 잃지 않고 수용 영역을 키우고; <b>ASPP</b>로 multi-scale context를 잡음; v3+는 경계를 위해 decoder 추가.</dd>
+<dt>PSPNet</dt><dd><b>Pyramid pooling</b>으로 여러 영역 scale의 global context를 집계.</dd>
+<dt>Mask R-CNN (2017)</dt><dd>Faster R-CNN + mask branch + <b>RoIAlign</b>. 수년간 사실상 표준이던 two-stage instance segmenter.</dd>
 </dl>
 
-> [!QUESTION] "Why does Mask R-CNN need RoIAlign, not RoIPool?"
-> **Short:** RoIPool은 RoI 좌표를 두 번 quantize (region→bin)하여 feature를 최대 한 stride만큼 어긋나게 합니다; mask는 공간적으로 정밀하므로 이게 해롭습니다. **Deep:** RoIAlign은 반올림 없이 **정확한 float 좌표에서 bilinear sampling**을 사용해 sub-pixel alignment를 보존합니다. Box AP는 이 misalignment에 꽤 관대하지만 mask AP는 크게 뛰어오릅니다 — 전형적인 "metric이 설계를 결정한다"는 이야기입니다.
+> [!QUESTION] "Mask R-CNN은 왜 RoIPool이 아니라 RoIAlign이 필요한가?"
+> **짧게:** RoIPool은 RoI 경계와 bin을 quantize해 feature와 입력 좌표의 정렬을 깨뜨릴 수 있고, mask는 이 오차에 민감합니다. **깊게:** RoIAlign은 RoI/bin 경계를 반올림하지 않고 정해진 sample point에서 bilinear interpolation을 사용합니다. Box와 mask 지표 모두 영향을 받을 수 있지만 pixel mask가 정렬 개선의 직접적인 수혜자입니다.
 
-## 3 · Mask classification, in depth
+## 4 · Mask classification, 깊게
 
-MaskFormer / **Mask2Former**는 query `i`마다 class distribution $p_i \in \Delta^{C+1}$ ("no-object" $\varnothing$ 포함)과 mask embedding $\mathbf{e}_i$를 만들어냅니다. mask는 per-pixel embedding $\mathbf{F}$와의 dot product입니다:
+MaskFormer / **Mask2Former**는 query `i`마다 클래스 분포 $p_i \in \Delta^{C+1}$("no-object" $\varnothing$ 포함)와 mask embedding $\mathbf{e}_i$를 만듭니다. mask는 픽셀별 embedding $\mathbf{F}$와의 내적입니다:
 
 $$\hat{m}_i = \sigma(\mathbf{e}_i \cdot \mathbf{F}) \in [0,1]^{H\times W}$$
 
-학습은 **Hungarian matching**으로 `N`개 예측을 ground-truth segment에 매칭한 뒤, 매칭별 loss를 적용합니다:
+학습은 **Hungarian matching(헝가리안 매칭)** 으로 `N`개 예측을 정답 segment에 짝지은 뒤 매칭별 loss를 적용:
 
 $$\mathcal{L} = \lambda_{\text{cls}}\,\mathcal{L}_{\text{CE}}(p, c) + \lambda_{\text{dice}}\,\mathcal{L}_{\text{dice}}(\hat m, m) + \lambda_{\text{ce}}\,\mathcal{L}_{\text{mask-BCE}}(\hat m, m)$$
 
-Mask2Former가 MaskFormer 대비 핵심적으로 개선한 점은 **masked attention**입니다: transformer decoder에서 각 query의 cross-attention이 *자신의 현재 mask 예측의 foreground 영역으로 제한*됩니다. 이는 attention을 국소화하고, 수렴을 빠르게 하며, 정확도를 끌어올립니다. **OneFormer**는 task token을 추가해 한 세트의 weight로 세 task를 함께 처리하고; **Mask DINO**는 DINO decoder에서 detection + segmentation을 통합합니다.
+> **PyTorch식 pseudocode — query에서 semantic map까지**
 
-> [!NOTE] Interview link
-> Mask2Former는 **ECLIPSE의 backbone**입니다 (continual panoptic). 그 query 구조가 바로 "step마다 prompt를 추가하고 query 출력을 집계"하는 것을 자연스럽게 만듭니다 — [ECLIPSE deep-dive](#/resume/eclipse) 참고.
+```python
+pixel = pixel_decoder(features)                    # [B,D,H,W]
+query = transformer_decoder(features)              # [B,N,D]
+mask_logits = torch.einsum("bnd,bdhw->bnhw", query, pixel)
+class_logits = class_head(query)                    # [B,N,C+1], + no-object
 
-## 4 · Metrics: mIoU vs PQ
+costs = build_cost_per_image(class_logits, mask_logits, targets)  # [N,M_b]씩
+match = [hungarian(cost.detach()) for cost in costs]
+loss = matched_class_loss(class_logits, match) \
+     + matched_mask_loss(mask_logits, targets, match)
 
-**mIoU** (semantic): 클래스별 intersection-over-union을 클래스에 대해 평균한 값.
+# semantic inference: no-object를 버리고 query 기여를 class별로 합침
+class_prob = class_logits.softmax(-1)[..., :-1]     # [B,N,C]
+mask_prob = mask_logits.sigmoid()                    # [B,N,H,W]
+semantic_score = torch.einsum("bnc,bnhw->bchw", class_prob, mask_prob)
+```
+
+Mask2Former의 핵심 개선은 **masked attention**: transformer decoder에서 각 query의 cross-attention을 *자기 현재 mask 예측의 foreground 영역으로 제한*합니다. attention을 국소화해 수렴을 빠르게 하고 정확도를 올립니다. **OneFormer**는 task token으로 한 세트 weight로 세 task를; **Mask DINO**는 DINO decoder에서 detection+segmentation을 통합.
+
+> [!NOTE] 이력서 연결
+> Mask2Former는 **ECLIPSE의 backbone**입니다(continual panoptic). 그 query 구조가 "step마다 prompt를 추가하고 query 출력을 집계"를 자연스럽게 만듭니다 — [ECLIPSE 딥다이브](#/resume/eclipse).
+
+## 5 · 지표: mIoU vs PQ
+
+**mIoU**(semantic): 클래스별 intersection-over-union의 평균.
 
 $$\text{IoU}_c = \frac{TP_c}{TP_c + FP_c + FN_c}, \qquad \text{mIoU} = \frac{1}{C}\sum_c \text{IoU}_c$$
 
-**PQ** (panoptic, Kirillov et al. CVPR 2019)는 recognition과 mask quality를 분리합니다. 예측 segment와 ground-truth segment는 IoU > 0.5일 때만 매칭됩니다 (증명 가능하게 최대 하나인 *유일한* 매칭):
+여기서 $C$에 background를 포함하는지, GT와 prediction 모두에 없는 class($0/0$)를 제외하는지는 benchmark 구현마다 다릅니다. Ignore label을 confusion matrix에 넣지 말고, 논문·코드에서 class set과 reduction convention을 명시하세요.
 
-$$\mathrm{PQ}=\underbrace{\frac{\sum_{(p,g)\in TP}\mathrm{IoU}(p,g)}{|TP|}}_{\mathrm{SQ}\ (\text{mask quality})}\times\underbrace{\frac{|TP|}{|TP|+\tfrac12|FP|+\tfrac12|FN|}}_{\mathrm{RQ}\ (\text{an F}_1)}$$
+**PQ**(panoptic, Kirillov 2019)는 인식 품질과 mask 품질을 분리합니다. 같은 class의 예측/정답 panoptic segment는 IoU $>0.5$일 때 매칭됩니다. Segment들이 서로 겹치지 않는 panoptic 조건 덕분에 이 threshold에서 matching이 유일해집니다.
+
+$$\mathrm{PQ}=\underbrace{\frac{\sum_{(p,g)\in TP}\mathrm{IoU}(p,g)}{|TP|}}_{\mathrm{SQ}\ (\text{mask quality})}\times\underbrace{\frac{|TP|}{|TP|+\tfrac12|FP|+\tfrac12|FN|}}_{\mathrm{RQ}\ (\text{F}_1)}$$
 
 <figure>
 <svg viewBox="0 0 640 150" xmlns="http://www.w3.org/2000/svg" font-family="Inter, sans-serif" font-size="12">
   <rect x="20" y="40" width="150" height="70" rx="8" fill="none" stroke="#0ea5e9" stroke-width="2"/>
-  <text x="95" y="30" text-anchor="middle" fill="#0ea5e9">SQ = mean IoU of matches</text>
-  <text x="95" y="80" text-anchor="middle" fill="#6b7686">"are the masks tight?"</text>
+  <text x="95" y="30" text-anchor="middle" fill="#0ea5e9">SQ = 매칭들의 평균 IoU</text>
+  <text x="95" y="80" text-anchor="middle" fill="#98a3b2">"mask가 정밀한가?"</text>
   <text x="200" y="80" text-anchor="middle" fill="#e0533f" font-size="20">×</text>
   <rect x="240" y="40" width="170" height="70" rx="8" fill="none" stroke="#12a150" stroke-width="2"/>
-  <text x="325" y="30" text-anchor="middle" fill="#12a150">RQ = F₁ over segments</text>
-  <text x="325" y="80" text-anchor="middle" fill="#6b7686">"did we detect them?"</text>
+  <text x="325" y="30" text-anchor="middle" fill="#12a150">RQ = segment F₁</text>
+  <text x="325" y="80" text-anchor="middle" fill="#98a3b2">"제대로 찾았나?"</text>
   <text x="440" y="80" text-anchor="middle" fill="#e0533f" font-size="20">=</text>
   <rect x="470" y="40" width="150" height="70" rx="8" fill="#e0533f"/>
   <text x="545" y="80" text-anchor="middle" fill="#fff" font-size="16">PQ</text>
 </svg>
-<figcaption>PQ는 mask quality (SQ)와 detection quality (RQ)로 분해됩니다. High SQ + low RQ = 엉뚱하거나 놓친 객체 위의 예쁜 mask — continual learning이 background shift를 통해 유발하는 실패 모드입니다.</figcaption>
+<figcaption>PQ는 매칭된 segment의 mask 품질(SQ)과 recognition 품질(RQ)로 분해됩니다. SQ 높음 + RQ 낮음은 매칭된 mask 경계는 좋지만 miss·false positive·오분류가 많다는 뜻입니다. Continual background shift는 가능한 원인 중 하나입니다.</figcaption>
 </figure>
 
-> [!QUESTION] "Why is PQ stricter than mIoU?"
-> mIoU는 클래스별로 픽셀을 모으므로, instance가 서로 뭉개져도 *대체로* 맞는 클래스는 좋은 점수를 받습니다. PQ는 **IoU > 0.5에서의 instance-level bipartite match**를 요구합니다; 놓치면 온전한 FN, 헛된 segment는 온전한 FP이고 각각 RQ에서 절반씩 가중됩니다. 그래서 PQ는 mIoU가 숨기는 recognition 오류를 처벌합니다. [mAP & mIoU](#/ml-coding/metrics-map-miou)도 참고.
+> [!QUESTION] "PQ가 mIoU보다 왜 더 엄격한가?"
+> mIoU는 클래스별로 픽셀을 모으므로 개체가 서로 뭉개져도 대체로 좋은 점수를 받습니다. PQ는 **IoU > 0.5의 개체 단위 매칭**을 요구합니다; 놓치면 온전한 FN, 헛된 segment는 온전한 FP이고 각각 RQ에서 절반씩 가중됩니다. 그래서 PQ는 mIoU가 숨기는 인식 오류를 처벌합니다.
 
-## 5 · Losses cheat-sheet
+## 6 · Loss 치트시트
 
-| Loss | Form | Good for | Watch out |
+| Loss | 형태 | 좋은 경우 | 주의 |
 | --- | --- | --- | --- |
-| Cross-entropy | per-pixel softmax | semantic baseline | class imbalance |
-| Weighted / OHEM CE | reweight rare/hard pixels | imbalance | tuning |
-| **Dice** | $1-\frac{2\sum \hat m m}{\sum \hat m + \sum m}$ | overlap, imbalance | unstable on tiny masks |
-| Focal | $(1-p_t)^\gamma$ CE | dense hard-neg | γ tuning; see [Detection](#/cv/detection) |
-| Boundary / Grad | gradient agreement | crisp edges | needs sharp GT |
-| Lovász-softmax | direct IoU surrogate | mIoU optimization | slower |
+| Cross-entropy | 픽셀별 softmax | semantic 기본 | 클래스 불균형 |
+| Weighted / OHEM CE | 희귀/어려운 픽셀 재가중 | 불균형 | 튜닝 |
+| **Soft Dice** | $1-\frac{2\sum \hat m m+\epsilon}{\sum \hat m+\sum m+\epsilon}$ | 겹침·불균형 | empty mask·class/batch reduction convention |
+| Focal | $(1-p_t)^\gamma$ CE | dense hard-neg | γ 튜닝 — [Detection](#/cv/detection) |
+| Boundary / Grad | gradient 일치 | 선명한 경계 | 날카로운 GT 필요 |
+| Lovász-softmax | IoU 직접 대리 | mIoU 최적화 | 느림 |
 
-Mask2Former는 point-sampled 위치에서 **Dice + mask-BCE**를 (dense보다 저렴함) 사용하고 여기에 classification CE를 더합니다. Boundary-aware 항은 matting 수준의 경계로 밀어붙일 때 가장 중요합니다 — [Image Matting](#/cv/matting) 참고.
+Mask2Former는 point-sampled 위치에서 **Dice + mask-BCE**(dense보다 저렴)에 분류 CE를 더합니다. Boundary-aware 항은 matting 수준 경계로 밀 때 중요 — [Image Matting](#/cv/matting).
 
-## 6 · 2025–2026 frontier
+## 7 · 2025–2026 프런티어
 
-- **Promptable / concept segmentation.** **SAM** (2023, promptable class-agnostic mask) → **SAM 2** (2024, streaming video memory) → **SAM 3** (Meta, Nov 2025): **Promptable Concept Segmentation (PCS)** — 짧은 명사구나 exemplar가 open-vocabulary detect + segment + track을 구동하며, *recognition*(이 concept이 존재하는가?)과 *localization*(어디에?)을 분리하는 **presence head**를 갖습니다. 전체 계보는 [Vision Foundation Models](#/cv/foundation-models)에.
-- **Frozen SSL backbones for dense tasks.** **DINOv3** (Meta, Aug 2025, 7B, 완전 self-supervised)는 전용 dense-task 모델을 능가하는 frozen feature를 만들어냅니다; **Gram anchoring**이 긴 학습에서 dense-feature 저하를 막습니다.
-- **Open-vocabulary segmentation.** CLIP/SigLIP text alignment + mask decoder (OpenSeg, SEEM, ODISE, Grounded-SAM); novel-class mIoU로 평가합니다.
-- **Matting-grade quality.** SAM의 거친 경계가 **ZIM** (ICCV 2025 Highlight)의 동기가 되었는데, SAM의 promptable interface는 유지하되 soft $\alpha$를 출력합니다 — [ZIM deep-dive](#/resume/zim) 참고.
+- **Promptable / concept segmentation.** **SAM**(2023, point/box/mask prompt) → **SAM 2**(2024, streaming video) → **SAM 3**(Meta, 2025.11, text/exemplar concept): 짧은 명사구나 exemplar가 open-vocabulary detect·segment·track을 조건화하고, *인식*과 *위치*를 분리하는 **presence head**를 갖습니다. **SAM 3.1**(2026.03)은 Object Multiplex로 multi-object video 실행을 개선한 업데이트입니다. 계보는 [Vision Foundation Models](#/cv/foundation-models).
+- **Frozen SSL backbone.** **DINOv3**(2025)는 보고된 여러 frozen dense-evaluation protocol에서 강한 결과를 보였고, **Gram anchoring**은 긴 학습 중 patch-level dense feature가 저하되는 현상을 완화합니다. 모든 도메인 specialist를 보편적으로 능가한다는 뜻은 아닙니다.
+- **Open-vocabulary.** CLIP/SigLIP text alignment + mask decoder(SEEM, ODISE, Grounded-SAM); novel-class mIoU로 평가.
+- **Matting 수준 품질.** SAM의 거친 경계가 **ZIM**(ICCV 2025 Highlight)의 동기 — promptable interface는 유지하되 soft $\alpha$를 출력 — [ZIM 딥다이브](#/resume/zim).
 
-## 7 · Q&A
+## 8 · Q&A
 
-<details class="qa"><summary>What changed to make "one model, all three tasks" possible?</summary>
+<details class="qa"><summary>"하나의 모델로 세 task 모두"가 어떻게 가능해졌나?</summary>
 <div class="qa-body">
 
-**Short:** per-pixel classification에서 **set prediction 기반 mask classification**으로의 전환.
+**짧게:** per-pixel classification → **집합 예측 기반 mask classification** 전환.
 
-**Deep:** Hungarian assignment로 매칭된 (mask, class) 쌍의 *집합*을 예측하고 나면, task 간 유일한 차이는 post-processing입니다: semantic은 같은 클래스 mask를 병합하고, instance는 things를 분리해 유지하며, panoptic은 confidence로 겹침을 해소합니다. MaskFormer가 이를 보였고; Mask2Former가 masked attention으로 정확하고 빠르게 만들었으며; OneFormer가 task token으로 하나의 학습된 모델로 만들었습니다.
+**깊게:** (mask, class) 집합을 공통 표현으로 쓸 수 있고, semantic은 class별 mask score를 집계하고 instance는 thing query를 유지하며 panoptic은 겹침을 해소합니다. 실제로는 training dataset, matching cost, task token, loss와 inference threshold도 달라질 수 있어 "후처리만 다르다"고 일반화하면 과합니다. MaskFormer/Mask2Former/OneFormer는 이 통합 가능성을 서로 다른 recipe로 보였습니다.
 </div></details>
 
-<details class="qa"><summary>When would you still reach for Mask R-CNN or DeepLab in 2026?</summary>
+<details class="qa"><summary>2026년에도 Mask R-CNN이나 DeepLab을 쓸 때가 있나?</summary>
 <div class="qa-body">
 
-**Short:** 빠듯한 latency/compute 예산, 소규모 팀, 또는 peak AP보다 성숙한 학습 recipe가 더 중요할 때.
+**짧게:** 빠듯한 latency/compute, 소규모 팀, 또는 최고 AP보다 성숙한 학습 recipe가 중요할 때.
 
-**Deep:** query-based transformer는 더 무겁고 수렴이 느릴 수 있으며 더 세심한 학습이 필요합니다. 잘 튜닝된 Mask R-CNN이나 DeepLabv3+는 믿을 만한 production baseline이고, ONNX/TensorRT로 깔끔하게 export되며, 디버깅이 쉽습니다. on-device라면 가벼운 FCN/U-Net head를 쓰겠습니다 — [On-Device Seg](#/resume/on-device-segmentation) 참고 (~10ms mobile CPU).
+**깊게:** query-based transformer는 더 무겁고 수렴이 느릴 수 있어 세심한 학습이 필요합니다. 잘 튜닝된 Mask R-CNN/DeepLabv3+는 믿을 만한 production baseline이고 ONNX/TensorRT export가 깔끔하며 디버깅이 쉽습니다. on-device면 가벼운 FCN/U-Net head — [On-Device Seg](#/resume/on-device-segmentation) (~10ms mobile CPU).
 </div></details>
 
-<details class="qa"><summary>How do query count and "no-object" interact?</summary>
+<details class="qa"><summary>query 개수와 "no-object"는 어떻게 상호작용하나?</summary>
 <div class="qa-body">
 
-**Short:** query가 너무 적으면 → 객체를 놓칩니다 (FN); $\varnothing$ 클래스가 사용되지 않은 query를 흡수합니다.
+**짧게:** query가 너무 적으면 물체를 놓치고(FN); $\varnothing$ 클래스가 안 쓰인 query를 흡수합니다.
 
-**Deep:** `N`개 query는 각각 GT segment에 매칭되거나 $\varnothing$에 할당됩니다. `N`은 이미지당 최대 객체 수를 넘어야 합니다. continual 환경에서는 step마다 query를 *늘려서* (ECLIPSE는 $N^t \approx |\mathcal{C}^t|$, 최소 10을 사용) 기존 query를 건드리지 않고 새 클래스에 capacity를 줍니다.
+**깊게:** `N`개 query는 각각 GT segment에 매칭되거나 $\varnothing$에 할당됩니다. 표준 one-to-one matching에서는 한 이미지의 target segment 수가 `N`을 넘으면 전부 매칭할 수 없으므로 query budget을 데이터에 맞춰야 합니다. 너무 많이 두면 no-object imbalance와 계산이 늘 수 있습니다. Continual prompt/query 증설은 기존 경로를 보존하는 한 전략이지만, query만 늘린다고 forgetting이 자동으로 사라지지는 않습니다.
 </div></details>
 
-### Follow-ups you should expect
-- *"Panoptic on COCO vs ADE20K — why is ADE20K harder?"* ADE20K가 더 dense하고 (이미지당 클래스/instance가 훨씬 많음) stuff 비중이 커서 RQ에 부담을 줍니다.
-- *"SQ high, RQ low — diagnose it."* mask는 tight하지만 segment를 놓치거나 잘못 레이블링하고 있는 것 — continual learning에서 background/no-object drift의 특징입니다.
-- *"Boundary IoU vs mask IoU?"* Boundary IoU는 경계 주변의 띠만 평가합니다; 미세 구조가 중요할 때 정직한 metric이며 matting metric(SAD/Grad)으로 가는 다리입니다.
+### 예상 follow-up
+- *"COCO vs ADE20K panoptic — 왜 ADE20K가 더 어렵나?"* ADE20K가 더 dense하고(이미지당 클래스/개체 많음) stuff 비중이 커 RQ에 부담.
+- *"SQ 높고 RQ 낮음 — 진단하라."* mask는 정밀하나 segment를 놓치거나 오라벨 — continual의 background drift 특징.
+- *"Boundary IoU vs mask IoU?"* Boundary IoU는 경계 띠만 평가 — 미세 구조가 중요할 때 정직하며 matting metric(SAD/Grad)으로 가는 다리.
 
 ## Cheat-sheet
 
-| Concept | One-liner |
+| 개념 | 한 줄 |
 | --- | --- |
-| mIoU | mean per-class IoU (semantic) |
-| PQ = SQ × RQ | instance-aware; mask quality × detection F₁ |
-| Per-pixel vs mask-cls | independent softmax vs matched (mask, class) set |
-| Masked attention | Mask2Former restricts cross-attn to current mask → faster convergence |
-| RoIAlign | bilinear, no quantization → sub-pixel masks |
-| stuff vs things | uncountable regions vs countable objects |
-| Promptable seg | point/box/text → class-agnostic mask (SAM→SAM3) |
-| Background shift | in continual/weak seg, old/future classes collapse into bg |
+| mIoU | 클래스별 IoU 평균 (semantic) |
+| PQ = SQ × RQ | 개체 인식형; mask 품질 × 검출 F₁ |
+| per-pixel vs mask-cls | 독립 softmax vs 매칭된 (mask, class) 집합 |
+| masked attention | Mask2Former가 cross-attn을 현재 mask로 제한 → 빠른 수렴 |
+| RoIAlign | bilinear, 반올림 없음 → sub-pixel mask |
+| stuff vs things | 셀 수 없는 영역 vs 셀 수 있는 물체 |
+| promptable/concept seg | SAM은 point/box/mask prompt, SAM 3 계열은 text/exemplar concept까지 지원 |
+| background shift | continual seg에서 step마다 background/no-object의 의미가 바뀌는 현상 |
 
-**Related:** [Object Detection](#/cv/detection) · [Image Matting](#/cv/matting) · [Weak & Semi-Supervised](#/cv/weak-semi-supervised) · [Continual Learning](#/cv/continual-learning) · [Vision Foundation Models](#/cv/foundation-models) · [ZIM deep-dive](#/resume/zim) · [ECLIPSE deep-dive](#/resume/eclipse) · [mAP & mIoU](#/ml-coding/metrics-map-miou)
+**다음:** [Object Detection](#/cv/detection) · [Image Matting](#/cv/matting) · [Weak & Semi-Supervised](#/cv/weak-semi-supervised) · [Continual Learning](#/cv/continual-learning) · [Vision Foundation Models](#/cv/foundation-models) · [업샘플링 & U-Net](#/cv/upsampling-unet) · [mAP & mIoU](#/ml-coding/metrics-map-miou) · [ZIM 딥다이브](#/resume/zim) · [ECLIPSE 딥다이브](#/resume/eclipse)

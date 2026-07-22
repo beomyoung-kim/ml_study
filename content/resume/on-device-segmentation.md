@@ -1,19 +1,22 @@
 # Deep-Dive: On-Device Human Segmentation (~10ms, Mobile CPU)
 
-<div class="tag-row"><span class="tag">on-device</span><span class="tag">mobile CPU</span><span class="tag">~10ms</span><span class="tag">ONNX serving</span><span class="tag">distillation · quantization</span><span class="tag">solo project</span></div>
+<div class="tag-row"><span class="tag">on-device</span><span class="tag">mobile CPU</span><span class="tag">~10ms</span><span class="tag">ONNX serving</span><span class="tag">efficiency toolbox</span><span class="tag">independent development: resume-verified</span></div>
 
 > [!TIP] 30-second pitch
-> I independently built a **human/portrait segmentation** model that runs on **mobile CPU** at **~10ms**, deployed through an in-house **ONNX** serving stack. The 10ms wasn't a vanity number — it's the frame-budget threshold that keeps a real-time (~30 fps) experience smooth once you subtract camera I/O, pre/post-processing, and other on-device models. The project is the counterpoint to ZIM: **cloud foundation model for quality, tiny on-device specialist for latency and privacy.**
+> The resume explicitly says that you **independently developed** a human-segmentation model, achieved about **10 ms on a mobile CPU**, and deployed it through **ONNX-based in-house serving**. Use those three facts as a strong opening sentence. Then support the number and the exact ownership boundary with the actual device, input size, runtime, thread configuration, warm-up, latency statistic, and collaborator interfaces.
 
 > [!NOTE] Confidential internals
-> Exact architecture, FLOPs, dataset scale, and A/B numbers are **confidential**. Everything below is engineering method + general efficiency knowledge, not internal figures. Backing chapters: [Mixed Precision & Efficiency](#/foundations/mixed-precision-efficiency), [Segmentation](#/cv/segmentation).
+> Exact architecture, FLOPs, dataset scale, and A/B figures do not appear in the resume. Treat them as non-public until disclosure approval is confirmed. Everything below is engineering method and general efficiency knowledge, not a reconstruction of internal figures or techniques. Backing chapters: [Mixed Precision & Efficiency](#/foundations/mixed-precision-efficiency), [Segmentation](#/cv/segmentation).
+
+> [!IMPORTANT] Separate resume facts from preparation hypotheses
+> The verifiable core is `independent model development · human segmentation · mobile CPU · about 10 ms · ONNX-based in-house serving`. The distillation, quantization, hard-example mining, CPU affinity, p99/p95, and pipeline order below are <strong>general design candidates</strong>, not facts about what this project used. Put a specific design choice into a first-person answer only when your experiment and deployment records confirm it.
 
 ## Deployment path
 
 ```mermaid
 flowchart LR
-  TRAIN["PyTorch: train + distill<br/>(server teacher → tiny student)"] --> EXP["ONNX export"]
-  EXP --> OPT["Simplify · op-fix · quantize (PTQ/QAT)"]
+  TRAIN["PyTorch training<br/>(distillation is an optional candidate)"] --> EXP["ONNX export"]
+  EXP --> OPT["Optional: simplify · op-fix · quantize"]
   OPT --> PAR["Parity test<br/>(ORT vs PyTorch)"]
   PAR --> SERVE["In-house ONNX runtime"]
   SERVE --> APP["Mobile / edge feature"]
@@ -21,6 +24,8 @@ flowchart LR
   style TRAIN fill:#0ea5e9,color:#fff
   style SERVE fill:#12a150,color:#fff
 ```
+
+The diagram is a <strong>deployment checklist</strong> to review in an interview, not a reconstruction of the actual internal pipeline.
 
 ## The 10ms is frame-budget engineering, not a magic number
 
@@ -33,12 +38,12 @@ flowchart LR
   <rect x="316" y="30" width="324" height="34" fill="currentColor" opacity="0.15"/><text x="478" y="52" font-size="11" fill="currentColor" text-anchor="middle">other models · UI · headroom</text>
   <line x1="0" y1="72" x2="640" y2="72" stroke="currentColor" opacity="0.3"/>
 </svg>
-<figcaption>Illustrative budget only (real numbers device/resolution-dependent). At 15–20ms the segmenter alone starves the rest of the frame and you drop frames.</figcaption>
+<figcaption>An illustrative 30 fps budget. Actual latency depends on device, resolution, threads, and thermal state; if the segmenter uses 15–20 ms, it may reduce the headroom available to other stages.</figcaption>
 </figure>
 
-If you target 60 fps the budget halves, so the discipline matters more than the specific figure. The reusable statement: *"I sized the model to a frame budget, not to a leaderboard."*
+At 60 fps the budget halves, so the discipline matters more than the specific figure. A useful answer spine is *“I designed the quality–latency Pareto around the required frame budget,”* but use it in the first person only when the real requirement and your decision record support it.
 
-## Compression levers (in the order I'd pull them)
+## Compression levers — an example review order
 
 | Lever | What it buys | Watch out for |
 | --- | --- | --- |
@@ -50,7 +55,7 @@ If you target 60 fps the budget halves, so the discipline matters more than the 
 | **Quantization (PTQ → QAT)** | INT8 latency/memory | Boundary collapse if done first |
 | **Operator fusion** | Conv-BN-ReLU merges | Runtime-specific |
 
-Rule of thumb I'd say out loud: **resolution → width → decoder → distill → *quantize last*.** Quantizing before you've distilled tends to kill boundaries first.
+A preparation heuristic is <strong>resolution → width → decoder → distill if needed → quantize after checking the target runtime</strong>. The best order depends on hardware, operator support, and the quality floor; also measure whether calibration alone makes PTQ sufficient before moving further.
 
 ## Predicted deep-dive Q&A
 
@@ -59,15 +64,15 @@ Rule of thumb I'd say out loud: **resolution → width → decoder → distill �
 
 **Short:** CPU is the worst-case common denominator — maximum device reach, no op-support fragmentation.
 
-**Deep:** NPUs are fast but fragmented (op coverage, quantization constraints vary by chip); GPUs aren't always available or free to use. Targeting CPU means the feature ships everywhere. It also forces genuinely efficient design rather than leaning on an accelerator. The résumé says mobile CPU deliberately.
+**Deep:** Operator and quantization support for NPUs/GPUs varies by device, while CPUs are available more broadly, but a CPU target does not automatically guarantee deployment on every device. Verify the actual target-device matrix and fallback requirements when explaining why CPU was chosen.
 </div></details>
 
-<details class="qa"><summary>How did you use distillation?</summary>
+<details class="qa"><summary>If you actually used distillation, how should you explain it?</summary>
 <div class="qa-body">
 
-**Short:** A server-grade human-seg/matte **teacher** supervises a tiny **student** with soft masks, boundary-weighted and feature-level losses.
+**Short:** Describe the teacher, student, targets, and losses only if training logs confirm them. Otherwise say, “It is a possible way to recover quality, but I will not claim that this project used it.”
 
-**Deep:** A *matting* teacher is especially useful because soft labels carry boundary information a hard mask throws away — the student learns crisper hair/edges than it could from binary GT alone. This is organizationally adjacent to the ZIM/FG-API quality work, but I won't claim it's the same weights — it's a separate, distilled model.
+**Deep:** In general, soft targets from a matting or segmentation teacher can carry boundary information that a hard mask discards. But describe the teacher type, boundary-weighted or feature losses, and any relationship to ZIM or the foreground API as methods used in this project only when evidence supports them.
 </div></details>
 
 <details class="qa"><summary>Quantization pitfalls for a small boundary-sensitive model?</summary>
@@ -89,7 +94,7 @@ Rule of thumb I'd say out loud: **resolution → width → decoder → distill �
 | Perf regression | Graph optimize, IO binding, thread tuning |
 | Preprocess drift | Share mean/std normalization with runtime |
 
-The one that most often bites near launch is an unsupported/edge-behaving op forcing a last-minute graph rewrite.
+This table lists general ONNX failure modes. Verify from records which issue actually occurred in the project and who resolved it before answering in the first person.
 </div></details>
 
 <details class="qa"><summary>Why not run SAM/ZIM on-device?</summary>
@@ -103,36 +108,36 @@ A ViT-B foundation model is orders of magnitude off a 10ms mobile-CPU budget (ZI
 <details class="qa"><summary>Cut latency in half without losing quality. Concretely, how?</summary>
 <div class="qa-body">
 
-In order: drop input resolution and re-distill so the teacher's soft boundaries survive; trim width and simplify the decoder; *then* QAT to INT8. Re-ablate quality on a **hard set** (crossed limbs, sheer clothing, extreme lighting, multi-person) after each step, and parity-test the ONNX graph before measuring on device. The failure mode to avoid is quantizing first — boundaries die before you've protected them with distillation.
+First profile latency to determine whether the bottleneck is model compute or pre/post-processing. If the model is the bottleneck, reduce resolution, width, and decoder complexity one at a time, then compare distillation or quantization if they are actually available. Re-measure hard slices and target-device latency at each step, and check ONNX parity. Because zero quality loss cannot be guaranteed, agree on an acceptable quality floor first.
 </div></details>
 
 <details class="qa"><summary>"Robust under tight budget" — what does robust actually mean here?</summary>
 <div class="qa-body">
 
-Compressing naively makes the model good only on easy samples. I hold a **quality floor** with hard-example mining, distillation, product-domain data, and failure monitoring — so FLOPs↓ is not treated as synonymous with quality↓. Robustness = the p95 hard case stays acceptable, not just the mean.
+Preserving an average metric can still hide regressions on hard cases. In general, use hard-slice evaluation, domain-matched data, and failure monitoring to examine a **quality floor**. Say in the first person that you used hard-example mining or distillation, or that a `p95` statistic describes a particular distribution, only after verifying those facts.
 </div></details>
 
 <details class="qa"><summary>Mobile CPU vs "ONNX serving" — which is it?</summary>
 <div class="qa-body">
 
-Both, cleanly separated: the **model** is designed and measured against a mobile-CPU budget; the **serving infrastructure** is an in-house ONNX runtime. I'd measure latency with warmup, fixed-resolution input, p50/p95, and (for a device) pinned CPU affinity — never confuse training-GPU ms with deployment latency. Sustained (thermal-throttled) latency, not a cold single-shot, is the honest number.
+The two phrases refer to different layers. The <strong>model target</strong> is mobile-CPU latency, while the <strong>deployment/runtime</strong> is the in-house ONNX stack named on the resume. A defensible latency number needs the device, input, runtime, thread configuration, warm-up, sample count, and statistic. Add CPU affinity or a sustained thermal test only if you actually used it, and never mix training-GPU time with target-device time.
 </div></details>
 
-## Honest limitations
+## Design assumptions and limitations to verify
 
 - **Closed-set (human/portrait):** open-vocabulary would blow the budget; product KPI justifies the narrowing.
 - **Single-pass fixed resolution:** multi-scale/refine would help hard boundaries but breaks 10ms.
 - **Heavy post-processing (CRF) is too expensive on mobile;** only light morphology / guided-filter fits.
-- **Temporal smoothing (video)** adds cost and isn't free.
+- <strong>Temporal smoothing (video)</strong> adds cost and isn't free.
 
-## Which JD this connects to
+## Which JD signals this connects to
 
-| Company | Connection |
+| JD signal | Evidence to connect |
 | --- | --- |
-| Apple | On-device intelligence, distillation, privacy |
-| Meta | Efficient multimodal deployment |
-| NVIDIA | Efficient inference (TensorRT/ONNX) mindset |
-| Adobe | Mobile creative tools |
+| On-device / mobile inference | The about-10-ms mobile-CPU claim and its measurement protocol |
+| Runtime optimization | ONNX export, parity, and operator-support checklist |
+| Efficient perception | Quality-floor and latency trade-off |
+| Privacy-sensitive processing | Data transfer that on-device processing may reduce; verify actual privacy guarantees across the whole system |
 
 ## Cheat-sheet
 
@@ -141,8 +146,8 @@ Both, cleanly separated: the **model** is designed and measured against a mobile
 | Task | On-device human/portrait segmentation, mobile CPU |
 | Latency | **~10ms** (frame-budget threshold for ~30 fps) |
 | Stack | PyTorch → **ONNX** → in-house runtime |
-| Lever order | resolution → width → decoder → **distill** → quantize (last) |
-| Measure | warmup, fixed res, p50/p95, sustained (thermal) latency |
+| Lever order | Preparation candidates: profile → resolution/width/decoder → validate distillation/quantization separately |
+| Measure | State device, input, runtime, threads, warm-up, sample count, and statistic |
 | Narrative | cloud foundation (quality) + on-device specialist (latency/privacy) |
 | Confidential | architecture, FLOPs, data scale, A/B numbers |
 

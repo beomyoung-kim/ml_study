@@ -3,33 +3,35 @@
 <div class="tag-row"><span class="tag">whiteboarding your work</span><span class="tag">2-min / 10-min / 30-min</span><span class="tag">tailoring to audience</span><span class="tag">figures that land</span></div>
 
 > [!TIP] The meta-skill
-> Presenting is not a slide-design task — it's **audience-modeling under a time budget**. The same work becomes an elevator pitch, a whiteboard chalk-talk, or a full job talk depending on *who's listening and for how long*. This chapter is the general skill; [The Research Job Talk](#/research/job-talk) is the specific 45-minute format. Beomyoung has real stage reps to draw on — DAN 24, Centum Digital Week 2025, NeurIPS 2021 Social — so speak from *verified habits*, not theory.
+> Presenting is not only a slide-design task—it is **audience modeling under a time budget**. The same work becomes an elevator pitch, a whiteboard chalk talk, or a full job talk depending on *who is listening and for how long*. This chapter covers **adaptation** across length, audience, and medium; the canonical 45-minute structure, Q&A, and claim-ledger rules live once in [The Research Job Talk](#/research/job-talk). If you cite appearances such as DAN 24, Centum Digital Week, or a NeurIPS Social, verify the program, year, and your role from a public record.
 
 ```mermaid
 flowchart LR
   M[Motivation<br/>why care] --> P[Problem<br/>precise task]
   P --> I[Insight / Method]
-  I --> E[Evidence<br/>results + ablation]
-  E --> L[Limitations]
+  I --> PresentEvidence[Evidence<br/>results + ablation]
+  PresentEvidence --> L[Limitations]
   L --> F[Future / fit]
   F --> Q[Q&A]
 ```
 
 ## One work, three lengths
 
-The hardest skill is **graceful degradation**: cutting content without losing the thread. Build the 30-min version, then derive the shorter ones by *dropping detail, never the spine*.
+The hardest skill is **graceful degradation**: cutting content without losing the thread. Build a source deck and narrative spine, then derive versions by dropping detail to fit the time. The longest version need not always come first, but each version must preserve the connection problem → delta → evidence.
 
 | | **2-minute** (elevator / hallway) | **10-minute** (chalk-talk / screen) | **30-minute** (seminar / job talk) |
 | --- | --- | --- | --- |
 | Goal | Make them want more | Convey **one idea** + evidence | Depth + defensibility + trajectory |
 | Content | Problem + your one result | Motivation → 1 insight → 2 evidences → next | Full arc + ablations + limitations + future |
 | Slides/board | none / 1 | ~6–10 | ~18–22 + backup |
-| Cut first | everything but the hook + result | background, secondary results | nothing — this is the full version |
+| Cut first | **keep only** hook + result | long background, secondary results | secondary history/results; move them to backup |
 | Keep always | the pain and your delta | the *mechanism* | the honest limitation |
 
 ### The 2-minute version (memorize)
 
-> "I make pixel-level perception **label-efficient**, and I ship it: my work became a segmentation API that beats commercial tools and an image-matting model (ZIM, ICCV 2025 Highlight) inside CLOVA-X. Now I'm connecting that pixel-level grounding to language models so they reason from **visual evidence**, not guesses."
+> **Placeholder draft:** "I make pixel-level perception **label-efficient** and deployable. One line of work produced [publicly verifiable paper/product result]; another showed [one measured research result]. Now I'm connecting pixel-level grounding to language models so their answers can be checked against **visual evidence**."
+
+Even if phrases such as `outperformed commercial tools`, `ICCV Highlight`, or `integrated into CLOVA-X` are true, replace the brackets only after verifying the **evaluation scope, official record, and your contribution** for each. Do not imply that two products use the same model.
 
 Pattern: **Pain → what you did → why it matters → where you're going**, in four breaths. No jargon, no acronym you don't immediately unpack.
 
@@ -47,29 +49,29 @@ flowchart TB
 
 ### The 30-minute version
 
-The [job-talk arc](#/research/job-talk) at full resolution: motivation → prior art → **contributions up front** → one deep-dive → results + ablations → impact → future/fit, with a backup deck for defense.
+This is a compressed form of the [job-talk arc](#/research/job-talk): motivation → prior art → **contributions up front** → one deep-dive → results + ablations → impact → future/fit. Use the job-talk chapter as the source of truth for exact timing, Q&A, and claim verification rather than duplicating them here.
 
 ## Tailoring to the audience
 
 > [!WARNING] Wrong altitude sinks talks
 > The same slide is too shallow for an expert panel and too dense for a mixed room. **Read the room first**, then set altitude — this is a graded signal in the job talk.
 
-| Audience | Set altitude to… | Lead with | Beomyoung's rep |
+| Audience | Set altitude to… | Lead with | Candidate evidence (if verified) |
 | --- | --- | --- | --- |
-| Mixed / product (execs, PMs) | User value & impact first | A visible product pain, a demo | **DAN 24** — CLOVA-X Image Editing |
-| Trend / broad tech | Narrative + one concrete anchor | Where the field is going, then *your* work as proof | **Centum Digital Week 2025** — agents |
-| Expert research panel | Mechanism & evidence | The gap and your delta; defend choices | **NeurIPS 2021 Social** — SSUL |
+| Mixed / product (execs, PMs) | User value & impact first | A visible product pain, a demo | A product-event talk, if publicly documented |
+| Trend / broad tech | Narrative + one concrete anchor | Where the field is going, then *your* work as proof | A broad-tech talk, if publicly documented |
+| Expert research panel | Mechanism & evidence | The gap and your delta; defend choices | A workshop/social talk tied to the paper |
 | Hiring committee | Contribution clarity + trajectory | What *you* did, and the next question | the [job talk](#/research/job-talk) |
 
 > [!EXAMPLE] The line to say about audience-tailoring
-> "At DAN, user value came before research detail; at the NeurIPS Social, the technical core came first. I practice changing **altitude** for the room without changing the truth of the result."
+> If the contrast is verifiable in two real decks or recordings: "At the product event, user value came before research detail; at the research event, the technical core came first. I change **altitude** for the room without changing the truth of the result."
 
 <details class="qa"><summary>"You have a mixed audience — non-experts and experts. What's your first two minutes?"</summary>
 <div class="qa-body">
 
 **Short:** Open with a concrete, visible failure everyone understands (a jagged cut-out edge; a VLM confidently mislabeling an object), state your one-line promise, and *signal* the depth is coming so experts stay patient.
 
-**Deep:** Give a single "on-ramp" everyone boards, then climb. Define each acronym once. Put a "for the experts, details in backup" pointer so you don't lose either group. Never open with the AI grand-narrative or a market-size chart — start with the *pain*.
+**Deep:** Give a single "on-ramp" everyone boards, then climb. Define each acronym once. Put a "for the experts, details in backup" pointer so you do not lose either group. A concrete *problem or failure* the audience can inspect is usually a faster start than a giant market-size chart, although a business-review talk may appropriately lead with market evidence.
 </div></details>
 
 ## Whiteboarding your own work
@@ -81,7 +83,7 @@ flowchart TD
   A[Announce the plan<br/>'I'll draw the pipeline, then the one trick'] --> B[Draw the spine<br/>input → model → output]
   B --> C[Add the ONE contribution<br/>in a different color]
   C --> D[Annotate the loss / data as you speak]
-  D --> E[Pause: invite questions]
+  D --> WhitePause[Pause: invite questions]
 ```
 
 <details class="qa"><summary>"Whiteboard your most important result for me."</summary>
@@ -89,7 +91,7 @@ flowchart TD
 
 **Short:** Say the plan, draw the **pipeline spine** left-to-right, then add your contribution in a second color so it's visually obvious what's *yours*, narrating the loss/data as you go.
 
-**Deep:** Manage the board like slides: reserve space (don't run off the edge), write the *thesis sentence* at the top and leave it, box the one equation that matters. Talk while you draw — silence reads as uncertainty. Invite questions at natural breaks; a whiteboard makes Q&A conversational, which favors you. → [Communication & Whiteboarding](#/playbook/communication).
+**Deep:** Manage the board like slides: reserve space so you do not run off the edge, write the *thesis sentence* at the top and leave it, and box the one equation that matters. Explain the core intent briefly while drawing, but a short silence while thinking or drawing a complex shape is fine. Invite questions at natural breaks to make whiteboard Q&A conversational. → [Communication & Whiteboarding](#/playbook/communication).
 </div></details>
 
 > [!NOTE] Whiteboard hygiene
@@ -101,7 +103,7 @@ flowchart TD
 ## Figures that land
 
 > [!TIP] The one-job rule
-> Every figure answers **one** question; if it needs two, split it. The reader should get the point in ~5 seconds, then you narrate the nuance.
+> Whenever possible, design a presentation figure to answer **one primary question**. If a composite figure is necessary, use panels and annotations to reveal the reading order. Make the core message discoverable within seconds, then narrate the nuance.
 
 | Figure | Does one job | Trap to avoid |
 | --- | --- | --- |
@@ -116,8 +118,8 @@ flowchart TD
 ## Delivery mechanics
 
 - **Openers/closers memorized**, middle spoken freely — the two moments audiences remember.
-- ~1 slide/minute; slide text ≤ ~6 lines; the thesis sentence large on the slide.
-- Live demo? Always have a **muted video / static image fallback** — demos fail on stage.
+- ~1 slide/minute and ~6 lines of slide text are **rehearsal starting points**, not rules. Give a complex figure more time and a transition slide less.
+- A live demo can fail because of network, permissions, or latency, so prepare a **muted video / static-image fallback**.
 - Q&A: restate → answer → "does that address it?"; never bluff. See the [job-talk Q&A frame](#/research/job-talk).
 - English talk: rehearse **transition phrases** ("which brings me to…", "the key insight here is…") so momentum doesn't stall on word-finding.
 
@@ -143,18 +145,20 @@ flowchart TD
 
 ## Opening 30 seconds (practice draft)
 
-> "I work on making pixel-level perception **label-efficient** and getting it into real products — a segmentation API that outperforms commercial tools, and a matting model, ZIM, inside CLOVA-X image editing. Now I'm connecting that pixel- and region-level grounding to language-model agents, so they reason from *visual evidence* instead of unsupported description. Today I'll walk one idea from that trajectory in depth, its limitations, and the next question I'd open with this team."
+> **Placeholder draft:** "I work on making pixel-level perception **label-efficient** and deployable. In [verified project], I contributed [documented role] and we measured [scoped result]. Now I'm connecting pixel- and region-level grounding to language-model agents so their outputs can be checked against *visual evidence*. Today I'll walk through one idea from that trajectory, its limitations, and the next question I'd explore with this team."
+
+Fill the brackets from the latest CV, paper, and public product page; for internal numbers, state only a disclosure-safe aggregate and its evaluation scope.
 
 ## Cheat-sheet
 
 | Item | One-liner |
 | --- | --- |
-| Degrade gracefully | Build 30-min, derive 10/2-min by dropping detail, never the spine |
+| Degrade gracefully | Derive 30/10/2-minute versions by removing detail from the source narrative; never remove the spine |
 | 2-min | Pain → what you did → why it matters → where you're going |
 | Altitude | Product room = value first; expert panel = mechanism first |
 | Whiteboard | Announce plan → draw spine → contribution in 2nd color → talk while drawing |
-| Figures | One job each; ~5-sec readable; highlight only your row/number |
-| Demos | Always a muted-video / static fallback |
+| Figures | One primary question; clear reading order; emphasize the key row or number |
+| Demos | Prepare a muted-video / static fallback |
 | Openers/closers | Memorized verbatim; middle spoken freely |
 | Q&A | Restate → answer → confirm; never bluff |
 

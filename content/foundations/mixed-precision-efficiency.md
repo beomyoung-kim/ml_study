@@ -2,7 +2,10 @@
 
 <div class="tag-row"><span class="tag">BF16/FP8</span><span class="tag">NVFP4/MXFP4</span><span class="tag">GPTQ/AWQ</span><span class="tag">FlashAttention</span><span class="tag">KV cache</span><span class="tag">speculative decoding</span></div>
 
-> [!TIP] Say this first
+> [!NOTE] This chapter is advanced—you may skip it for now
+> **One-line intuition:** computers approximate numbers using a fixed number of bits. **Using fewer bits—lower precision, such as moving from 32 bits to 16, 8, or 4—makes training and inference faster and cheaper**, but going too far hurts accuracy. This chapter collects techniques for reducing bit width while preserving accuracy. Remember one sentence: **"Exponent bits buy range; mantissa bits buy precision."** If you are a beginner, you can return to this chapter later.
+
+> [!TIP] Interview one-liner
 > Efficiency is where research becomes product. Two clean framings win interviews: (1) *"exponent bits buy range, mantissa bits buy precision"* — that alone explains BF16 vs FP16 vs FP8; (2) *"training and inference have different levers"* — precision/parallelism/activation-memory for training; quantization/kernels/KV-cache/speculation for inference.
 
 ## Training vs. inference levers
@@ -35,11 +38,26 @@ flowchart LR
 | FP8 E5M2 | 5 / 2 | gradients (wider range) |
 | FP4 E2M1 | 2 / 1 | 4-bit element in NVFP4/MXFP4 blocks |
 
-**BF16 shares FP32's exponent**, so it rarely overflows — the default training precision on modern accelerators. **FP16** has more mantissa but a narrow range, hence loss scaling. **FP8** (Hopper+ via Transformer Engine) is routine at the frontier; the microscaling **4-bit** formats are the 2026 frontier — including for *pretraining*.
+**BF16 shares FP32's exponent width**, so it has less overflow risk than FP16 and is a common training precision on modern accelerators with good support. **FP16** has more mantissa but a narrower range, so many training setups use loss scaling. **FP8** and block-scaled **4-bit** formats have also begun to appear in some large-scale training runs when the hardware, kernels, and model recipe support them, but they are not the default for every layer and workload.
 
 ### Loss scaling (FP16)
 
 FP16 gradients underflow to zero; scale the loss up before backward, then unscale before the optimizer step. **Dynamic loss scaling**: raise the scale while stable, halve it on overflow. Master weights and optimizer moments stay FP32. BF16's wide range usually makes this unnecessary — a real operational simplification.
+
+> **PyTorch-style pseudocode—ordering is correctness in AMP**
+
+```python
+optimizer.zero_grad(set_to_none=True)
+with torch.autocast("cuda", dtype=torch.float16):
+    logits = model(x)
+    loss = criterion(logits, y)
+
+scaler.scale(loss).backward()                 # first enlarge small FP16 gradients
+scaler.unscale_(optimizer)                    # restore scale before clipping
+torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+scaler.step(optimizer)                        # skip the update on overflow
+scaler.update()                               # adjust the scale for the next step
+```
 
 ### FP4: NVFP4 vs MXFP4 <span class="badge badge-2026">2026</span>
 
@@ -51,22 +69,22 @@ Both use **E2M1** 4-bit elements with a shared per-block scale; they differ in b
 </dl>
 
 > [!NOTE] 4-bit *pretraining* is real
-> NVIDIA pretrained a **12B model on 10T tokens in NVFP4** (the longest documented 4-bit run), matching FP8 loss (arXiv:2509.25149). Stability came from **random Hadamard transforms** (spread outliers), **2D block quantization**, **stochastic rounding**, and keeping a few sensitive layers in higher precision. *(verifiable; hedge exact numbers.)*
+> NVIDIA researchers reported an experiment in arXiv:2509.25149 that **pretrained a 12B model at a scale of 10T tokens with NVFP4**, obtaining loss close to an FP8 baseline. The stability recipe combined **random Hadamard transforms** to spread outliers, **2D block quantization**, **stochastic rounding**, and higher precision for selected sensitive layers. This is a result for that model, hardware, and recipe; do not generalize it into a claim that 4-bit training always matches FP8.
 
 <details class="qa"><summary>Why is BF16 usually preferred over FP16 for training?</summary>
 <div class="qa-body">
 
 **Short:** BF16 keeps FP32's 8 exponent bits, so it has the same dynamic range and rarely overflows/underflows — you typically drop loss scaling entirely. FP16 has more mantissa but a narrow range, so it needs dynamic loss scaling and is more fragile.
 
-**Deep:** training gradients span many orders of magnitude; FP16's max ~65504 and small subnormal floor make overflow/underflow common, which loss scaling patches at the cost of a moving hyperparameter and overflow-retry logic. BF16 trades mantissa (precision) for range, and the reduced precision is tolerable because GEMMs accumulate in FP32. Net: BF16 is simpler and more robust; FP16 only wins on hardware without good BF16 support. **Follow-up:** *What stays FP32?* — master weights, optimizer moments, softmax/cross-entropy, and normalization statistics.
+**Deep:** Training gradients span many orders of magnitude. FP16's maximum value is 65504, and small values can underflow, so loss scaling and overflow-skip logic are commonly used. BF16 trades mantissa precision for dynamic range, and many GEMMs accumulate in higher precision, often simplifying training operations. The final choice depends on the accelerator's native throughput, kernel support, and convergence validation. **Follow-up:** *What remains at high precision?* Optimizer state, reductions and accumulation, and sensitive operations such as softmax and normalization use FP32 or BF16 depending on the implementation and recipe.
 </div></details>
 
 <details class="qa"><summary>What's the standard FP8 training recipe, and what breaks it?</summary>
 <div class="qa-body">
 
-**Short:** keep forward weights/activations in E4M3 and gradients in E5M2 (wider range), master weights and optimizer moments in FP32/BF16, and **exclude** the numerically sensitive layers — normalization, softmax, and the LM head — from FP8. Per-tensor or per-block scaling (amax tracking, via Transformer Engine) manages the dynamic range.
+**Short:** A common FP8 recipe considers E4M3 for forward weights and activations and the wider-range E5M2 for gradients, while keeping optimizer state and sensitive operations at higher precision. Modern delayed scaling, current scaling, and block-scaling recipes can assign dtypes differently by implementation. Per-tensor or per-block scales manage dynamic range.
 
-**Deep:** FP8's ~3 mantissa bits are fine for GEMMs that accumulate in FP32, but activation **outliers** blow up the per-tensor scale and lose the small values; delayed scaling (amax history) can lag a sudden shift and cause a spike, so labs sometimes switch to current/just-in-time scaling early in training. Blackwell's **MXFP8** uses finer block-wise scales to tame outliers vs. per-tensor FP8. Large FP8 pretraining is proven (DeepSeek-V3), but the recipe — which layers stay high-precision, scaling policy, warmup — is what makes it reproduce. **Follow-up:** *FP8 inference vs training?* — inference often quantizes weights only (or with rotations for W4A4); it doesn't need the E5M2 gradient path.
+**Deep:** FP8's narrow mantissa and range make it sensitive to activation outliers, so scaling granularity and high-precision exceptions matter. **Follow-up:** *FP8 inference versus training?* Inference does not need an E5M2 gradient path, but deployment is not limited to weight-only quantization. FP8 W8A8 is also used, while weight-only PTQ is especially common for INT4. Check which dtype combinations have fast kernels on the actual accelerator.
 </div></details>
 
 ## Quantization for inference
@@ -87,12 +105,12 @@ Uniform affine quantization: $x_q=\mathrm{clip}(\mathrm{round}(x/s)+z)$, with sc
 
 **Short:** activation outliers span a huge range and blow up the quantization scale, wasting bits on the whole tensor. An orthogonal rotation (e.g., Hadamard) redistributes that energy across channels so the distribution is more uniform and quantizes cleanly — and being orthogonal, it's mathematically invertible so the model output is unchanged.
 
-**Deep:** a few channels with large magnitude force a large $s$, coarsening every other value. Rotating by an orthogonal matrix $R$ (and folding $R^{-1}=R^\top$ into the adjacent weight) preserves the linear map while smearing outliers into a near-Gaussian spread — reducing the dynamic range each block must cover. QuaRot uses fixed random Hadamard rotations; SpinQuant learns them for a bit more accuracy. This is what makes W4A4 viable where plain AWQ/GPTQ (weight-only) can't go. **Follow-up:** *Weight-only vs weight+activation?* — weight-only (AWQ) is easier and common; W4A4 needs rotations + careful calibration but doubles activation-bandwidth savings.
+**Deep:** A few high-magnitude channels can force a large $s$ and coarsen every other value. If an orthogonal rotation is folded exactly into adjacent linear maps, the function is preserved **before quantization** while outliers spread across channels. After quantization the output is approximate, so calibration must measure the error. A W4A4 activation element is theoretically four times smaller than FP16, but scale metadata, packing, and kernels determine the actual bandwidth and latency gain.
 </div></details>
 
 ## FlashAttention: IO-aware attention
 
-Standard attention materializes the $n\times n$ scores in HBM. FlashAttention **tiles** Q/K/V and computes softmax online in SRAM, never storing the full matrix — same math, far less memory traffic, turning attention from memory-bound to compute-bound.
+A naive attention implementation materializes the $n\times n$ score matrix in HBM. FlashAttention **tiles** Q/K/V and computes online softmax in on-chip memory, producing the same attention result within numerical error without storing the full score matrix in HBM. This greatly reduces memory traffic and peak memory, although whether the operation actually shifts from memory-bound to compute-bound depends on sequence length, head dimension, dtype, GPU, and kernel.
 
 <dl class="kv">
 <dt>FA-2</dt><dd>Better work partitioning across warps/threadblocks.</dd>
@@ -100,8 +118,8 @@ Standard attention materializes the $n\times n$ scores in HBM. FlashAttention **
 <dt>FA-4</dt><dd>Blackwell (B200/GB200); rewritten in CuTe-DSL. Exists because of <b>asymmetric hardware scaling</b>.</dd>
 </dl>
 
-> [!IMPORTANT] "Asymmetric hardware scaling" — a 2026 talking point
-> FlashAttention needed a v4 (not just a retuned v3) because on Blackwell, **tensor-core throughput grew ~2× while shared-memory bandwidth and the exp/softmax units scaled much less**. The kernel must be redesigned so the now-relatively-scarce softmax/memory path stops bottlenecking the abundant matmul throughput. Kernels are increasingly *hardware-generation-specific*. *(verifiable direction; hedge exact TFLOPs figures.)*
+> [!IMPORTANT] "Asymmetric hardware scaling"—a 2026 talking point
+> On the Blackwell generation, tensor-core throughput and the softmax and memory paths did not scale at the same rate, so merely retuning an older kernel is insufficient to exploit all the new arithmetic capacity. FlashAttention-4 redesigns scheduling and data movement around this asymmetry. The key lesson is not the version number itself, but that **bottlenecks vary by hardware generation and tensor shape, so end-to-end kernel benchmarks are necessary**.
 
 ## KV cache & serving
 
@@ -122,7 +140,7 @@ Autoregressive decoding caches past K/V; the cache grows with context and domina
 
 ## Speculative decoding
 
-A cheap **drafter** proposes several tokens; the target model **verifies** them in one parallel forward and accepts the longest correct prefix — same output distribution, fewer sequential target steps.
+A cheap **drafter** proposes several tokens and the target model verifies them in parallel. Under greedy decoding, appending only tokens that match the target preserves the result. Under sampling, preserving the target distribution requires the full **exact speculative-sampling algorithm**, including rejection and residual sampling. Merely checking draft tokens and keeping a prefix does not automatically preserve the same distribution.
 
 <dl class="kv">
 <dt>Medusa</dt><dd>Extra prediction heads on the target model draft multiple future tokens.</dd>
@@ -130,14 +148,14 @@ A cheap **drafter** proposes several tokens; the target model **verifies** them 
 <dt>MTP</dt><dd>Multi-token prediction trained into the model (DeepSeek-style) → self-speculation.</dd>
 </dl>
 
-Now a **default serving layer** (vLLM, TensorRT-LLM, SGLang), not a bonus optimization.
+Major serving runtimes support it as an option, but it is not the default for every workload. When acceptance is low or batching is already compute-bound, overhead can erase the gain, so measure it on the real request distribution.
 
 <details class="qa"><summary>When does speculative decoding help, and when can it hurt?</summary>
 <div class="qa-body">
 
 **Short:** it helps at low batch size / memory-bound decoding where the target GPU is underutilized and drafts are accepted often; it hurts when the batch is already large (compute-bound) or acceptance is low, since rejected drafts waste the verification compute.
 
-**Deep:** decoding is usually memory-bandwidth-bound at small batch — the target does one token's worth of matmul but pays a full weight read. Speculation amortizes that read across several accepted tokens, so speedup ≈ expected accepted length × acceptance rate, minus drafter overhead. At high batch you're already saturating compute, so the extra verification work and rejected tokens can *reduce* throughput. Acceptance depends on drafter–target agreement (domain shift, temperature). **Follow-up:** *Does it change outputs?* — no; verification preserves the target's distribution exactly (that's the correctness guarantee).
+**Deep:** Small-batch decoding is often memory-bandwidth-bound, so verifying several tokens at once can amortize weight reads. But speedup depends jointly on draft length, acceptance, target batch size, and drafter cost; a simple product does not predict it reliably. **Follow-up:** *Does it change outputs?* Greedy decoding preserves output through exact-token verification, while sampling preserves the target distribution only when the formal rejection and residual-sampling procedure is implemented.
 </div></details>
 
 ## Pruning & distillation

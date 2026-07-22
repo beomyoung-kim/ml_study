@@ -5,8 +5,8 @@
 > [!TIP] How to use these
 > Each case is walked through the [9-step framework](#/system-design/framework). They're chosen to sit squarely on a CV/VLM research-applied candidate's turf — background removal / matting, visual search, vision moderation, a segmentation data engine, face auth / anti-spoofing, recommendation ranking, and OCR / document AI — so you can lift the framing straight into your own loop. Steal the *structure* and the *trade-off arguments*, not the exact numbers; state your own assumptions on the day.
 
-> [!NOTE] Say your CV out loud
-> Where a case touches shipped work — foreground-segmentation API, ZIM zero-shot matting → CLOVA X, on-device ONNX human seg (~10 ms class), FaceSign anti-spoofing, grounded-VLM data work — **name it**. "I shipped a version of exactly this; here's what I'd reuse and what I'd change at 100× scale" is the strongest sentence you can say in a design round.
+> [!NOTE] Speak from your CV, but stay inside the public record
+> Use first person only when the example is genuinely present in your submitted CV and publicly disclosable. If your role, product, latency, or deployment scope differs, replace the example with your precise contribution. Do not disclose confidential numbers or present a team result as an individual result.
 
 ---
 
@@ -51,7 +51,7 @@ flowchart TB
     HQ[Matting model<br/>ZIM-class]
     Post[Alpha refine · encode]
   end
-  subgraph Offline
+  subgraph MattingOffline[Offline]
     Lake[(Opt-in sample lake)]
     Mine[Hard-case mining<br/>+ active learning]
     Train[Training cluster]
@@ -82,7 +82,7 @@ flowchart TB
 > [!QUESTION] "Why on-device preview but cloud export — why not one model?"
 > **Short:** Different constraints. Preview needs ~30 ms and privacy; export needs quality and can spend 1–2 s and a GPU.
 >
-> **Deep:** A single model that's good enough for export can't hit 30 ms on a mid-tier phone, and a single model small enough for the phone leaves visible alpha errors on export. Tiering lets each optimize its own objective, keeps ~99% of interactions off the GPU fleet (cost), and satisfies privacy-first markets. The cost is *two* models to train, distill, and keep consistent — I'd distill the on-device student *from* the export teacher so their behavior agrees.
+> **Deep:** Tiering is reasonable when preview and export have different latency, quality, and privacy constraints. The share of traffic that avoids a GPU must be calculated from measured user behavior and export rate, not asserted as 99% without evidence. Measure device-specific thermal/quality behavior and the cloud cost curve, distill the on-device student from the export teacher, and evaluate preview↔export consistency.
 
 ---
 
@@ -106,7 +106,7 @@ flowchart LR
   V --> ANN[(ANN index<br/>HNSW / IVF-PQ)]
   ANN -->|top ~500| RR[Re-ranker<br/>cross-features + metadata]
   RR -->|top k| Res[Results]
-  subgraph Offline
+  subgraph RetrievalOffline[Offline]
     Cat[Catalog images] --> Eb[Batch encode] --> Build[Build / refresh index]
     Build --> ANN
   end
@@ -152,13 +152,13 @@ flowchart TB
   Fast -->|clearly safe| Pub[Publish]
   Fast -->|uncertain / risky| Heavy[Stage 2: heavy multimodal model<br/>image + OCR text + context]
   Heavy -->|high conf violate| Block[Block + log]
-  Heavy -->|gray zone| HQ[Human review queue]
-  HQ --> Label[(Reviewed labels)]
-  Label --> Train[Retrain / active learning]
-  Train --> Reg[(Registry)] -.-> Fast & Heavy
+  Heavy -->|gray zone| ModQueue[Human review queue]
+  ModQueue --> Label[(Reviewed labels)]
+  Label --> ModTrain[Retrain / active learning]
+  ModTrain --> ModReg[(Registry)] -.-> Fast & Heavy
   KnownCSAM[(Known-bad hash DB<br/>PhotoDNA-style)] --> Fast
   style Heavy fill:#e0533f,color:#fff
-  style HQ fill:#12a150,color:#fff
+  style ModQueue fill:#12a150,color:#fff
 ```
 
 ### 4–6 · Data, model, eval
@@ -186,7 +186,7 @@ flowchart TB
 
 > *"Design a data engine that turns a stream of unlabeled images into high-quality segmentation training data, cheaply."*
 
-This is the most **research-flavored** case and the one closest to a modern CV lab's real work (SAM-style data engines, ZIM, grounded-VLM annotation). Lead with it if the panel is FAIR/Adobe/ByteDance-Seed-style.
+This is the most **research-flavored** case and is close to the day-to-day work of modern CV labs: SAM-style data engines, matting/segmentation annotation, and grounded-VLM data. Lead with it when the role genuinely emphasizes data engines or applied vision research.
 
 ### 1–2 · Clarify + metrics
 
@@ -200,12 +200,12 @@ flowchart LR
   Raw[(Unlabeled stream)] --> Auto[Auto-label<br/>promptable seg SAM-class<br/>+ open-vocab detector]
   Auto --> Conf{Confidence /<br/>agreement}
   Conf -->|high| Accept[Auto-accept]
-  Conf -->|low / disagree| Human[Human correction UI]
+  Conf -->|low / disagree| LabelHuman[Human correction UI]
   Accept --> Pool[(Label pool)]
-  Human --> Pool
-  Pool --> Train[Train / improve model]
-  Train --> Auto
-  Pool --> AL[Active learning<br/>pick next batch] --> Human
+  LabelHuman --> Pool
+  Pool --> LabelTrain[Train / improve model]
+  LabelTrain --> Auto
+  Pool --> AL[Active learning<br/>pick next batch] --> LabelHuman
   style Auto fill:#6366f1,color:#fff
   style AL fill:#e0533f,color:#fff
 ```
@@ -234,13 +234,13 @@ The loop **improves its own labeler**: better model → more auto-accepts → ch
 
 ## Case E — Face authentication & liveness (anti-spoofing)
 
-> *"Design a face-authentication system (unlock / payment) robust to spoofing — photos, replays, masks."* The candidate shipped exactly this — **FaceSign** — so lead with it at a security/on-device-heavy panel.
+> *"Design a face-authentication system (unlock / payment) robust to spoofing—photos, replays, and masks."* If your submitted CV publicly documents directly relevant work such as **FaceSign**, you may use that experience; otherwise keep the answer at the system-design level.
 
 ### 1–2 · Clarify + metrics
 - **Two sub-problems:** face **recognition** (is this the enrolled user?) + **liveness / presentation-attack detection (PAD)** (a live person, not a photo/replay/mask?). PAD is the hard, security-critical half.
-- **Cost asymmetry:** a **false accept** (spoof succeeds) is catastrophic for payments; a false reject is merely annoying → operate at a **fixed, very low FAR** (e.g. 1e-5–1e-6) and minimize FRR *there*.
-- **Metrics:** recognition = **TAR@FAR** (verification ROC); PAD = **APCER / BPCER / ACER** (ISO 30107-3 attack vs bona-fide error rates). Guardrail: on-device latency; **fairness** = error parity across skin tone / age / gender is mandatory.
-- **Privacy:** face templates are biometric → **on-device, encrypted, no raw images to server** (FaceSign's government-certified context).
+- **Cost asymmetry:** system false acceptance combines recognition impostor acceptance with PAD attack acceptance. Design recognition around TAR/FRR at a target FAR, and PAD around the APCER/BPCER trade-off by attack type. An extreme claim such as $10^{-5}$ FAR is not verifiable without enough negative trials and confidence intervals.
+- **Metrics:** recognition = **TAR@FAR**; PAD = **APCER / BPCER**, and ACER when useful. One ACER average can hide the worst attack and asymmetric costs, so report attack-instrument, device, and demographic slices with confidence intervals.
+- **Privacy:** face templates are biometric → keep them **on-device and encrypted**, and avoid sending raw images to a server when the product and platform support that design.
 
 ### 3 · Architecture
 ```mermaid
@@ -248,30 +248,30 @@ flowchart TB
   Cam[Camera + IR/depth if available] --> Live[Liveness / PAD model]
   Live -->|spoof| Rej[Reject]
   Live -->|live| Emb[Face embedding model]
-  Emb --> M{Cosine vs enrolled template}
+  Emb --> M
+  subgraph SE["TEE / secure enclave (device-specific scope)"]
+    Tpl[(Encrypted template)]
+    M{Protected template match}
+  end
+  Tpl --> M
   M -->|match| Acc[Accept]
   M -->|no| Fb[Reject → PIN fallback]
-  subgraph SE["Secure enclave (on-device)"]
-    Live
-    Emb
-    Tpl[(Encrypted template)]
-  end
   style Live fill:#e0533f,color:#fff
 ```
 
 ### 4–6 · Data, model, eval
 - **PAD data:** diverse **attack instruments** (print, screen replay, 2D/3D mask, cutout) across devices/lighting; it's an **open-set** problem (new attacks appear) → robustness/anomaly framing, not just binary classification.
-- **Signals:** multi-modal when hardware allows (**IR/depth** kills most 2D replays), texture/moiré cues, optional active challenge (blink/turn) for high-risk actions.
-- **Model:** compact CNN embeddings (**ArcFace-style margin loss** for recognition) + a PAD head; distilled/quantized for the enclave.
+- **Signals:** IR/depth can add evidence against some print and screen-replay attacks when hardware allows, but it does not neutralize sensor spoofing, 3D masks, or domain shift. Evaluate texture/moiré cues and optional challenges together with replay, accessibility, and UX threat models.
+- **Model:** compact CNN embeddings (**ArcFace-style margin loss** for recognition) + a PAD head; distill/quantize for on-device execution.
 - **Eval:** **cross-dataset / cross-attack** generalization is the real test (train on some attacks, test on unseen) — in-distribution PAD numbers are misleadingly high.
 
 ### 7–9 · Serve, monitor, govern
-- All inference **on-device** in a secure enclave; server sees only pass/fail + audit metadata.
+- Run inference on-device where possible, but do not assume the entire NPU/GPU computation runs inside a secure enclave. A TEE/enclave usually protects a smaller trusted component such as keys, templates, and matching; verify the scope for each OS/SoC. Minimize server telemetry and apply consent and retention limits.
 - **Monitoring:** spoof-attempt rate, FRR drift by device/OS update, new-attack campaign detection; a fast loop to add newly-seen attacks.
-- **Failure/abuse:** liveness down → fall back to PIN (**never** fail-open to accept); template compromise → revocable, re-enrollable.
+- **Failure/abuse:** liveness down → fail closed to PIN or another factor. Because biometrics cannot be changed, avoid storing a raw embedding alone; use keyed/cancellable templates, device-bound keys, and versions so a compromise allows transformation/key rotation and reenrollment.
 
-> [!QUESTION] "Why optimize PAD at a fixed FAR instead of accuracy?"
-> **Short:** the costs are wildly asymmetric — one false accept can drain a payment account — so the operating point is chosen on the PAD ROC at a tiny fixed FAR, and data/threshold/model are all tuned to minimize false rejects *there*. Plain accuracy hides the only number that matters for a security system.
+> [!QUESTION] "Why not optimize face authentication with one accuracy number?"
+> **Short:** separate recognition as TAR@FAR and PAD as APCER@BPCER by attack type. Choose the final operating point from attack cost, user friction, and the combined error of both stages. One accuracy or ACER number can hide rare but catastrophic attack acceptance.
 
 ---
 
@@ -282,7 +282,7 @@ flowchart TB
 ### 1–2 · Clarify + metrics
 - **Stage it:** candidate **retrieval** (millions → hundreds) → **ranking** (score each) → **re-rank / policy** (diversity, freshness, business rules).
 - **Objective:** usually a blend — pCTR, dwell/watch-time, conversion — combined into one score; beware optimizing a single proxy (clickbait).
-- **Metrics:** offline **AUC / logloss / NDCG** on logged data; online **A/B** on the north-star (engagement, revenue) + guardrails (diversity, reported-content, latency). Online is truth; offline only *ranks candidates*.
+- **Metrics:** offline **AUC / logloss / NDCG** on logged data; online **A/B** on the north-star (engagement, revenue) + guardrails (diversity, reported content, latency). Online evaluation is decisive, but novelty, interference, and long-term effects mean that “online is immediately the truth” is also too simplistic.
 
 ### 3 · Architecture (multi-stage funnel)
 ```mermaid
@@ -293,15 +293,15 @@ flowchart LR
   Rank --> Rr[Re-rank<br/>diversity · freshness · rules]
   Rr --> Feed[Feed]
   Log[(Interaction logs)] --> FS[Feature store] --> Rank
-  Log --> Tr[Train] --> Reg[(Registry)] -.-> Rank
+  Log --> Tr[Train] --> RecReg[(Registry)] -.-> Rank
   style Rank fill:#e0533f,color:#fff
 ```
 
 ### 4–6 · Data, model, eval
 - **Retrieval:** **two-tower** (user tower / item tower) with in-batch negatives → ANN over item embeddings (same tech as Case B).
 - **Ranker:** rich cross-features (user×item×context); **GBDT** baseline → **DLRM / deep ranking** with embeddings for high-cardinality IDs. Calibrated probabilities matter if scores feed a blend/auction.
-- **Feedback loops & bias:** logs are **biased by the current model** (you only observe clicks on what was shown) → **position-bias** correction, exploration (ε-greedy / bandits), inverse-propensity weighting. This is *the* defining subtlety of rec systems.
-- **Eval:** counterfactual/replay estimates offline, then A/B; watch **feedback-loop amplification** (rich-get-richer, filter bubbles).
+- **Feedback loops & bias:** outcomes are observed only for shown items, so log the serving policy's **propensity and exposure position** and use safe exploration to establish support/overlap. IPS and self-normalized IPS need clipping and diagnostics for the high variance caused by small propensities; a doubly robust estimator that combines an outcome model still requires model-misspecification checks.
+- **Eval:** trust replay/off-policy estimates only for policy changes with adequate overlap, report effective sample size and confidence intervals, then confirm through staged A/B tests. Monitor **feedback-loop amplification** such as rich-get-richer dynamics and filter bubbles.
 
 ### 7–9 · Serve, monitor, govern
 - **Serving:** feature store with **train/serve parity** (the #1 bug source), precomputed user/item embeddings, tight p99, caching.
@@ -325,19 +325,19 @@ flowchart LR
 ### 3 · Architecture
 ```mermaid
 flowchart LR
-  Img[Doc photo] --> Pre[Dewarp · deskew · denoise]
-  Pre --> Det[Text detector]
+  Img[Doc photo] --> DocPre[Dewarp · deskew · denoise]
+  DocPre --> Det[Text detector]
   Det --> Rec[Recognizer OCR]
   Rec --> Lay[Layout + KV extraction<br/>LayoutLM-class or doc-VLM]
   Lay --> Val[Validation / business rules]
-  Val -->|low conf| Human[Human-in-the-loop]
+  Val -->|low conf| DocHuman[Human-in-the-loop]
   Val -->|ok| Out[Structured output]
-  Human --> Store[(Corrected → retrain)]
+  DocHuman --> Store[(Corrected → retrain)]
   style Lay fill:#e0533f,color:#fff
 ```
 
 ### 4–6 · Data, model, eval
-- **Pipeline vs VLM:** the classic pipeline (DBNet-class detector + CRNN/transformer recognizer + LayoutLM) is controllable, cheap, debuggable per stage; a **document VLM** is simpler and stronger on messy layouts but heavier and can **hallucinate** fields. Hybrid: VLM for understanding, **deterministic parsing/validation** for the numbers.
+- **Pipeline vs VLM:** a staged pipeline is controllable and measurable by component, while a document VLM can be flexible on open-ended layouts but is heavier and can hallucinate fields. In a hybrid, a deterministic parser, schema, or checksum verifies **format and arithmetic consistency**, not that the model actually read the value from the image.
 - **Data:** synthetic document generation (fonts, templates, augmentation) + real labeled scans; multilingual.
 - **Eval:** per-field and per-document-type slices (receipt vs invoice vs ID); track the VLM path's **hallucinated-field** rate.
 
@@ -347,7 +347,7 @@ flowchart LR
 - **Failure:** a wrong total on a receipt is high-cost → validation rules (checksums, totals must sum) + fail to human.
 
 > [!QUESTION] "One document-VLM or a staged pipeline?"
-> **Short:** VLM for robustness to messy/curved layouts and less per-template engineering; pipeline for per-stage metrics, cost, and control. I'd use a VLM for layout/understanding but keep **deterministic validation** (regex, checksums, totals) on numeric fields and route low-confidence to humans — VLMs hallucinate exactly the numbers that matter.
+> **Short:** compare the VLM and staged pipeline on the same document/language slices and cost. Apply regex, schema, checksum, and subtotal-consistency checks to numeric fields, but do not treat passing them as proof of correctness. Return the supporting source span/box as well, and send high-risk or low-confidence cases to a human.
 
 ### Follow-ups they'll push (any case)
 
@@ -364,7 +364,7 @@ flowchart LR
 | **B · Visual search** | metric learning + ANN + re-rank | two-stage retrieval; PQ-compressed index | encoder version skew across query/catalog |
 | **C · Moderation** | multi-label detection | hash-first + cheap→heavy cascade; fail-closed | adversarial drift; slice-unfair recall |
 | **D · Data engine** | model-in-the-loop labeling | self-improving flywheel + active learning | self-reinforcing label bias (no gold set) |
-| **E · Face auth / PAD** | recognition + presentation-attack detection | on-device enclave; operate at fixed low FAR | false accept (spoof); cross-attack generalization |
+| **E · Face auth / PAD** | recognition + presentation-attack detection | on-device + protected template; separate TAR@FAR from APCER/BPCER | system false accept; cross-attack generalization |
 | **F · Recommendation** | retrieval + ranking (+ re-rank) | two-tower ANN → heavy ranker; debias logs | feedback-loop bias; train/serve skew |
 | **G · OCR / doc AI** | detect → recognize → layout/KV | pipeline vs doc-VLM + deterministic validation | VLM hallucinated numeric fields |
 

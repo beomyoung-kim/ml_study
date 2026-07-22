@@ -1,7 +1,7 @@
 # Graphs (BFS / DFS)
 
 > [!TIP] Say this first
-> "Almost every graph problem is `adjacency list + visited`. BFS gives shortest paths on **unweighted** graphs; DFS gives connectivity, cycles, and topological order. Add a priority queue and it's Dijkstra." Stating the representation and the traversal choice up front is half the signal.
+> “Many basic graph problems start with `adjacency list + visited`. BFS finds the minimum number of edges in an **unweighted** graph; DFS supplies the machinery for connectivity, cycles, and topological ordering. For non-negative weighted shortest paths, consider Dijkstra with a priority queue.” Stating the representation and traversal choice up front is half the signal.
 
 Grids, dependency DAGs, and social graphs are the same abstraction. The interview skill is choosing the traversal, tracking `visited` correctly, and knowing the four escalations: BFS → Dijkstra (weights), DFS → topo-sort / cycle detection, union of components → [Union-Find](#/coding/union-find).
 

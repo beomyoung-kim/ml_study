@@ -126,6 +126,71 @@ BFS, 큐 길이를 스냅샷으로 잡아 각 레벨을 분리해 둡니다.
 
 `O(N)`. 이 chain-반환 / global-갱신 분리는 **diameter** (LC 543), **house robber III** (LC 337), 그리고 대부분의 "tree 내부 경로" DP의 템플릿입니다.
 
+## Backtracking 정본 — 선택하고, 탐색하고, 되돌리기
+
+Backtracking은 명시적인 tree 자료구조가 아니라 **선택의 search tree**를 DFS하는 방법입니다. 각 호출에서 지금까지의 경로와 다음 후보 범위를 정의하고, 선택을 추가한 뒤 재귀하고 반드시 원상 복구합니다.
+
+```python
+def subsets(nums):
+    """입력 원소의 위치가 서로 다른 모든 부분집합."""
+    out, path = [], []
+
+    def dfs(start):
+        out.append(path.copy())      # mutable path 자체를 넣으면 모두 같은 객체
+        for i in range(start, len(nums)):
+            path.append(nums[i])     # choose
+            dfs(i + 1)               # explore: 앞 index로 돌아가지 않음
+            path.pop()               # unchoose
+
+    dfs(0)
+    return out
+
+
+def unique_permutations(nums):
+    """중복 값이 있어도 서로 다른 permutation만 반환."""
+    nums = sorted(nums)
+    out, path = [], []
+    used = [False] * len(nums)
+
+    def dfs():
+        if len(path) == len(nums):
+            out.append(path.copy())
+            return
+        for i, value in enumerate(nums):
+            if used[i]:
+                continue
+            # 같은 depth에서는 같은 값을 한 번만 시작점으로 사용한다.
+            if i > 0 and nums[i] == nums[i - 1] and not used[i - 1]:
+                continue
+            used[i] = True
+            path.append(value)
+            dfs()
+            path.pop()
+            used[i] = False
+
+    dfs()
+    return out
+
+
+assert subsets([]) == [[]]
+assert sorted(subsets([1, 2])) == [[], [1], [1, 2], [2]]
+assert unique_permutations([1, 1, 2]) == [
+    [1, 1, 2], [1, 2, 1], [2, 1, 1]
+]
+```
+
+| 문제 형태 | 상태와 후보 | 대표 pruning |
+| --- | --- | --- |
+| Subset/combination | `path`, 다음 `start` index | 남은 길이로 목표 개수에 못 미치면 중단 |
+| Permutation | `path`, `used[]` | 정렬 후 같은 depth의 duplicate skip |
+| 합이 target | 현재 합/잔여량, `start` | 후보가 양수로 정렬됐을 때 `candidate > remaining`이면 중단 |
+| Grid word search | 좌표, 문자 index, 방문 상태 | 범위·문자 mismatch 즉시 중단; 방문 표시를 복구 |
+
+부분집합은 출력 자체가 $2^N$개라 대략 $O(N2^N)$, 순열은 $N!$개라 $O(N\cdot N!)$ 시간이 필요합니다(각 답을 복사하는 비용 포함). 따라서 exponential이라는 사실만 말하지 말고 **출력 크기에 비례해 최적에 가깝다**는 점과 pruning 조건의 정당성을 설명하세요. 동일한 `(state)`가 반복되고 최적값·경우의 수만 필요하다면 memoization/DP로 전환할 신호입니다.
+
+> [!WARNING] Backtracking 함정
+> Base case에서 `return`을 빠뜨려 잘못된 길이의 답을 더 탐색하거나, `path.copy()` 대신 `path`를 저장하거나, 성공 경로에서 조기 반환하며 방문 표시를 복구하지 않는 버그가 흔합니다. 입력에 duplicate가 있으면 “같은 depth에서 skip”과 “모든 depth에서 skip”을 구분하세요.
+
 ## 흔한 tree-DP 레시피
 
 | 문제 | 위로 반환 | 전역 갱신 |
@@ -180,6 +245,8 @@ BFS, 큐 길이를 스냅샷으로 잡아 각 레벨을 분리해 둡니다.
 | DFS vs BFS 메모리 | `O(H)` vs `O(W)` |
 | Iterative in-order | left-spine 스택, pop 시 방문, 오른쪽으로 |
 | Validate BST | 부모만이 아니라 `(low, high)` 경계를 상속 |
+| Backtracking | choose → explore → unchoose; 답에는 `path.copy()` 저장 |
+| Duplicate pruning | 정렬 후 같은 depth의 동일 후보만 skip |
 | 복잡도 | traversal `O(N)`; 균형 BST 연산 `O(log N)` |
 
 **관련:** [Graphs (BFS/DFS)](#/coding/graphs-bfs-dfs) · [Binary Search](#/coding/binary-search) · [Dynamic Programming](#/coding/dynamic-programming) · 다시 [The Core Patterns](#/coding/patterns)와 [Coding Round Strategy](#/coding/strategy)로.

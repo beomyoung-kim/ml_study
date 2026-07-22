@@ -3,9 +3,9 @@
 <div class="tag-row"><span class="tag">environment</span><span class="tag">camera / audio</span><span class="tag">CoderPad / live-share</span><span class="tag">backup plans</span><span class="tag">body language on video</span></div>
 
 > [!TIP] Why sweat the setup
-> Most RS/AS loops in 2025–2026 are still **virtual** (with some in-person onsites returning). A frozen screen-share, a dead mic, or a dark room converts your content advantage into wasted minutes and interviewer frustration. This is the cheapest edge in the whole process: **you can make the logistics near-perfect with an hour of prep.** Nail it once and forget it for every round.
+> Remote rounds remain common, but whether a loop is remote, in person, or hybrid varies by team and date. A frozen screen share, a dead mic, or a dark room consumes time you could spend answering. Confirm the actual format from the invitation and recruiter guidance, then reproduce and test the environment you will use in advance.
 
-For a candidate interviewing across time zones (Seoul → US/EU), the setup also has to survive **odd hours and a non-native-English audio channel** — clarity matters more than usual.
+For a candidate interviewing across time zones (Seoul → US/EU), the setup also has to survive <strong>odd hours and a non-native-English audio channel</strong> — clarity matters more than usual.
 
 ## The environment checklist
 
@@ -31,25 +31,25 @@ flowchart LR
 
 ## Camera & audio: the details that read as "professional"
 
-Audio quality matters more than video — a crisp mic keeps a non-native accent perfectly intelligible; a laptop mic in a echoey room does not.
+Audio quality matters more than video. A clear microphone and low-echo environment improve intelligibility regardless of accent.
 
 | Element | Cheap fix | Why it matters |
 | --- | --- | --- |
 | **Mic** | Wired earbuds/headset mic > laptop mic | kills room echo & keyboard clatter; clearer for non-native accents |
-| **Camera height** | Raise laptop so the lens is at **eye level** | looking down reads as low-confidence; eye-level = engaged |
+| **Camera height** | Raise laptop so the lens is at <strong>eye level</strong> | looking down reads as low-confidence; eye-level = engaged |
 | **Lighting** | Face a window or put a lamp *behind the camera* | back-lighting turns you into a silhouette |
 | **Framing** | Head-and-shoulders, small headroom | too close = intense; too far = disengaged |
-| **Eye contact** | Glance at the **lens**, not the face on screen | on video, lens-gaze *is* eye contact |
+| **Eye contact** | Glance at the <strong>lens</strong>, not the face on screen | on video, lens-gaze *is* eye contact |
 
 > [!WARNING] Test with the actual tool, not just a mirror
-> "Camera works" in Photo Booth ≠ "works in the interview app." Do a real test call (a friend, or the platform's test room) on the **same app, same machine, same network** you'll use. Verify the mic isn't the wrong device and screen-share actually transmits.
+> "Camera works" in Photo Booth ≠ "works in the interview app." Do a real test call (a friend, or the platform's test room) on the <strong>same app, same machine, same network</strong> you'll use. Verify the mic isn't the wrong device and screen-share actually transmits.
 
 ## Practice the coding/collaboration tool in advance
 
 The interview platform is a variable you can *remove*. Each has quirks — no autocomplete, no run button, unfamiliar keybindings — that eat time if you meet them cold.
 
 <dl class="kv">
-<dt>CoderPad / Codility / HackerRank</dt><dd>Shared editor, often minimal. Practice: writing without IDE autocomplete, using its language selector, running tests if allowed. Meta's phone screen is typically CoderPad.</dd>
+<dt>Shared coding editor</dt><dd>CoderPad, Codility, HackerRank, and similar tools differ in configuration. After confirming the actual platform, practice writing without autocomplete, selecting the language, and determining whether test execution is allowed.</dd>
 <dt>VS Code Live Share</dt><dd>Real-time collaborative editing in your own editor. Install and test it beforehand; know how to share terminal and follow the interviewer's cursor.</dd>
 <dt>Google Doc / plain shared text</dt><dd>Some research rounds use a bare doc — no execution. Practice writing *runnable-looking* code and tracing by hand, since you can't lean on a compiler.</dd>
 <dt>Virtual whiteboard (Excalidraw / built-in)</dt><dd>For system/ML design. Practice drawing boxes-and-arrows fast; know how to make/label/move nodes. See [The Design Framework](#/system-design/framework).</dd>
@@ -58,11 +58,17 @@ The interview platform is a variable you can *remove*. Each has quirks — no au
 > [!TIP] Ask the recruiter which tool
 > Include it in your recruiter-screen question list (see [Recruiter & HM Screens](#/process/recruiter-hm)): *"Which coding platform will we use, and is code execution / AI assistance allowed?"* Then do one warm-up problem in that exact tool.
 
-## AI-assisted coding rounds (2026)
+## AI-assisted coding rounds
 
-Some companies (notably Meta) now run **AI-assisted coding rounds** where an assistant/autocomplete is allowed or expected. Confirm the policy with the recruiter and, if allowed, practice the *workflow*: prompt for scaffolding, then read, verify, and edit critically. The signal being tested shifts from "can you recall syntax" to "can you steer and vet a tool" — narrate your verification, don't blindly accept output.
+Generative-AI and autocomplete policies cannot be generalized from the company name. Even within the same company, a round may <strong>allow, restrict, or prohibit</strong> them; follow the invitation or the recruiter's written answer. If there is no answer, do not assume permission — ask.
 
-## Backup plans (things *will* break)
+- **Prohibited or disabled round:** practice implementing, testing, and debugging without IDE assistance.
+- **Allowed round:** confirm which tools and features are permitted, then practice a workflow in which you personally verify assumptions, complexity, edge cases, and tests in generated output.
+- **Ambiguous restrictions:** confirm with the interviewer before the round starts, and follow the recorded policy.
+
+Even when a tool is allowed, do not assume the evaluation criterion automatically becomes "prompting ability." The safe approach is to narrate how you retain ownership of problem solving and verification.
+
+## Backup plans (keep failures short)
 
 Have a written fallback so a glitch costs 30 seconds, not the round.
 
@@ -80,7 +86,7 @@ flowchart TB
 ```
 
 - **Save the interviewer/recruiter contact** (email + any phone/Slack) *before* the call, so you can reach them instantly if you drop.
-- **Pre-configure a phone hotspot** as a network fallback.
+- <strong>Pre-configure a phone hotspot</strong> as a network fallback.
 - **Keep the join link open on a second device** so you can rejoin in seconds.
 - If something breaks, **stay calm and communicate**: "I've lost audio — dialing in now." Composure under a glitch is itself a positive signal.
 

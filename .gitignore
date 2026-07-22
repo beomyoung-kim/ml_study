@@ -1,7 +1,10 @@
 # Local-only files (not for the public site)
+.DS_Store
 *.local.md
 PRISM-full.local.md
 
 # stray root-level scratch (book content lives in content/)
 /coding/
 *.local.html
+
+local/

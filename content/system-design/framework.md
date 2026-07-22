@@ -3,9 +3,9 @@
 <div class="tag-row"><span class="tag">9-step spine</span><span class="tag">problem → metric → data → model → serve → monitor</span><span class="tag">research vs product framing</span><span class="tag">45–60 min</span></div>
 
 > [!TIP] Say this in the first 60 seconds
-> "Before I design anything, let me clarify the use case, constraints, and how we'll measure success — then I'll sketch a baseline system and deep-dive wherever you want." A structured opening is itself a scored signal. The interviewer is filling a rubric box that reads *"frames the problem before jumping to a model."* Give them that evidence immediately.
+> "Before I design anything, let me clarify the use case, constraints, and how we'll measure success—then I'll sketch a baseline system and deep-dive wherever you want." Rubrics vary by organization, but this opening immediately demonstrates problem framing and structured thinking.
 
-Every worked case in the [next chapter](#/system-design/case-studies) rides this same spine. Learn it once; instantiate it under pressure. The framework here is the widely-cited **9-step ML system design** structure (alirezadir), compressed into a loop you can walk on a whiteboard.
+The worked cases in the [next chapter](#/system-design/case-studies) use this spine as a common starting point. The framework adapts [alirezadir's 9-step ML system-design outline](https://github.com/alirezadir/machine-learning-interviews/blob/main/src/MLSD/ml-system-design.md) into a loop that can be walked on a whiteboard. Do not memorize the order rigidly; reallocate time around the risks in the question.
 
 > [!WARNING] The research/applied twist
 > Product-MLE framing assumes garden-variety infra exists and rewards a clean data→features→ranking→serve→A/B pipeline. **Research/applied framing shifts the weight** toward *problem formulation, metric design, experimental rigor (ablations, baselines, failure analysis), and modeling novelty.* You still draw the whole system, but you spend your extra minutes where a scientist adds value: **what to measure and how to know you're right.** *(defensible — synthesized from RS/AS loop reports)*
@@ -31,7 +31,7 @@ flowchart TD
 
 The dashed edge is the point: an ML system is **iterative**, not a waterfall. Say so out loud — "I'd ship the simplest thing that beats the current baseline, then let monitoring and error analysis re-scope the problem." That single sentence reads as production maturity.
 
-## Time budget (45-minute round)
+## Time budget (illustrative 45-minute round)
 
 | Phase | Min | What you must produce |
 | --- | --- | --- |
@@ -44,6 +44,8 @@ The dashed edge is the point: an ML system is **iterative**, not a waterfall. Sa
 
 > [!NOTE] Read the room, don't recite
 > A strong interviewer will interrupt to deep-dive one box. **Let them steer** — the budget above is your default when *they* don't. Never sprint through all nine steps to "finish"; depth on the box they care about beats breadth they didn't ask for.
+
+Treat the table as one illustrative allocation, not a universal interview duration or company rubric. Ask how much time is available and which section the interviewer wants to explore, then scale the phases proportionally.
 
 ## Step 1 — Problem formulation (where research candidates win)
 
@@ -70,13 +72,17 @@ Then state the **ML framing** explicitly: is this binary/multi-label classificat
 The most common failure is conflating them. Separate three tiers and connect them with a hypothesis.
 
 <dl class="kv">
-<dt>Offline ML metrics</dt><dd>What you optimize/select on before deploy. Must match the <b>decision</b>, not convenience. Classification: PR-AUC (imbalanced) &gt; ROC-AUC; F<sub>β</sub> to weight recall vs precision; calibration (ECE) for anything safety-critical. Dense prediction: mIoU, boundary-F, SAD/MSE for matting. Retrieval/ranking: Recall@k, nDCG, MRR. Generation: task-specific + human/LLM-judge.</dd>
+<dt>Offline ML metrics</dt><dd>What you use to select a model before deployment; they must match the <b>decision and operating point</b>. For imbalanced or rare positives, a PR curve and precision/recall at a threshold are often more direct, but ROC-AUC is not always inferior. Do not reduce calibration to ECE alone: inspect reliability diagrams, NLL/Brier score, class- and slice-level calibration, and risk/coverage at the target threshold. For dense prediction use mIoU, boundary-F, and SAD/MSE; for retrieval/ranking use Recall@k, nDCG, and MRR; for generation combine task metrics with validated human or judge evaluation.</dd>
 <dt>Online business metrics</dt><dd>What the product actually cares about: edit-completion rate, retention, CTR, report rate, task success. You cannot A/B on these until you ship, so you need an offline <b>proxy</b> and a stated hypothesis linking them.</dd>
 <dt>Guardrail metrics</dt><dd>Must-not-regress constraints: p99 latency, cost/req, crash rate, fairness across slices, safety violation rate. A win on the primary metric that trips a guardrail is <b>not</b> a win.</dd>
 </dl>
 
 > [!EXAMPLE] Metric design as a research signal
 > Don't just name a metric — **defend it against gaming**. "mIoU averages over pixels, so a model can score well while destroying thin structures like hair; I'd add a **boundary-F** metric and a hard-case slice (fine detail, transparency) so the number I optimize matches the quality users see." That is exactly the judgment a research panel probes for. See [Evaluation Metrics](#/foundations/evaluation-metrics).
+
+## Step 3 — Architecture / MVP
+
+Separate the **online path**—input → preprocessing → model → postprocessing → storage/response—from the **offline path**—collection → labels → training → registry → deployment. Authentication, caches, queues, human review, and fallbacks are first-class components outside the model. Add rough QPS, payload, and latency budgets to the arrows, and mark single points of failure and backpressure boundaries.
 
 ## Steps 4–5 — Data and features
 
@@ -85,12 +91,12 @@ Data quality dominates model choice at this level. Cover, briefly:
 - **Sources & labels** — licensed vs scraped vs synthetic; who labels, guideline versioning, inter-annotator agreement; weak/self-supervised signals when labels are scarce.
 - **The data engine** — sampled production data → hard-case mining → active learning → re-label → retrain. Draw this loop; it's often the real product moat.
 - **Splits & leakage** — split by *entity* (user/scene/identity), not by row, or your metric lies. Temporal splits for anything with drift.
-- **PII / consent / retention** — opt-in sampling, retention windows, purpose limitation. Naming this unprompted is an integrity signal (and a hard requirement at Apple-style orgs).
+- **PII / consent / retention** — design for lawful basis or consent, purpose limitation, data minimization, retention and deletion, and access auditing. Verify the concrete requirements for the jurisdiction, data type, and organization policy.
 - **Representation** — which encoder/features; normalization; class imbalance handling (resampling, focal/reweighted loss).
 
 ## Step 6 — Model & offline evaluation
 
-Always propose a **ladder**, never a single model:
+Rather than naming only one candidate, you can often propose a comparable **model ladder**:
 
 ```mermaid
 flowchart LR
@@ -119,13 +125,48 @@ flowchart LR
 | On-device | privacy, offline, ultra-low latency | model-size ceiling, fragmentation, no hotfix |
 | Cascade (cheap → expensive) | cost control at scale | calibration of the router/threshold |
 
-**Online testing** is a staged rollout, never a big-bang: **shadow** (mirror traffic, no user impact) → **canary** (1% with auto-rollback on guardrail breach) → **A/B** (powered experiment on the online metric) → ramp. State your **hypothesis, primary metric, guardrails, and stopping rule** before you ramp.
+**Online testing and rollout** can proceed in stages when appropriate: **shadow** (mirror traffic only when safety and privacy permit) → **canary** (a small fraction, with rollback on guardrail breach) → **A/B** (when interference, ethics, and statistical-power conditions are satisfied) → ramp. Not every product can use this sequence unchanged; for high-risk or rare events, simulation, prospective validation, and a human gate may matter more. Predeclare the **hypothesis, primary metric, guardrails, and stopping rule**.
+
+<details class="concept-code">
+<summary>View as conceptual code</summary>
+
+> This is Python-like **pseudocode** that separates deployment from experimental decisions. It is not a real statistical-testing or deployment-platform API.
+
+```python
+def staged_rollout(candidate, baseline, preregistered_plan):
+    plan = validate_plan(preregistered_plan)  # Fix analysis unit, primary, guardrails, and horizon
+    verify_artifact_hash(candidate)
+
+    if privacy_and_side_effect_policy.allows_shadow:
+        shadow_report = shadow(candidate, sampled_traffic(), actions_disabled=True)
+        require_no_operational_regression(shadow_report)
+
+    deployment = canary(candidate, traffic_fraction=0.01)
+    while deployment.in_canary_window():
+        health = monitor_guardrails(deployment)  # Latency, error, safety, cost
+        if health.crosses_emergency_boundary:    # Predeclared immediate-stop boundary
+            deployment.rollback()
+            return "rolled_back"
+
+    experiment = assign_stably_by_unit(          # Analysis unit such as user, not request
+        units=eligible_population(), variants=[baseline, candidate], seed=plan.seed
+    )
+    results = run_until_planned_horizon(experiment, plan)  # No ad hoc daily peeking or early stop
+    effect, interval = paired_or_cluster_aware_estimate(results, plan)
+    if plan.primary_wins(effect, interval) and plan.guardrails_pass(results):
+        return deployment.ramp_with_monitoring()
+    deployment.rollback()
+    return "no_ship"
+```
+
+</details>
 
 **Monitoring & failure modes** — the box juniors skip and seniors lead with:
 
 - *Operational:* QPS, error rate, latency, GPU util, cost.
+- *Capacity & queues:* arrival rate, queue depth/age, saturation, admission control, timeouts, and retry storms. Under overload, specify backpressure, load shedding, and degraded mode instead of allowing an unbounded wait.
 - *ML health:* prediction distribution, confidence drift, **data/concept drift** vs training, per-slice metrics.
-- *Failure modes & degraded mode:* what happens on a bad model (rollback via registry), bad input (validation, fallback UI), abuse (rate limits + policy model), or outage (serve the cheaper baseline). Always have a **fallback that is worse but safe.**
+- *Failure modes & degraded mode:* what happens on a bad model (rollback via registry), bad input (validation, fallback UI), abuse (rate limits + policy model), or outage. When possible, keep a **reduced-functionality but safer fallback**; if no safe fallback exists, fail closed, escalate to a human, or surface an explicit outage.
 
 <details class="qa"><summary>Walk me through your reusable design checklist — the one you'd run in any design round.</summary>
 <div class="qa-body">
@@ -134,15 +175,15 @@ flowchart LR
 
 **Deep:**
 
-1. **Clarify** — users, scale, latency, quality bar, cost, privacy, horizon. Write assumptions down.
-2. **ML framing + objective** — classification / dense / retrieval / ranking / generation; the reduction I chose and why.
-3. **Metrics** — offline (matches the decision, resists gaming) · online (business) · guardrails (latency, cost, fairness, safety). State the proxy→KPI hypothesis.
-4. **Architecture** — one box diagram; request path; offline vs online split.
-5. **Data** — sources, labeling + guidelines, splits/leakage, PII/consent, imbalance, the data-engine loop.
-6. **Features/representation** — encoder, preprocessing, normalization.
-7. **Model ladder** — baseline → ambitious → distilled; **ablations + failure analysis**.
-8. **Serving** — batch/online/on-device/cascade; latency & cost back-of-envelope.
-9. **Online eval + monitoring + failure** — shadow→canary→A/B; drift; rollback; degraded mode.
+1. **Problem formulation** — ask about users, scale, latency, cost, and privacy; choose the objective and reduction among classification, dense prediction, retrieval, ranking, and generation.
+2. **Metrics** — connect offline decision/operating-point metrics, online KPIs, and latency/cost/fairness/safety guardrails with a proxy hypothesis.
+3. **Architecture / MVP** — draw the online request path, offline data/training path, non-ML baseline, authentication, queues, and fallback.
+4. **Data** — cover sources, labeling guidelines, entity/temporal splits, leakage, PII/consent, and the data-engine loop.
+5. **Features / representation** — specify encoder, preprocessing, normalization, and train/serve parity.
+6. **Model + offline eval** — baseline → ambitious → distilled; ablations, uncertainty, and failure slices.
+7. **Serving** — batch/online/on-device/cascade; latency, capacity, cost, and backpressure.
+8. **Online testing** — shadow → canary → A/B where valid; hypothesis, power, stopping rule, and rollback.
+9. **Scale / monitor / update** — drift, queue and SLO health, slice metrics, retraining triggers, degraded mode, and governance.
 
 Then: *"Which box do you want me to go deep on?"*
 </div></details>
@@ -150,9 +191,9 @@ Then: *"Which box do you want me to go deep on?"*
 <details class="qa"><summary>You've got 45 minutes and the interviewer stays quiet. How do you spend them?</summary>
 <div class="qa-body">
 
-**Short:** 8 min clarify + metrics, 8 min architecture, ~20 min on data+model (the ML heart), ~8 min serving+monitoring, and I narrate trade-offs the whole way.
+**Short:** If the scheduled round is about 45 minutes, I might use 8 minutes for clarification and metrics, 8 for architecture, about 20 for data and model, and about 8 for serving and monitoring—while narrating trade-offs throughout.
 
-**Deep:** Silence usually means "keep driving, I'm assessing structure." I front-load the parts that are hard to redo — problem framing and metrics — because a wrong objective invalidates everything downstream. I timebox myself aloud ("I'll spend ~2 more minutes on data, then move to the model") so the interviewer can redirect. If I'm running long, I compress serving to the pattern table and spend the recovered minutes on ablations, because for a research role that's where my signal is.
+**Deep:** Do not infer intent from silence alone; ask, "Would you like me to go deeper here or continue end to end?" I front-load problem framing and metrics because they are costly to redo, and I share timeboxes aloud ("I'll spend about two more minutes on data, then move to the model") so the interviewer can redirect. If time is tight, I compress serving or modeling detail according to the role and the question.
 </div></details>
 
 ### Follow-ups they'll push after your first answer
@@ -179,4 +220,4 @@ Then: *"Which box do you want me to go deep on?"*
 > [!TIP] The one-sentence close
 > "I'd ship the baseline behind a shadow test, prove the ambitious model beats it on the hard-case slice *and* the guardrails, distill it to the latency budget, then let per-slice monitoring tell me what to fix next." That sentence contains all nine steps.
 
-**Related:** [Worked Case Studies](#/system-design/case-studies) · [Designing LLM/Agent Systems](#/system-design/llm-systems) · [Evaluation Metrics](#/foundations/evaluation-metrics) · [Mixed Precision & Efficiency](#/foundations/mixed-precision-efficiency) · [Distributed Training](#/foundations/distributed-training) · [Experiment Design & Ablations](#/research/experiment-design) · [The RS/AS Pipeline](#/process/pipeline)
+**Related:** [Resume-based stage-by-stage answer examples](#/resume/interview-stage-answers) · [Worked Case Studies](#/system-design/case-studies) · [Designing LLM/Agent Systems](#/system-design/llm-systems) · [Evaluation Metrics](#/foundations/evaluation-metrics) · [Mixed Precision & Efficiency](#/foundations/mixed-precision-efficiency) · [Distributed Training](#/foundations/distributed-training) · [Experiment Design & Ablations](#/research/experiment-design) · [The RS/AS Pipeline](#/process/pipeline)

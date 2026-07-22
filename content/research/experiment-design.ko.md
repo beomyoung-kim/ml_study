@@ -3,7 +3,7 @@
 <div class="tag-row"><span class="tag">hypothesis-driven</span><span class="tag">ablation discipline</span><span class="tag">controls & confounders</span><span class="tag">seeds & significance</span><span class="tag">compute budget</span></div>
 
 > [!TIP] 질문 뒤의 질문
-> RS/AS 심사위원단은 "your idea가 좋은가"를 거의 묻지 않습니다 — **"how do you know this diff actually caused the improvement?"**를 묻습니다. 강한 답변은 깔끔한 사슬을 따라갑니다: 하나의 hypothesis → 강한 frozen baseline → 한 factor만 변경 → confounder 통제 → variance/seeds → claim의 범위 한정. 이 장은 [Debugging & Experimentation](#/foundations/debugging-experimentation)의 research 측 짝입니다.
+> RS/AS 면접에서는 아이디어의 매력과 함께 <strong>“이 변경이 개선의 원인임을 어떻게 아는가?”라는 질문</strong>을 자주 던집니다. 강한 답변은 hypothesis → 재현 가능한 baseline → matched comparison/factorial design → confounder 통제 → uncertainty → claim scope를 잇습니다. 이 장은 [Debugging & Experimentation](#/foundations/debugging-experimentation)의 research 측 짝입니다.
 
 ```mermaid
 flowchart TB
@@ -33,7 +33,7 @@ flowchart TB
 ## Ablation discipline
 
 > [!WARNING] "All modules on = best"는 ablation이 아니다
-> Ablation은 각 component를 **한 번에 하나씩** 제거/교체하여, 나머지(data, schedule, augmentation, resolution)를 모두 baseline에 고정한 채 그것의 **marginal contribution**을 보여야 합니다.
+> 기본 ablation은 한 component만 제거/교체하고 data·schedule·augmentation·resolution을 맞춰 **조건부 marginal effect**를 봅니다. Component interaction이 예상되면 leave-one-out 하나로 끝내지 말고 factorial/additive 비교를 추가합니다.
 
 | Technique | What it isolates | When |
 | --- | --- | --- |
@@ -43,14 +43,14 @@ flowchart TB
 | **Sensitivity sweep** | 핵심 hyperparameter에 대한 robustness | Reviewer가 "그냥 튜닝한 것 아니냐"고 물을 때 |
 | **Cross-dataset / backbone** | 하나의 세팅에 overfit인지 vs generality | Generality 주장 |
 
-**Beomyoung's worked example (ZIM):** 이득을 **세 개의 independent axes**에 걸쳐 귀속 — architecture(matting head), loss(soft-boundary term), 그리고 ~1M-image **data pipeline**. Data-alone (+α), data 위의 architecture (+β), 그리고 full model을 보고하여 어떤 reviewer도 스토리를 "just more data"로 뭉갤 수 없게 하세요. [ZIM deep-dive](#/resume/zim) 참고.
+**개인 프로젝트 예시를 쓸 때:** architecture, loss, data를 독립 축으로 둔 factorial/additive ablation을 설계하고 상호작용도 보고합니다. `+α`, `+β`, 데이터 규모 같은 숫자는 [ZIM deep-dive](#/resume/zim)와 실제 실험표에서 확인된 값으로만 채우며, 측정하지 않은 독립성을 가정하지 않습니다.
 
 > [!NOTE] Interaction effects
 > 때때로 component는 *다른 것이 있을 때만* 도움이 됩니다(각각 단독 제거하면 미미; 둘 다 제거하면 붕괴). 이를 숨기지 말고 2×2로 명시적으로 보고하세요 — 지저분한 결과가 아니라 진짜 과학적 발견입니다.
 
 ## Controls & confounders
 
-모든 "our method is better"는 causal claim입니다. Control로 원인을 증명하세요.
+"이 component 때문에 좋아졌다"는 causal attribution입니다. 단순 benchmark 우위와 원인 귀속을 구분하고, 귀속을 말할 때 matched control을 사용하세요.
 
 ```mermaid
 flowchart LR
@@ -73,22 +73,58 @@ flowchart LR
 - **Test-set leakage / tuning on test** — hyperparameter를 test split에서 선택.
 
 > [!DANGER] Foundation-model 시대의 오염
-> Web-scale pretraining에서는 benchmark 예제가 이미 training corpus *안에* 있을 수 있습니다. Near-duplicate(perceptual hash)를 확인하고, official split만 쓰고, val에서 튜닝하며 test는 **한 번만** 건드리세요. VLM/LLM의 경우 eval이 pretraining data에 나타났는지 명시적으로 추론하세요. → [Reading & Critiquing Papers](#/research/papers).
+> Web-scale pretraining에는 benchmark 예제가 섞였을 수 있습니다. Near-duplicate·timestamp·source overlap을 가능한 범위에서 감사하고, official split과 validation으로 선택하며 test/lockbox 접근 횟수를 제한·기록하세요. 완전한 corpus visibility가 없다면 contamination을 배제했다고 단정하지 말고 known/unknown을 보고합니다. → [Reading & Critiquing Papers](#/research/papers).
 
 ## Statistical significance, seeds & variance
 
 <details class="qa"><summary>"Is a 0.3-point improvement real?"</summary>
 <div class="qa-body">
 
-**Short:** **seed variance**보다 클 때만. 가능하면 baseline에 paired로 3~5 seed에 걸쳐 mean ± std를 보고; 격차가 noise band 안이면 SOTA로 팔지 마세요.
+**Short:** 같은 seed/split의 **paired difference**를 만들고 effect size와 confidence interval을 봅니다. mean±std만으로 "실제" 여부를 판정하거나 effect가 std보다 커야 한다는 규칙은 없습니다.
 
-**Deep:** Academic ML은 공식 t-test를 강제하는 일이 드물지만 *원칙*은 유지됩니다: single-run delta는 일화입니다. Variance를 줄이려 paired comparison(같은 seed/split)을 쓰고, seed가 저렴하면 bootstrap CI를 쓰며, 많은 benchmark에 걸친 **multiple-comparison p-hacking**을 경계하세요. 무대에서 정직하게: "*I don't dress up a 0.2-point win that's below our seed std as a contribution.*"
+**Deep:** single-run delta는 불확실합니다. 먼저 분석 단위(seed, image, query, user)를 정하고, 가능한 경우 paired bootstrap/permutation 또는 적절한 hierarchical model로 **차이의 CI**를 구합니다. 필요한 seed·sample 수는 예상 effect와 variance에 대한 power analysis로 정합니다. benchmark·metric·HPO trial을 많이 본 뒤 최고값만 고르면 selection bias가 생기므로 primary hypothesis를 미리 정하고 multiple-comparison 보정 또는 확인용 holdout을 둡니다.
 </div></details>
 
 > [!NOTE] CV-metric 미묘함
-> mIoU/AP은 class imbalance와 threshold에 민감합니다; 작은 물체와 **boundary quality**는 aggregate 점수에 씻겨나갑니다. **Stratified analysis**(size / class / difficulty별)를 하세요 — aggregate는 정확히 제품이 신경 쓰는 failure를 숨길 수 있습니다. → [Evaluation Metrics](#/foundations/evaluation-metrics).
+> mIoU와 AP 모두 aggregate가 작은 객체·희귀 class·boundary 품질을 숨길 수 있습니다. **AP는 confidence threshold 하나에 고정된 지표가 아니라 ranking을 적분**하지만, IoU threshold 범위, max detections, interpolation과 class averaging 규약에 민감합니다. size/class/difficulty와 operating-point metric을 함께 보고하세요. → [Evaluation Metrics](#/foundations/evaluation-metrics).
 
-**Seed가 비쌀 때**(1 run = 다수 GPU에서 며칠): full pretrain의 5 seed를 평균낼 수 없습니다. 완화책: *fine-tuning* 단계의 variance를 보고, 더 작은 ablation에 seed를 주고, robustness proxy로 여러 dataset에서 효과를 보이며, headline model이 single run임을 명시하세요.
+**Seed가 비쌀 때** full-scale 반복이 비현실적일 수 있습니다. 더 작은 scale/fine-tuning의 variance와 learning curve를 보고, 핵심 ablation에 반복을 우선 배정하며, 여러 dataset 결과가 seed uncertainty를 대신하지는 않는다고 밝히세요. Headline model이 single run이면 그대로 명시하고 가능한 paired per-example uncertainty를 보완합니다.
+
+<details class="concept-code">
+<summary>개념 코드로 보기</summary>
+
+> 아래는 matched comparison과 paired uncertainty의 **실험 의사코드**입니다. 통계 방법은 metric과 분석 단위에 맞게 바꿔야 합니다.
+
+```python
+def run_matched_experiment(base_cfg, proposed_diff, seeds, frozen_eval):
+    records = []
+    for seed in seeds:
+        common = freeze_everything_except(base_cfg, proposed_diff.changed_factor)
+        for variant in ["baseline", "proposed"]:
+            seed_everything(seed)
+            cfg = apply_variant(common, proposed_diff, variant)
+            model = train(cfg)                              # 같은 data/schedule/budget
+            model.eval()
+            with no_grad():
+                pred = model(frozen_eval.inputs)
+            records.append(per_unit_metrics(
+                pred, frozen_eval.labels,
+                unit_id=frozen_eval.analysis_unit,          # image/query/user/scene
+                seed=seed, variant=variant,
+                artifact_hash=hash_config_data_code(cfg),
+            ))
+
+    paired = join_on(records, keys=["seed", "unit_id"])
+    delta = paired.proposed - paired.baseline
+    # seed와 user/video 같은 분석 단위를 계층째 재표집한다.
+    interval = hierarchical_bootstrap_ci(delta, levels=["seed", "unit_id"])
+    return {"effect": mean(delta), "confidence_interval": interval,
+            "slice_effects": prespecified_slices(delta)}
+```
+
+Test/lockbox는 HPO 선택에 재사용하지 않고, 결측 run·실패 run도 이유와 함께 기록합니다. 단순 per-example bootstrap이 seed·사용자·video 계층의 변동을 모두 설명한다고 가정하지 마세요.
+
+</details>
 
 ## Compute-budgeting the experiment plan
 
@@ -99,33 +135,33 @@ flowchart LR
 
 | Bucket | Share | Purpose |
 | --- | --- | --- |
-| Small-scale pilots / sweeps | ~40% | 커밋하기 전 1/10 비용으로 약한 hypothesis 죽이기 |
+| Small-scale pilots / sweeps | 예시 ~40% | 싸게 구현·학습곡선·민감도 확인; full-scale 순위 보존 여부는 검증 |
 | Main runs (baseline + method) | ~30% | Headline 비교, matched setting |
 | Ablations + seeds | ~20% | 귀속 + variance |
 | Buffer / re-runs | ~10% | Bug, OOM, reviewer가 원할 control 하나 더 |
 
 > [!NOTE] 커밋 전에 pilot
-> 가장 저렴한 실험은 full scale로 *돌리지 않는* 실험입니다. 1/10 data/step에서 신호가 없는 hypothesis는 full scale에서 거의 스스로 구제되지 않습니다 — 비싼 run *전에* 아이디어를 죽이거나 승격시키는 데 pilot 예산을 쓰세요. 큰 run은 살아남은 두세 개의 hypothesis에 예약하세요.
+> Pilot은 bug와 명백히 약한 방향을 싸게 거르지만, 작은 scale의 순위가 full scale에서 뒤집힐 수 있습니다. 여러 scale point의 learning curve와 rank correlation을 확인하고, "pilot 무효 → 아이디어 사망"이 아니라 미리 정한 escalation rule로 사용하세요. 위 40/30/20/10은 예시이며 uncertainty·failure cost·cluster 제약에 맞춰 바꿉니다.
 
-**Compute를 first-class result로 보고:** train GPU-hour, params(MoE는 *active* params도), inference ms/memory, data-curation human-hour. Accuracy만의 Pareto는 불완전합니다 — reviewer와 product 모두 **accuracy per cost**로 결정합니다. Beomyoung의 ~10 ms on-device segmentation은 예산이 실험을 정의한 *constraint-first* 설계의 깔끔한 예입니다.
+**Compute를 first-class result로 보고:** train GPU-hour·energy/hardware, params(MoE는 active와 total), inference latency/throughput/memory, data-curation human-hour를 함께 적습니다. ratio 하나(`accuracy/cost`)는 trade-off 모양을 숨기므로 **동일한 train/test-time budget의 비교와 Pareto frontier**를 보고합니다. 개인 latency 사례는 device·batch·precision·input size가 CV/보고서에 확인된 경우에만 인용하세요.
 
 ## Reproducibility artifacts
 
-고정/릴리스할 최소 세트: seed 목록, library 버전/lockfile 또는 Docker, **모든** hyperparameter가 담긴 config YAML, data-prep script + license note, eval entrypoint, checkpoint, 그리고 mean/std 보고 컨벤션. **one-command reproduce**를 목표로. Bit-level determinism은 GPU에서 종종 불가능합니다(non-deterministic kernel) — 그럴 땐 **statistical** reproducibility(variance 안)와 bugfix changelog에 커밋하세요. Beomyoung의 open-source codebase(ZIM, ECLIPSE, PointWSSIS, BESTIE, SSUL, DRS)가 여기서 인용할 증거입니다.
+내부적으로 고정할 최소 세트: seed, library/driver/hardware, lockfile/container, 전체 config, data-prep·split provenance, eval entrypoint, checkpoint hash와 reporting convention. License·privacy·용량이 허용하는 범위에서 code/config/checkpoint를 공개하고, 불가하면 synthetic sample·pseudocode·artifact manifest로 경계를 설명합니다. **one-command reproduce**를 목표로 하되 bit-level determinism과 statistical reproducibility를 구분하세요. 개인 OSS 사례는 실제 repository가 이 요건을 충족하는지 확인한 뒤 증거로 듭니다.
 
 ## Agent / multimodal experiments differ
 
 "module"은 더 이상 layer만이 아니라 **tool, memory, orchestrator, verifier, 그리고 test-time compute budget**입니다.
 
 - Ablate: no-memory · no-verifier · single- vs multi-agent · perception-tool-off (blind LLM).
-- **Budget-match:** agent에게 더 많은 tool/token을 주면 성공률이 하찮게 올라갑니다 — 항상 **동일한 test-time token/tool budget**에서 비교하세요, 아니면 ablation이 무의미합니다.
-- Trajectory metric *과* final success를 보고; non-deterministic 환경을 고정(seed, cached web, frozen tool version). → [Agentic AI & Tool Use](#/llm/agents), [Reasoning & Test-Time Compute](#/llm/reasoning).
+- **Budget-match:** agent에게 더 많은 tool/token/attempt를 주면 성공률이 오를 수 있습니다. 동일 budget 비교와 함께 quality-cost frontier도 보고, planner별 실제 지출과 early stopping을 기록합니다.
+- Trajectory metric과 final success를 함께 보고, 재현용 snapshot(seed, cached/simulated web, pinned tool version)과 최신 live-environment 평가를 분리합니다. Live web은 완전히 고정할 수 없으므로 timestamp·failure provenance를 남깁니다. → [Agentic AI & Tool Use](#/llm/agents), [Reasoning & Test-Time Compute](#/llm/reasoning).
 
 ### Follow-ups they'll push
 
 - *"What's the single most common confounder in your field?"* — resolution/epoch/capacity drift; 빠르게 짚으세요.
 - *"How would you convince me the gain isn't cherry-picked?"* — seed + out-of-domain set + failure case 보여주기.
-- *"When do you stop ablating?"* — 남은 각 component의 marginal effect가 noise 안에 들거나, reviewer의 causal 질문이 답변됐을 때.
+- *"When do you stop ablating?"* — 의사결정을 바꿀 핵심 attribution·interaction·failure boundary를 답했고, 다음 실험의 정보 가치가 비용보다 낮을 때.
 - *"Additive vs leave-one-out — which and why?"* — 필요성엔 leave-one-out, 복리 스토리엔 additive; 둘이 어긋나면 둘 다 보고.
 
 ## Experiment-design checklist (copy-paste)
@@ -136,7 +172,8 @@ flowchart LR
 [ ] Strong, reproducible baseline frozen
 [ ] One factor changed at a time (ablation matrix drafted)
 [ ] Confounders controlled: data / capacity / schedule / resolution
-[ ] Seeds run; mean ± std reported; effect > variance
+[ ] Paired effect + confidence interval; sample/seed 수의 power 근거
+[ ] HPO/benchmark 선택 횟수 기록; multiple-comparison/selection bias 통제
 [ ] Contamination / leakage check
 [ ] Compute reported (GPU-hrs, params, latency)
 [ ] Failure cases + stratified analysis
@@ -151,10 +188,10 @@ flowchart LR
 | Ablation | 한 factor만 변경; 각 component의 marginal contribution을 보여라 |
 | ZIM pattern | 이득을 independent axes에 귀속: architecture · loss · data |
 | Confounders | Epochs, capacity, resolution, augmentation, test-tuning |
-| Significance | Seed에 걸친 mean ± std; 효과가 seed variance를 초과해야 함 |
+| Uncertainty | 분석 단위를 정하고 paired effect·CI·power; mean±std는 보조 요약 |
 | CV metrics | Stratify — aggregate mIoU/AP은 small-object & boundary failure를 숨김 |
 | Compute | Pilot 저렴하게, matched main run, seed, buffer; 비용을 result로 보고 |
 | Agents | Module = tool/memory/verifier; 모든 비교를 **budget-match** |
-| Contamination | Near-dup check, official split, test는 한 번만 |
+| Contamination | Near-dup/source/time audit, test 접근 제한·기록, unknown 명시 |
 
 **Related:** [Debugging & Experimentation](#/foundations/debugging-experimentation) · [Failure & Negative Results](#/research/failure) · [Reading & Critiquing Papers](#/research/papers) · [The Research Job Talk](#/research/job-talk) · [Evaluation Metrics](#/foundations/evaluation-metrics) · [Agentic AI & Tool Use](#/llm/agents) · [Deep-Dive: ZIM](#/resume/zim) · [Deep-Dive: ECLIPSE](#/resume/eclipse)

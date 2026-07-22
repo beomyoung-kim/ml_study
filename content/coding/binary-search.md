@@ -59,17 +59,21 @@ def search(nums: list[int], target: int) -> int:
             hi = mid - 1
     return -1
 
-# 2. Boundary / lower_bound (the workhorse). Loop while lo < hi,
-#    hi never below the candidate. Returns the FIRST index where pred is True.
+# 2. Boundary / lower_bound on an inclusive integer domain [lo, hi].
+#    Contract: pred is monotone False→True and pred(hi) is guaranteed True.
 def lower_bound(lo: int, hi: int, pred) -> int:
+    if lo > hi or not pred(hi):
+        raise ValueError("need a non-empty domain with a feasible hi sentinel")
     while lo < hi:
         mid = lo + (hi - lo) // 2
         if pred(mid):
             hi = mid          # keep mid: it might be the answer
         else:
             lo = mid + 1      # discard mid: definitely not the answer
-    return lo                 # == hi; smallest x with pred(x) True
+    return lo                 # == hi; smallest feasible x
 ```
+
+If you want `bisect_left` semantics—return the end index when nothing is True—use a separate half-open template on $[0,n)$ with sentinel $n$, never calling `pred(n)` inside the loop. **Do not mix the contracts of inclusive answer search and half-open insertion search**; that is the key to avoiding off-by-one errors.
 
 > [!WARNING] The only two bugs
 > **Infinite loop:** `while lo < hi` with `lo = mid` (not `mid + 1`) never advances when `hi = lo + 1`. Rule: whichever side *keeps* `mid` must be the one that shrinks toward it (`hi = mid`); the other adds one (`lo = mid + 1`). **Off-by-one boundary:** decide `<` vs `<=` in the predicate to pick lower vs upper bound, and test the two-element case by hand.
@@ -139,7 +143,7 @@ Binary-search the partition of the *shorter* array so that `left_max ≤ right_m
 | Variation | Twist | Key idea |
 | --- | --- | --- |
 | Real-valued search | tolerance `ε` instead of integers | `while hi - lo > eps` (or fixed ~100 iterations) |
-| Search 2D matrix (LC 240) | rows & cols sorted | staircase from top-right, `O(m+n)`; or treat as flat sorted array `O(log mn)` |
+| Search 2D matrix | LC 240 and LC 74 promise different orderings | LC 240: each row and column sorted → top-right staircase, `O(m+n)`. LC 74: globally sorted across row boundaries → flatten and search in `O(log mn)` |
 | First/last occurrence | duplicates | run lower_bound and upper_bound |
 | Rotated min (LC 153) | find pivot | compare `nums[mid]` to `nums[hi]` |
 | Peak / valley | local extremum | move toward the higher neighbor |

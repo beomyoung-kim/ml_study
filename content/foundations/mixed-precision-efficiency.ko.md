@@ -2,7 +2,10 @@
 
 <div class="tag-row"><span class="tag">BF16/FP8</span><span class="tag">NVFP4/MXFP4</span><span class="tag">GPTQ/AWQ</span><span class="tag">FlashAttention</span><span class="tag">KV cache</span><span class="tag">speculative decoding</span></div>
 
-> [!TIP] 이것부터 말하세요
+> [!NOTE] 이 챕터는 심화입니다 — 처음이면 건너뛰어도 됩니다
+> **한 줄 직관:** 컴퓨터는 숫자를 정해진 비트 수로 근사해서 저장합니다. **비트를 적게 쓰면(낮은 precision, 예: 32비트→16/8/4비트) 학습·추론이 더 빠르고 싸지지만**, 너무 줄이면 정확도가 떨어집니다. 이 챕터는 "정확도를 지키면서 비트를 줄이는 기술"들의 모음입니다. 핵심 한 줄만 기억하세요 — **"exponent(지수) 비트는 표현 범위를, mantissa(가수) 비트는 정밀도를 산다."** 입문 단계라면 이 챕터는 나중에 봐도 됩니다.
+
+> [!TIP] 면접 한 줄
 > Efficiency는 연구가 제품이 되는 지점입니다. 면접을 이기는 두 개의 깔끔한 프레이밍: (1) *"exponent bit는 range를 사고, mantissa bit는 precision을 산다"* — 이것만으로 BF16 vs FP16 vs FP8이 설명됩니다. (2) *"training과 inference는 서로 다른 레버를 갖는다"* — training엔 precision/parallelism/activation-memory, inference엔 quantization/kernel/KV-cache/speculation.
 
 ## Training vs. inference 레버
@@ -35,11 +38,26 @@ flowchart LR
 | FP8 E5M2 | 5 / 2 | gradient (더 넓은 range) |
 | FP4 E2M1 | 2 / 1 | NVFP4/MXFP4 block의 4-bit element |
 
-**BF16은 FP32의 exponent를 공유**하므로 overflow가 드뭅니다 — 현대 accelerator의 기본 training precision입니다. **FP16**은 mantissa가 더 많지만 range가 좁아 loss scaling이 필요합니다. **FP8**(Hopper+, Transformer Engine 경유)은 프론티어에서 일상적이고, microscaling **4-bit** format이 2026년 프론티어입니다 — *pretraining*에서도.
+**BF16은 FP32의 exponent 폭을 공유**하므로 FP16보다 overflow 위험이 낮고, 이를 잘 지원하는 현대 accelerator에서 흔한 training precision입니다. **FP16**은 mantissa가 더 많지만 range가 좁아 많은 학습 설정에서 loss scaling을 사용합니다. **FP8**과 block-scaled **4-bit** format도 지원 하드웨어·kernel·모델 recipe가 맞는 일부 대규모 학습에서 쓰이기 시작했지만, 모든 layer와 workload의 기본값은 아닙니다.
 
 ### Loss scaling (FP16)
 
 FP16 gradient는 0으로 underflow합니다. backward 전에 loss를 키우고 optimizer step 전에 unscale하세요. **Dynamic loss scaling**: 안정적이면 scale을 올리고, overflow 시 반으로. Master weight와 optimizer moment는 FP32로 유지합니다. BF16의 넓은 range는 보통 이를 불필요하게 만듭니다 — 실질적인 운영 단순화입니다.
+
+> **PyTorch식 pseudocode — AMP에서 순서가 correctness입니다**
+
+```python
+optimizer.zero_grad(set_to_none=True)
+with torch.autocast("cuda", dtype=torch.float16):
+    logits = model(x)
+    loss = criterion(logits, y)
+
+scaler.scale(loss).backward()                 # 작은 FP16 gradient를 먼저 확대
+scaler.unscale_(optimizer)                    # clipping 전에 반드시 원래 scale로
+torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+scaler.step(optimizer)                        # overflow면 update를 건너뜀
+scaler.update()                               # 다음 step의 scale 조정
+```
 
 ### FP4: NVFP4 vs MXFP4 <span class="badge badge-2026">2026</span>
 
@@ -51,22 +69,22 @@ FP16 gradient는 0으로 underflow합니다. backward 전에 loss를 키우고 o
 </dl>
 
 > [!NOTE] 4-bit *pretraining*은 실재한다
-> NVIDIA는 **12B 모델을 10T token에서 NVFP4로 pretrain**했고(문서화된 가장 긴 4-bit 학습), FP8 loss에 맞췄습니다(arXiv:2509.25149). 안정성은 **random Hadamard transform**(outlier 분산), **2D block quantization**, **stochastic rounding**, 그리고 민감한 몇몇 layer를 높은 precision으로 유지한 데서 왔습니다. *(verifiable. 정확한 수치는 hedge할 것.)*
+> NVIDIA 연구진은 arXiv:2509.25149에서 **12B 모델을 10T token 규모로 NVFP4 pretraining**한 실험과 FP8 baseline에 가까운 loss를 보고했습니다. 안정성에는 **random Hadamard transform**(outlier 분산), **2D block quantization**, **stochastic rounding**, 그리고 민감한 일부 layer의 높은 precision 유지가 함께 쓰였습니다. 이는 해당 모델·하드웨어·recipe의 결과이므로 4-bit 학습이 항상 FP8과 동등하다는 일반 명제로 확대하지 않습니다.
 
 <details class="qa"><summary>왜 training에 보통 FP16보다 BF16이 선호되나요?</summary>
 <div class="qa-body">
 
 **짧게:** BF16은 FP32의 8 exponent bit를 유지하므로 dynamic range가 같고 overflow/underflow가 드뭅니다 — 보통 loss scaling을 완전히 뺍니다. FP16은 mantissa가 더 많지만 range가 좁아 dynamic loss scaling이 필요하고 더 취약합니다.
 
-**깊게:** training gradient는 여러 자릿수에 걸칩니다. FP16의 최대 ~65504와 작은 subnormal floor는 overflow/underflow를 흔하게 만들고, loss scaling이 이를 이동하는 hyperparameter와 overflow-retry 로직의 비용으로 땜질합니다. BF16은 mantissa(precision)를 range와 맞바꾸고, GEMM이 FP32로 accumulate하므로 낮아진 precision은 견딜 만합니다. 결론: BF16은 더 단순하고 robust하며, FP16은 BF16 지원이 나쁜 하드웨어에서만 이깁니다. **후속 질문:** *무엇이 FP32로 남나?* — master weight, optimizer moment, softmax/cross-entropy, normalization 통계.
+**깊게:** training gradient는 여러 자릿수에 걸칩니다. FP16의 최대값은 65504이고 작은 값은 underflow할 수 있어, loss scaling과 overflow-skip 로직을 흔히 사용합니다. BF16은 mantissa precision을 dynamic range와 맞바꾸고, 많은 GEMM이 더 높은 precision으로 accumulate하므로 학습 운용이 단순해지는 경우가 많습니다. 최종 선택은 accelerator의 native throughput, kernel 지원과 수렴 검증에 달렸습니다. **후속 질문:** *무엇을 높은 precision으로 남기나?* — optimizer state, reduction/accumulation, softmax·normalization 같은 민감 연산은 구현과 recipe에 따라 FP32/BF16을 선택합니다.
 </div></details>
 
 <details class="qa"><summary>표준 FP8 training 레시피는 무엇이고, 무엇이 그것을 깨나요?</summary>
 <div class="qa-body">
 
-**짧게:** forward weight/activation은 E4M3, gradient는 E5M2(더 넓은 range), master weight와 optimizer moment는 FP32/BF16으로 유지하고, 수치적으로 민감한 layer — normalization, softmax, LM head — 는 FP8에서 **제외**합니다. Per-tensor 또는 per-block scaling(amax tracking, Transformer Engine 경유)이 dynamic range를 관리합니다.
+**짧게:** 흔한 FP8 recipe는 forward weight/activation에 E4M3, gradient에 더 넓은 range의 E5M2를 고려하고, optimizer state와 민감한 연산은 더 높은 precision으로 유지합니다. 다만 modern delayed/current scaling이나 block-scaling recipe의 dtype 배치는 구현마다 다릅니다. Per-tensor 또는 per-block scale이 dynamic range를 관리합니다.
 
-**깊게:** FP8의 ~3 mantissa bit는 FP32로 accumulate하는 GEMM에는 충분하지만, activation **outlier**가 per-tensor scale을 부풀려 작은 값을 잃게 합니다. Delayed scaling(amax history)은 급격한 shift에 뒤처져 spike를 유발할 수 있어, 랩들은 학습 초반에 current/just-in-time scaling으로 바꾸기도 합니다. Blackwell의 **MXFP8**은 per-tensor FP8 대비 더 세밀한 block-wise scale로 outlier를 길들입니다. 대규모 FP8 pretraining은 입증됐지만(DeepSeek-V3), 재현을 가능케 하는 것은 레시피 — 어느 layer가 high-precision으로 남는지, scaling policy, warmup — 입니다. **후속 질문:** *FP8 inference vs training?* — inference는 종종 weight만 quantize(또는 W4A4용 rotation과 함께)하며, E5M2 gradient path가 필요 없습니다.
+**깊게:** FP8의 좁은 mantissa와 range는 activation outlier에 민감하므로 scaling granularity와 high-precision 예외가 중요합니다. **후속 질문:** *FP8 inference vs training?* — inference에는 gradient용 E5M2 경로가 필요 없지만, 배포 형태는 weight-only로 한정되지 않습니다. FP8 W8A8도 사용되며, weight-only PTQ는 INT4 계열에서 특히 흔합니다. 어떤 dtype 조합이 빠른지는 실제 accelerator kernel 지원을 확인해야 합니다.
 </div></details>
 
 ## Quantization for inference
@@ -87,12 +105,12 @@ Uniform affine quantization: $x_q=\mathrm{clip}(\mathrm{round}(x/s)+z)$, scale $
 
 **짧게:** activation outlier는 거대한 range에 걸쳐 quantization scale을 부풀려 tensor 전체의 bit를 낭비합니다. Orthogonal rotation(예: Hadamard)이 그 에너지를 channel 전반에 재분배해 분포가 더 uniform해지고 깔끔하게 quantize됩니다 — 그리고 orthogonal이므로 수학적으로 역변환이 가능해 모델 출력이 바뀌지 않습니다.
 
-**깊게:** 큰 크기의 몇몇 channel이 큰 $s$를 강요해 다른 모든 값을 거칠게 만듭니다. Orthogonal matrix $R$로 회전하고($R^{-1}=R^\top$를 인접 weight에 folding) linear map을 보존하면서 outlier를 거의 Gaussian 분포로 퍼뜨립니다 — 각 block이 커버해야 할 dynamic range를 줄입니다. QuaRot은 고정된 random Hadamard rotation을 쓰고, SpinQuant는 약간의 accuracy를 더 얻으려 이를 학습합니다. 이것이 plain AWQ/GPTQ(weight-only)로는 갈 수 없는 W4A4를 가능하게 합니다. **후속 질문:** *Weight-only vs weight+activation?* — weight-only(AWQ)는 더 쉽고 흔함. W4A4는 rotation + 세심한 calibration이 필요하지만 activation-bandwidth 절약을 두 배로.
+**깊게:** 큰 크기의 몇몇 channel이 큰 $s$를 강요해 다른 값을 거칠게 만들 수 있습니다. Orthogonal rotation을 인접 linear map에 정확히 folding하면 **양자화 전** 함수는 보존되고 outlier를 여러 channel로 분산할 수 있습니다. 양자화 후 출력은 근사이므로 오차를 calibration으로 측정해야 합니다. W4A4의 activation 원소 크기는 FP16 대비 이론상 4배 작지만 scale·metadata·packing과 kernel 때문에 실제 bandwidth·latency 이득은 달라집니다.
 </div></details>
 
 ## FlashAttention: IO-aware attention
 
-표준 attention은 $n\times n$ score를 HBM에 materialize합니다. FlashAttention은 Q/K/V를 **tile**하고 SRAM에서 softmax를 online으로 계산해 full matrix를 절대 저장하지 않습니다 — 같은 수학, 훨씬 적은 메모리 트래픽, attention을 memory-bound에서 compute-bound로 전환합니다.
+순진한 attention 구현은 $n\times n$ score를 HBM에 materialize합니다. FlashAttention은 Q/K/V를 **tile**하고 on-chip memory에서 online softmax를 계산해 full score matrix를 HBM에 저장하지 않으면서 같은 attention 결과를 수치 오차 범위에서 계산합니다. 메모리 트래픽과 peak memory를 크게 줄이지만, 연산이 실제로 memory-bound에서 compute-bound로 바뀌는지는 sequence length·head dimension·dtype·GPU와 kernel에 달렸습니다.
 
 <dl class="kv">
 <dt>FA-2</dt><dd>Warp/threadblock 간 더 나은 work partitioning.</dd>
@@ -101,7 +119,7 @@ Uniform affine quantization: $x_q=\mathrm{clip}(\mathrm{round}(x/s)+z)$, scale $
 </dl>
 
 > [!IMPORTANT] "Asymmetric hardware scaling" — 2026년 화두
-> FlashAttention이 (retuned v3가 아니라) v4를 필요로 한 이유는, Blackwell에서 **tensor-core throughput은 ~2× 성장한 반면 shared-memory bandwidth와 exp/softmax 유닛은 훨씬 덜 scaling**됐기 때문입니다. 이제 상대적으로 희소해진 softmax/memory path가 풍부한 matmul throughput의 병목이 되지 않도록 kernel을 재설계해야 합니다. Kernel은 점점 *하드웨어 세대별로 특화*됩니다. *(방향은 verifiable. 정확한 TFLOPs 수치는 hedge할 것.)*
+> Blackwell 세대에서는 tensor-core 처리량과 softmax·메모리 경로가 같은 비율로 확장되지 않아, 기존 kernel을 단순 재튜닝하는 것만으로 새 연산 자원을 모두 활용하기 어렵습니다. FlashAttention-4는 이 비대칭을 겨냥해 scheduling과 data movement를 다시 설계합니다. 핵심은 버전 번호 자체보다 **병목이 하드웨어 세대·shape마다 달라지므로 end-to-end kernel benchmark가 필요하다**는 점입니다.
 
 ## KV cache & serving
 
@@ -122,7 +140,7 @@ Autoregressive decoding은 과거 K/V를 cache합니다. cache는 context에 따
 
 ## Speculative decoding
 
-싼 **drafter**가 여러 token을 제안하고, target 모델이 하나의 병렬 forward로 이를 **verify**해 가장 긴 올바른 prefix를 accept합니다 — 같은 출력 분포, 더 적은 순차 target step.
+싼 **drafter**가 여러 token을 제안하고 target 모델이 병렬로 verify합니다. greedy decoding은 target과 같은 token만 이어 붙이면 결과가 일치합니다. sampling에서는 rejection과 residual sampling까지 포함한 **정확한 speculative sampling 알고리즘**을 써야 target 분포를 보존합니다. 단순히 draft token을 검사해 prefix만 취한다고 같은 분포가 자동 보장되지는 않습니다.
 
 <dl class="kv">
 <dt>Medusa</dt><dd>Target 모델의 추가 prediction head가 여러 미래 token을 draft.</dd>
@@ -130,14 +148,14 @@ Autoregressive decoding은 과거 K/V를 cache합니다. cache는 context에 따
 <dt>MTP</dt><dd>모델에 학습된 Multi-token prediction(DeepSeek 스타일) → self-speculation.</dd>
 </dl>
 
-이제는 보너스 최적화가 아니라 **기본 serving layer**(vLLM, TensorRT-LLM, SGLang)입니다.
+주요 serving runtime이 지원하는 선택지이지만 모든 workload의 기본값은 아닙니다. acceptance가 낮거나 batch가 이미 compute-bound이면 overhead가 이득을 지울 수 있으므로 실제 요청 분포에서 측정합니다.
 
 <details class="qa"><summary>Speculative decoding은 언제 도움이 되고 언제 해가 되나요?</summary>
 <div class="qa-body">
 
 **짧게:** target GPU가 미활용되고 draft가 자주 accept되는 low batch / memory-bound decoding에서 도움이 됩니다. batch가 이미 큰(compute-bound) 경우나 acceptance가 낮은 경우엔 해가 됩니다. rejected draft가 verification compute를 낭비하기 때문입니다.
 
-**깊게:** decoding은 작은 batch에서 보통 memory-bandwidth-bound입니다 — target은 token 하나 분량의 matmul을 하지만 full weight read를 지불합니다. Speculation은 그 read를 여러 accepted token에 걸쳐 amortize하므로 speedup ≈ 기대 accepted 길이 × acceptance rate − drafter overhead입니다. 높은 batch에서는 이미 compute를 saturate하므로 추가 verification 작업과 rejected token이 throughput을 *줄일* 수 있습니다. Acceptance는 drafter–target 일치도(domain shift, temperature)에 달렸습니다. **후속 질문:** *출력을 바꾸나?* — 아니오. verification이 target의 분포를 정확히 보존합니다(그것이 correctness 보장).
+**깊게:** 작은 batch decode는 흔히 memory-bandwidth-bound라 여러 token을 한 번에 verify하면 weight read를 amortize할 수 있습니다. 하지만 speedup은 draft 길이, acceptance, target batch, drafter 비용에 함께 의존해 단순 곱 하나로 예측하기 어렵습니다. **후속 질문:** *출력을 바꾸나?* — greedy는 동일-token 검증으로, sampling은 정식 rejection/residual sampling을 구현했을 때만 target 분포가 보존됩니다.
 </div></details>
 
 ## Pruning & distillation

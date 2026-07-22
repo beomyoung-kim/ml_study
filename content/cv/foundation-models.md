@@ -1,18 +1,55 @@
 # Vision Foundation Models
 
-<div class="tag-row"><span class="tag">SAM / SAM2 / SAM3</span><span class="tag">DINOv3</span><span class="tag">SigLIP2 / AIMv2</span><span class="tag">Depth Anything</span><span class="tag">promptable</span><span class="tag">frozen backbone</span></div>
+<div class="tag-row"><span class="tag">SAM / SAM 2 / SAM 3.1</span><span class="tag">DINOv3</span><span class="tag">SigLIP2 / AIMv2</span><span class="tag">Depth Anything</span><span class="tag">promptable</span><span class="tag">frozen backbone</span></div>
 
-> [!TIP] Why this chapter matters
-> This is the parent generation of **ZIM** (SAM specialized into matting) and the frozen-backbone story behind ECLIPSE/prompt-tuning. Frame the 2026 direction crisply: **promptable, open-vocabulary, frozen self-supervised backbones**, with text/exemplar prompting as the default interface. Interviewers ask how you *specialize and productize* a foundation model without destroying its zero-shot ability.
+> [!NOTE] Goal of this chapter
+> This chapter explains what a **foundation model** is and why it became central to vision by 2026. Earlier chapters—[Transfer Learning](#/cv/backbones-transfer) and [Self-Supervised Learning](#/cv/self-supervised)—introduced the idea of reusing a well-trained backbone. Foundation models push that idea to its limit.
 
-## The 2026 direction in one line
+## What is a foundation model?
 
-> One promptable, open-vocabulary model — a frozen self-supervised backbone feeding lightweight, task-specific heads — replacing per-dataset specialist training.
+**One-line definition:** a base model pretrained at scale on broad data with a relatively general objective, then adapted to several downstream tasks. "Foundation model" is an umbrella term for scale and breadth of reuse, not a precise architecture name requiring every property below.
+
+- **Frozen backbone** or **fine-tuning/adapter:** choose the adaptation method based on budget and domain shift.
+- **Lightweight head or prompt:** a common way to lower reuse cost, but not a requirement.
+- **Promptable:** an interface offered by some models that accepts conditions such as a point, box, or text.
+- **Open vocabulary:** supports a wider text label space than a fixed class head, but not every foundation model offers it.
+- **Zero-shot:** an evaluation protocol with no additional training on the target task or data. Being a foundation model does not automatically guarantee strong zero-shot performance.
+
+<figure>
+<svg viewBox="0 0 640 220" xmlns="http://www.w3.org/2000/svg" font-family="Inter, sans-serif" font-size="12">
+  <text x="120" y="26" text-anchor="middle" fill="#98a3b2">train once on broad data</text>
+  <rect x="40" y="70" width="160" height="80" rx="12" fill="#6366f1"/>
+  <text x="120" y="105" text-anchor="middle" fill="#fff" font-weight="700">Frozen backbone</text>
+  <text x="120" y="126" text-anchor="middle" fill="#dfe3ff" font-size="11">frozen backbone ❄</text>
+  <!-- fan-out to many heads -->
+  <g stroke="#98a3b2" stroke-width="1.5" fill="none">
+    <path d="M200 90 C 280 90, 300 45, 380 45" marker-end="url(#fh)"/>
+    <path d="M200 105 C 280 105, 300 95, 380 95" marker-end="url(#fh)"/>
+    <path d="M200 120 C 280 120, 300 145, 380 145" marker-end="url(#fh)"/>
+    <path d="M200 135 C 280 135, 300 195, 380 195" marker-end="url(#fh)"/>
+  </g>
+  <g font-size="12">
+    <rect x="380" y="30" width="220" height="30" rx="6" fill="none" stroke="#e0533f" stroke-width="1.6"/><text x="490" y="50" text-anchor="middle" fill="#e0533f">+ head → classification</text>
+    <rect x="380" y="80" width="220" height="30" rx="6" fill="none" stroke="#0ea5e9" stroke-width="1.6"/><text x="490" y="100" text-anchor="middle" fill="#0ea5e9">+ head → detection/segmentation</text>
+    <rect x="380" y="130" width="220" height="30" rx="6" fill="none" stroke="#12a150" stroke-width="1.6"/><text x="490" y="150" text-anchor="middle" fill="#12a150">+ head → depth</text>
+    <rect x="380" y="180" width="220" height="30" rx="6" fill="none" stroke="#d97706" stroke-width="1.6"/><text x="490" y="200" text-anchor="middle" fill="#d97706">+ prompt → matting · robotics</text>
+  </g>
+  <defs><marker id="fh" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0 0 L6 3 L0 6" fill="#98a3b2"/></marker></defs>
+</svg>
+<figcaption>A representative layout in which several heads reuse the features of one frozen backbone. This is one foundation-model adaptation method; full fine-tuning, partial unfreezing, LoRA, and distillation are also selected according to cost and performance.</figcaption>
+</figure>
+
+> [!TIP] Interview one-liner
+> Important design axes today are **promptable and open-vocabulary interfaces**, **strong self-supervised or multimodal backbones**, and the choice among **freezing, adapters, and fine-tuning**. Do not present them as one mandatory recipe. Frame the answer as trade-offs among zero-shot retention, domain adaptation, latency, and data governance.
+
+## The big picture: three lineages
+
+> The map below compares three distinct model families. Promptable segmentation, self-supervised features, and vision-language encoders can intersect, but they are not the same concept and do not always replace specialists.
 
 ```mermaid
 flowchart TB
   subgraph seg ["Promptable segmentation (Meta SAM line)"]
-    SA1B[SA-1B engine] --> SAM[SAM 2023] --> SAM2[SAM2 video 2024] --> SAM3[SAM3 concepts 2025]
+    SA1B[SA-1B engine] --> SAM[SAM 2023] --> SAM2[SAM 2 video 2024] --> SAM3[SAM 3 concepts 2025] --> SAM31[SAM 3.1 multiplex 2026]
     SAM --> ZIM[ZIM matting ICCV25]
   end
   subgraph feat ["Self-supervised features (DINO line)"]
@@ -28,7 +65,23 @@ flowchart TB
 
 ## 1 · SAM: promptable segmentation
 
-**SAM** (Meta, ICCV 2023) = a heavy **image encoder** (ViT, run once) + a light **prompt encoder** (point/box/mask) + a **two-way transformer decoder** producing class-agnostic masks. Trained on **SA-1B** (11M images, ~1B masks) via a model-in-the-loop **data engine**.
+**SAM** (Meta, ICCV 2023) consists of a heavy **image encoder**—a ViT run once—a lightweight **prompt encoder** for points, boxes, or masks, and a **two-way Transformer decoder** that produces class-agnostic masks. It was trained on **SA-1B**, containing 11 million images and roughly 1 billion masks, through a model-in-the-loop **data engine**.
+
+> **PyTorch-style pseudocode—what interactive inference reuses**
+
+```python
+sam.eval()
+with torch.inference_mode():
+    image_in, meta = preprocess(image)               # preserve resize/pad metadata
+    image_embed = sam.image_encoder(image_in)        # once per image
+
+    for prompt in user_interactions:
+        prompt = map_to_encoder_coords(prompt, meta) # original -> encoder coordinates
+        sparse, dense = sam.prompt_encoder(prompt)
+        low_res_masks, quality = sam.mask_decoder(
+            image_embed, sparse, dense)              # repeat cheaply per prompt
+        masks = postprocess(low_res_masks, meta)      # unpad + restore original size
+```
 
 <figure>
 <svg viewBox="0 0 640 170" xmlns="http://www.w3.org/2000/svg" font-family="Inter, sans-serif" font-size="11">
@@ -43,45 +96,76 @@ flowchart TB
   <rect x="430" y="66" width="180" height="46" rx="8" fill="#12a150"/><text x="520" y="86" text-anchor="middle" fill="#fff">Masks (multi-output)</text><text x="520" y="102" text-anchor="middle" fill="#dcffe8">embedding · pixel-embed</text>
   <defs><marker id="s" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0 0 L6 3 L0 6" fill="#98a3b2"/></marker></defs>
 </svg>
-<figcaption>Encode the heavy image features once; the light prompt encoder + decoder run per interaction. ZIM keeps this skeleton but swaps in a hierarchical pixel decoder and soft-α output.</figcaption>
+<figcaption>The heavy image features are encoded once; the lightweight prompt encoder and decoder run on every interaction. ZIM preserves this skeleton but replaces the decoder with a hierarchical pixel decoder and produces soft alpha output.</figcaption>
 </figure>
 
 <dl class="kv">
-<dt>Promptable interface</dt><dd>Focus on <i>where</i> not <i>what</i>; multi-mask output resolves ambiguity (shirt vs person).</dd>
-<dt>Interactive by design</dt><dd>Encode the image once; iterate cheap prompts → real-time UX.</dd>
-<dt>Automatic mask generation</dt><dd>Grid of point prompts + NMS → segment everything.</dd>
-<dt>Known limits</dt><dd>Stride-4 shallow pixel decoder → checkerboard, coarse fine structure; hard-ish masks; no text/concept understanding (SAM1).</dd>
+<dt>Promptable interface</dt><dd>Focuses on <i>where</i>, not <i>what</i>; multi-mask output resolves ambiguity such as shirt versus person.</dd>
+<dt>Interactive by design</dt><dd>Encode the image once and repeat inexpensive prompts for a real-time user experience.</dd>
+<dt>Automatic mask generation</dt><dd>A grid of point prompts plus NMS segments everything.</dd>
+<dt>Known limits</dt><dd>A shallow stride-4 pixel decoder can produce checkerboard artifacts and coarse fine structure; masks are relatively hard; SAM 1 has no text or concept understanding.</dd>
 </dl>
 
-> [!NOTE] Candidate link
-> SAM's coarse boundaries are exactly what **ZIM** fixed to reach matting-grade $\alpha$ — same promptable interface, hierarchical decoder, soft output, and a data-granularity fix. See [Image Matting](#/cv/matting) and the [ZIM deep-dive](#/resume/zim).
+> [!NOTE] Related research
+> SAM's coarse boundaries are exactly what **ZIM** changes to reach matting-quality $\alpha$: the same promptable interface, a hierarchical decoder, soft outputs, and adjusted data granularity. See [Image Matting](#/cv/matting) and the [ZIM deep dive](#/resume/zim).
 
-## 2 · SAM 2 → SAM 3
+## 2 · SAM 2 → SAM 3 → SAM 3.1
 
-- **SAM 2** (2024): a **streaming memory bank** propagates object identity across video frames for near-real-time interactive video segmentation; **SA-V** dataset. Hiera backbone.
-- **SAM 3** (Meta, Nov 2025; ICLR 2026): **Promptable Concept Segmentation (PCS)** — a short **noun phrase** or **exemplar** drives open-vocabulary *detect + segment + track*. An image detector and a memory-based video tracker share one backbone, plus a **presence head** that **decouples recognition** ("is this concept here?") **from localization** ("where?"). Trained on the large **SA-Co** concept dataset.
+- **SAM 2** (2024): a **streaming memory bank** propagates object identity across video frames, enabling near-real-time interactive video segmentation; trained with the **SA-V** dataset and a Hiera backbone.
+- **[SAM 3](https://ai.meta.com/research/publications/sam-3-segment-anything-with-concepts/)** (Meta, 2025-11-19): **Promptable Concept Segmentation (PCS)** conditions detect + segment + track on a short noun phrase or exemplar. An image detector and memory-based video tracker share a backbone, with a presence head separating recognition from localization. The official release also introduced the SA-Co benchmark and data engine.
+- **[SAM 3.1](https://github.com/facebookresearch/sam3/blob/main/RELEASE_SAM3p1.md)** (2026-03-27): primarily an execution update for multi-object video tracking through **Object Multiplex**, plus checkpoint and inference optimizations, rather than a new generation of semantic capability. Because the official table shows mixed changes across benchmarks, compare throughput and memory at large object counts together with task scores instead of claiming that it is "always more accurate."
 
-> [!QUESTION] "How does SAM 3's PCS differ architecturally from SAM 2, and why decouple recognition from localization?"
-> **Short:** SAM 2 tracks a *prompted region*; SAM 3 finds *all instances of a concept* from text/exemplar, then tracks them. **Deep:** open-vocab detection couples two hard problems — *is the concept present* and *where exactly* — and jointly optimizing them lets recognition errors corrupt localization. A **presence head** predicts concept existence separately, so the mask decoder specializes in localization; this cleanly improves open-vocab precision/recall. It's the convergence of grounding and promptable segmentation into one model.
+> [!QUESTION] "How does SAM 3's PCS differ architecturally from SAM 2, and why separate recognition from localization?"
+> **Short:** SAM 2 tracks a *prompted region*; SAM 3 finds every instance of a *concept* from text or an exemplar, then tracks them. **Deep:** open-vocabulary detection combines two difficult problems—*is the concept present?* and *exactly where is it?* Optimizing them together can let recognition errors contaminate localization. A **presence head** predicts concept presence separately, letting the mask decoder specialize in localization and improving open-vocabulary precision and recall more cleanly. Grounding and promptable segmentation converge in one model.
 
 ## 3 · DINO family: self-supervised dense features
 
-**DINO → DINOv2 → DINOv3.** Self-**di**stillation with **no** labels: a student matches a momentum-teacher's output across augmented views; emergent attention maps localize objects for free.
+**DINO → DINOv2 → DINOv3.** Self-**di**stillation without human labels trains a student to match a momentum teacher across augmented views. Object structure then appears in attention and patch features, providing localization cues without additional manual annotation. This does not mean a complete detector appears automatically.
 
-### How DINO trains (self-distillation, no labels, no negatives)
+### How DINO trains: self-distillation, no labels, no negatives
 
-Two networks with the **same architecture**: a **student** $g_{\theta_s}$ (updated by gradient descent) and a **teacher** $g_{\theta_t}$ (an **EMA** of the student — never back-propagated). **Multi-crop** augmentation makes several **global** crops (large) and several **local** crops (small) of one image. The student sees *all* crops; the teacher sees only the global ones. The student is trained so its output distribution **matches the teacher's** — "predict the teacher's view of this image from a different view":
+Two networks share the **same architecture**: student $g_{\theta_s}$ is updated by gradient descent, while teacher $g_{\theta_t}$ is an EMA of the student and never receives backpropagation. **Multi-crop** augmentation produces several large **global** crops and smaller **local** crops from one image. The student sees *every* crop; the teacher sees only global crops. The student learns to make its output distribution match the teacher's—"predict the teacher's view of this image from another view."
+
+Let $\mathcal G$ be the set of two global crops and $\mathcal V$ every crop seen by the student. The core loss can be written as follows, excluding a crop paired with itself so that different views are aligned:
 
 $$
-\min_{\theta_s}\ \sum_{\text{views}} H\big(\,p_t(x_{\text{global}}),\ p_s(x_{\text{view}})\,\big),\qquad p(\cdot)=\mathrm{softmax}\!\big(g(\cdot)/\tau\big)
+\min_{\theta_s}\ \sum_{u\in\mathcal G}\sum_{\substack{v\in\mathcal V\\v\ne u}}
+H\!\left(p_t(u),p_s(v)\right),\qquad
+p_s(v)=\operatorname{softmax}\!\left(g_{\theta_s}(v)/\tau_s\right),\quad
+p_t(u)=\operatorname{softmax}\!\left((g_{\theta_t}(u)-c)/\tau_t\right)
 $$
 
-($H$ = cross-entropy; teacher temperature $\tau_t$ small = sharp, student $\tau_s$). Crucially it uses **no negative pairs** — so what stops it collapsing to a constant? Two opposing forces on the teacher:
+Here $H$ is cross-entropy; the teacher temperature $\tau_t$ is lower and therefore sharper than the student's $\tau_s$. Crucially, there are **no negative pairs**. What prevents collapse to a constant?
 
-- **Centering** — subtract an EMA mean from the teacher's logits, so no single output dimension can dominate (prevents one-hot collapse).
-- **Sharpening** — the small teacher temperature keeps the target peaky (prevents uniform collapse).
+- **Centering:** subtract an EMA mean from teacher logits so no single output dimension dominates, preventing one-hot collapse.
+- **Sharpening:** a low teacher temperature keeps targets peaked, preventing uniform collapse.
 
-Their balance rules out the trivial solutions. The teacher tracks the student as $\theta_t\leftarrow\lambda\theta_t+(1-\lambda)\theta_s$ (stop-gradient), and object-segmenting self-attention **emerges** with zero segmentation labels.
+Centering and sharpening are practical mechanisms that counter different collapse tendencies; do not claim that they mathematically guarantee non-collapse in every setting. The teacher follows the student through $\theta_t\leftarrow\lambda\theta_t+(1-\lambda)\theta_s$, and gradients never flow into the teacher. Self-attention from some heads has been observed to align with foreground objects, but an attention map is not itself a supervised segmentation mask.
+
+<details class="concept-code"><summary>View as concept code</summary>
+
+> **PyTorch-style pseudocode—the order of stop-gradient and EMA in DINO**
+
+```python
+student.train(); teacher.eval()
+global_views, local_views = multi_crop(images)
+
+with torch.no_grad():                              # detach teacher targets
+    t_logits = [teacher(v) for v in global_views]
+    t_prob = [softmax((z - center) / tau_t) for z in t_logits]
+
+s_logits = [student(v) for v in global_views + local_views]
+loss = cross_view_ce(s_logits, t_prob, exclude_same_view=True)
+optimizer.zero_grad(set_to_none=True)
+loss.backward(); optimizer.step()                  # gradient update only for student
+
+with torch.no_grad():
+    for pt, ps in zip(teacher.parameters(), student.parameters()):
+        pt.mul_(momentum).add_(ps, alpha=1 - momentum)
+    center = ema(center, batch_mean(t_logits))      # use global mean when distributed
+```
+
+</details>
 
 ```mermaid
 flowchart LR
@@ -94,102 +178,104 @@ flowchart LR
   S -.->|EMA update| T
 ```
 
-- **DINOv2** (2023): scales this with **iBOT-style patch-level masked prediction** (a dense/local objective on top of the global one) + KoLeo feature-spreading + heavy data curation → general-purpose *frozen* features (the standard backbone for depth, matting-adjacent, robotics).
-- **DINOv3** (Meta, Aug 2025): flagship **7B params, ~1.7B images, fully self-supervised**; distilled into smaller ViT/ConvNeXt variants. Its key trick is **Gram anchoring**.
+- **DINOv2** (2023): adds **iBOT-style patch-level masked prediction**, a dense/local objective layered on the global objective, plus KoLeo feature spreading and extensive data curation. The resulting general-purpose *frozen* features are widely reused in depth, segmentation, and robotics.
+- **[DINOv3](https://ai.meta.com/research/publications/dinov3/)** (Meta, 2025-08-14): according to the public report, self-supervised pretraining scales up to **7B parameters and roughly 1.7B images**, then distills smaller ViT and ConvNeXt variants. The key technique is **Gram anchoring**.
 
-> [!QUESTION] "DINOv3 is fully self-supervised yet beats supervised models on *frozen* dense prediction. What is Gram anchoring solving?"
-> **Short:** long SSL training degrades *dense* (patch-level) features even as global features improve; Gram anchoring stabilizes them. **Deep:** as training runs long, patch features drift and lose spatial consistency (good for image-level, bad for segmentation/depth). Gram anchoring regularizes the **Gram matrix of patch features** toward an earlier, cleaner reference, preserving inter-patch structure. Result: the first *frozen* SSL backbone whose dense features beat specialized dense-task solutions without fine-tuning — the ideal frozen trunk for prompt/adapter specialization (ECLIPSE-style).
+> [!QUESTION] "DINOv3 is fully self-supervised yet beats supervised models on *frozen* dense prediction. What does Gram anchoring solve?"
+> **Short:** Gram anchoring mitigates the degradation in patch-level consistency seen with long schedules and large models during DINOv3 training. **Deep:** Let $X_S$ be the L2-normalized student patch matrix and $X_G$ the patch matrix from an earlier or high-resolution Gram teacher with good dense properties. The objective $\|X_SX_S^\top-X_GX_G^\top\|_F^2$ aligns pairwise patch-similarity structure. It anchors relationships rather than copying feature coordinates. Frozen-backbone superiority is a result under the paper's stated benchmarks and head protocols; do not generalize it into universal superiority over every domain specialist.
 
 ## 4 · CLIP → SigLIP 2 / AIMv2
 
-Vision-language encoders moved beyond contrastive CLIP toward better **dense / localization** features (what detection, grounding, and VLMs need):
+Vision-language encoders have moved beyond contrastive CLIP toward better **dense and localization features** needed for detection, grounding, and VLMs:
 
-| Encoder | Objective | Buys you |
+| Encoder | Objective | What it provides |
 | --- | --- | --- |
-| CLIP | softmax contrastive (needs large negatives) | strong global image-text alignment |
-| **SigLIP 2** | **sigmoid** loss + self-distillation + masked prediction + online curation | better localization/dense features; multilingual; native-aspect variants |
-| **AIMv2** | **autoregressive** multimodal pretraining | strong frozen-trunk features (native resolution) |
+| CLIP | batch-wise softmax contrastive | strong global image–text alignment; sensitive to batch-negative composition |
+| **SigLIP 2** | **sigmoid** loss + self-distillation + masked prediction + online curation | improved localization/dense features; multilingual; native-aspect variants |
+| **AIMv2** | **autoregressive** multimodal pretraining | strong frozen-trunk features at native resolution |
 
-Sigmoid loss decouples pairs (no giant negative batch), self-distillation and masked prediction inject dense structure, and AR pretraining (AIMv2) learns generative-quality features. Multi-encoder fusion is common (OpenVLA fuses **DINOv2 + SigLIP**). VLM-side detail in [VLM Pretraining](#/vlm/pretraining).
+Sigmoid loss treats each image–text pair as an independent binary term and removes global softmax normalization, but it does not remove negative pairs. SigLIP 2's dense and localization behavior comes from the combination of sigmoid loss, self-distillation, masked prediction, and the data recipe—not sigmoid alone. AIMv2 uses an autoregressive multimodal objective. Do not infer downstream superiority from the objective's name; compare at the same resolution, extraction layer, and fine-tuning protocol. For the VLM side, see [VLM Pretraining](#/vlm/pretraining).
 
 ## 5 · Open-vocabulary detection & Depth Anything
 
-- **Open-vocab detection:** Grounding DINO (1.5/1.6, DINO-X), OWL-ViT/OWLv2, **YOLO-World** (real-time), APE (unifies detect+segment+ground as sentence-object matching). Full treatment in [Object Detection](#/cv/detection); the language side connects to [Grounding & Region Reasoning](#/vlm/grounding).
-- **Depth Anything V2** (NeurIPS 2024): **DPT head + DINOv2 backbone**; a teacher-student pipeline where the key finding is **synthetic-GT depth beats noisy real pseudo-labels**. Metric variants; Prompt Depth Anything (LiDAR-prompted, 4K metric); Video Depth Anything.
+- **Open-vocabulary detection:** Grounding DINO 1.5/1.6 and DINO-X, OWL-ViT/OWLv2, **YOLO-World** for real-time use, and APE, which unifies detection, segmentation, and grounding through sentence–object matching. See [Object Detection](#/cv/detection) for the full story and [Grounding & Region Reasoning](#/vlm/grounding) for the language side.
+- **Depth Anything V2** (NeurIPS 2024): a **DPT head + DINOv2 backbone** and a teacher–student pipeline built on the finding that **synthetic ground-truth depth beats noisy real pseudo-labels**. It includes a metric variant, Prompt Depth Anything for LiDAR-prompted 4K metric depth, and Video Depth Anything.
 
-> [!QUESTION] "Depth Anything V2 found synthetic GT beats real pseudo-labels — walk the pipeline."
-> Train a teacher on **precise synthetic** depth → label a huge pool of **real unlabeled** images with the teacher → train a student on those pseudo-labels. Synthetic GT is dense and exact (no sensor noise/holes), so the teacher learns clean structure; real images supply diversity/coverage. Trade-off: a synthetic-only teacher risks a domain gap, which the large real pseudo-labeled set closes. Same **synthetic + distillation** recipe now spreading across dense-prediction foundation models.
+> [!QUESTION] "Depth Anything V2 found that synthetic GT beats real pseudo-labels. Walk through the pipeline."
+> Train a teacher on **precise synthetic** depth → use the teacher to label a broad pool of **real unlabeled** images → train a student on those pseudo-labels. Synthetic GT is dense and exact, without sensor noise or holes, so the teacher learns clean structure; real images supply diversity and coverage. The trade-off is a domain gap for a synthetic-only teacher, which the large real pseudo-labeled set helps close. The same **synthetic + distillation** recipe now appears across dense-prediction foundation models.
 
-## 6 · The productization playbook (candidate's specialty)
+## 6 · Productization playbook
 
-> [!EXAMPLE] Specialize without breaking zero-shot
-> The recurring lesson across ZIM/ECLIPSE: naive fine-tuning on a narrow dataset **destroys** the foundation model's generality (ZIM: Matte-Anything-style FT collapses micro zero-shot). Fixes: **(1) match data granularity** to the target (ZIM's SA1B-Matte), **(2) freeze the backbone and adapt via prompts/adapters/LoRA** (ECLIPSE), **(3) build a data engine** rather than hand-label. Data quality/granularity, not just model size, is the lever.
+> [!EXAMPLE] Specialize without destroying zero-shot behavior
+> Full fine-tuning on a narrow dataset can reduce zero-shot generality in some settings, but not always. Preserve zero-shot and frozen baselines, then ablate **(1) matching data granularity to the target**, **(2) heads, prompts, adapters, LoRA, and partial/full fine-tuning**, and **(3) a data engine with human QA**. Report generality retention and in-domain performance as separate metrics.
 
 <dl class="kv">
-<dt>Latency tiers</dt><dd>Server ViT foundation (100s of ms) vs a dedicated on-device specialist (~10ms mobile CPU). Role separation — don't ship the foundation model on-device. See <a href="#/resume/on-device-segmentation">On-Device Seg</a>.</dd>
-<dt>Data engine</dt><dd>Model-in-the-loop annotation (SAM), label conversion (ZIM), self-refinement (BESTIE), pseudo-label filtering (PointWSSIS) — the shared DNA of the CV work.</dd>
-<dt>Failure monitoring</dt><dd>Ambiguous prompts, domain shift, silent perception errors when used as an agent tool.</dd>
+<dt>Latency tiers</dt><dd>Compare server foundation models with on-device specialists or compressed models on identical inputs and hardware. The rule is not "never put a foundation model on-device"; the criterion is whether distillation, quantization, and caching still meet latency, memory, and energy SLAs. See <a href="#/resume/on-device-segmentation">On-Device Segmentation</a>.</dd>
+<dt>Data engine</dt><dd>Model-in-the-loop annotation in SAM, label conversion in ZIM, self-refinement in BESTIE, and pseudo-label filtering in PointWSSIS are shared patterns across CV projects.</dd>
+<dt>Failure monitoring</dt><dd>Ambiguous prompts, domain shift, and silent perception errors when the model becomes an agent tool.</dd>
 </dl>
 
 > [!NOTE] DINOv3's reach beyond 2D
-> A single frozen DINOv3 trunk has been applied across depth, segmentation, robotics/manipulation, and even geospatial/satellite tasks — the "universal feature extractor" thesis. For a candidate, this is the argument that investing in one strong backbone amortizes across an entire product surface, rather than training a specialist per task.
+> The DINOv3 report evaluates frozen features under several protocols, including depth, segmentation, detection, and geospatial tasks. Sharing backbone computation across several heads on the same input becomes a product hypothesis. It does not mean one trunk is always optimal across different modalities and domains; validate head cost, feature resolution, licensing, and serving topology as well.
 
-### Timeline to memorize
+### Timeline to remember
 
 | Year | Segmentation line | Feature / encoder line |
 | --- | --- | --- |
 | 2023 | SAM (SA-1B, promptable) | DINOv2; CLIP-era encoders |
 | 2024 | SAM 2 (video memory); HQ-SAM, Grounded-SAM, SEEM | Depth Anything V2 |
-| 2025 | **SAM 3** (concept seg, SA-Co); **ZIM** (matting) | **DINOv3** (Gram anchoring); **SigLIP 2**, **AIMv2** |
+| 2025 | **SAM 3** (concept segmentation, SA-Co); **ZIM** (matting) | **DINOv3** (Gram anchoring); **SigLIP 2**, **AIMv2** |
 | 2026 | SAM 3.1 (multi-object tracking speedups) | frozen-backbone + prompt/adapter specialization |
 
 ## 7 · Foundation models as agent tools
 
-VisProg / ViperGPT / VADAR call SAM, detectors, and depth models as **tools**; mask/box quality gates the reasoning chain, and a **silent perception failure** (a wrong mask the LLM keeps reasoning over) is a distinct, hard-to-detect error class — directly related to the candidate's NeurIPS-2026-under-review diagnostic-framework direction. See [Visual Reasoning Agents](#/vlm/visual-agents) and [Grounding](#/vlm/grounding).
+VisProg, ViperGPT, and VADAR call SAM, detectors, and depth models as **tools**. Mask and box quality affects the reasoning chain, and a **silent perception failure**—an incorrect mask that the LLM continues to reason over—is a distinct and difficult-to-detect error mode. This connects directly to the candidate's NeurIPS 2026 under-review diagnostic-framework direction. See [Visual Reasoning Agents](#/vlm/visual-agents) and [Grounding](#/vlm/grounding).
 
 ## 8 · Q&A
 
-<details class="qa"><summary>Why is a frozen self-supervised backbone the 2026 default?</summary>
+<details class="qa"><summary>When do you start with a frozen self-supervised backbone, and when do you fine-tune?</summary>
 <div class="qa-body">
 
-**Short:** one strong trunk + cheap heads generalizes across depth/matting/detection/robotics without per-task pretraining, and freezing enables prompt/adapter specialization with minimal forgetting.
+**Short:** Start frozen when data is limited, you need a fast baseline, or several heads will share features. If the domain gap is large and enough data and budget are available, compare adapters with partial and full fine-tuning.
 
-**Deep:** DINOv3-class features are good enough *frozen* to beat specialists on dense tasks, so the marginal task cost drops to a small head or a prompt set. This is why prompt-tuning (ECLIPSE) and matting heads (ZIM) sit naturally on frozen foundations, and why the field converges on "freeze + adapt."
+**Deep:** DINOv3 reported strong results in specific frozen-backbone evaluations, but it does not guarantee superiority in the deployment domain. Freezing preserves pretraining features and zero-shot behavior and reduces training and storage cost, but imposes a ceiling on task-specific plasticity. Increase cost stepwise—linear probe → adapter/LoRA → partial unfreezing → full fine-tuning—on the same validation split, while measuring regressions in the original domain.
 </div></details>
 
-<details class="qa"><summary>Contrastive (CLIP) vs sigmoid (SigLIP 2) vs autoregressive (AIMv2) — when does each matter?</summary>
+<details class="qa"><summary>Contrastive CLIP vs sigmoid SigLIP 2 vs autoregressive AIMv2—when does each matter?</summary>
 <div class="qa-body">
 
-**Short:** contrastive gives global alignment; sigmoid removes the giant-negative-batch dependency and adds dense structure; AR gives generative-grade frozen features.
+**Short:** CLIP uses batch-wise global alignment, the SigLIP family uses pairwise sigmoid alignment, and AIMv2 uses an autoregressive multimodal objective. For dense behavior, examine auxiliary objectives, data, and layer selection as well.
 
-**Deep:** softmax-contrastive needs huge batches for negatives and yields coarse spatial features; SigLIP 2's sigmoid loss + self-distillation + masked prediction produce better localization (grounding/detection); AIMv2's AR objective yields strong native-resolution trunks. For dense/grounding tasks, prefer SigLIP2/AIMv2 or fuse with DINOv2.
+**Deep:** CLIP's in-batch softmax is sensitive to batch composition and negative count, but a large batch is not a logical requirement. SigLIP's pairwise sigmoid removes global normalization, and SigLIP 2 adds self-distillation and masked prediction. AIMv2 pretrains with autoregressive targets. For dense or grounding tasks, do not preselect a winner by name; compare patch-feature resolution, extraction layer, text alignment, and latency on the same benchmark.
 </div></details>
 
-<details class="qa"><summary>What breaks when you fine-tune a foundation model on your product data?</summary>
+<details class="qa"><summary>What can break when you fine-tune a foundation model on product data?</summary>
 <div class="qa-body">
 
-**Short:** zero-shot collapse from distribution/granularity mismatch.
+**Short:** Zero-shot collapse from a distribution or granularity mismatch.
 
-**Deep:** ZIM's whole motivation: fine-tuning SAM on the small, macro-heavy public matting sets makes it forget micro-level promptability. The fix isn't more parameters — it's matching training-data granularity to the target and/or freezing + adapting. State this as a general foundation-model risk, not a matting quirk.
+**Deep:** ZIM's motivating observation is that fine-tuning SAM on small, macro-focused public matting datasets can erase micro-level promptability. The fix is not simply adding parameters: match training-data granularity to the target or freeze and adapt. Present this as a general foundation-model risk, not only a matting issue.
 </div></details>
 
 ### Follow-ups
-- *"SAM 3 vs Grounded-SAM?"* Grounded-SAM = two models (Grounding DINO → SAM), errors propagate; SAM 3 folds concept detection + segmentation + tracking into one model with a presence head.
-- *"Evaluate a foundation model how?"* Zero-shot transfer suites, promptability robustness (# points, noisy boxes), boundary metrics, video J&F, concept benchmarks (SA-Co) — not a single COCO AP.
-- *"No DINOv4 / SAM 4?"* Correct as of mid-2026 — don't cite them; the current flagships are DINOv3 and SAM 3.
 
-## Cheat-sheet
+- *SAM 3 vs Grounded-SAM?* Grounded-SAM is two models—Grounding DINO followed by SAM—so errors propagate. SAM 3 folds concept detection, segmentation, and tracking into one model with a presence head.
+- *How do you evaluate a foundation model?* Use a zero-shot transfer suite, promptability robustness across point counts and noisy boxes, boundary metrics, video J&F, and concept benchmarks such as SA-Co—not one COCO AP.
+- *No DINOv4 or SAM 4?* Do not state an unverified version as current fact. Re-check official publication and release repositories immediately before the interview, and treat this chapter's DINOv3 from August 2025 and SAM 3.1 from March 2026 as dated snapshots.
+
+## Cheat sheet
 
 | Model | Core idea |
 | --- | --- |
-| SAM | promptable zero-shot class-agnostic seg; SA-1B data engine |
+| SAM | promptable zero-shot class-agnostic segmentation; SA-1B data engine |
 | SAM 2 | streaming memory → video segmentation |
-| SAM 3 | promptable **concept** seg (text/exemplar) + presence head |
-| DINOv2/v3 | self-supervised frozen features; v3 = Gram anchoring, dense-safe |
-| SigLIP 2 | sigmoid loss + self-distill → dense/localization features |
+| SAM 3 | promptable **concept** segmentation from text/exemplars + presence head |
+| SAM 3.1 | Object Multiplex execution optimization for multi-object video tracking |
+| DINOv2/v3 | self-supervised frozen features; v3 = Gram anchoring for dense features |
+| SigLIP 2 | sigmoid loss + self-distillation → dense/localization features |
 | AIMv2 | autoregressive vision-encoder pretraining |
 | Depth Anything V2 | DPT + DINOv2; synthetic GT > noisy real pseudo-labels |
-| ZIM | SAM specialized into zero-shot matting (candidate) |
-| 2026 direction | promptable + open-vocab + frozen SSL backbone |
+| ZIM | specialize SAM for zero-shot matting (candidate work) |
+| Adaptation principle | compare frozen head, adapter, and full fine-tuning by performance, regression, and cost |
 
-**Related:** [Segmentation](#/cv/segmentation) · [Object Detection](#/cv/detection) · [Image Matting](#/cv/matting) · [Continual Learning](#/cv/continual-learning) · [The 2026 Landscape](#/start/landscape-2026) · [VLM Grounding](#/vlm/grounding) · [ZIM deep-dive](#/resume/zim) · [ECLIPSE deep-dive](#/resume/eclipse)
+**Related:** [Segmentation](#/cv/segmentation) · [Object Detection](#/cv/detection) · [Image Matting](#/cv/matting) · [Continual Learning](#/cv/continual-learning) · [The 2026 Landscape](#/start/landscape-2026) · [VLM Grounding](#/vlm/grounding) · [ZIM deep dive](#/resume/zim) · [ECLIPSE deep dive](#/resume/eclipse)

@@ -86,11 +86,11 @@ postfix 식을 평가하세요.
 
 <div class="widget" data-widget="code">
 <script type="application/json" class="code-config">
-{"func":"eval_rpn","starter":"def eval_rpn(tokens: list[str]) -> int:\n    # stack of operands; on an operator pop b then a, push a op b\n    pass","tests":[{"args":[["2","1","+","3","*"]],"expect":9},{"args":[["4","13","5","/","+"]],"expect":6},{"args":[["10","6","9","3","+","-11","*","/","*","17","+","5","+"]],"expect":22},{"args":[["3","-4","+"]],"expect":-1}],"solution":"def eval_rpn(tokens: list[str]) -> int:\n    stack = []\n    ops = {\"+\": lambda a, b: a + b, \"-\": lambda a, b: a - b,\n           \"*\": lambda a, b: a * b, \"/\": lambda a, b: int(a / b)}\n    for tok in tokens:\n        if tok in ops:\n            b, a = stack.pop(), stack.pop()\n            stack.append(ops[tok](a, b))\n        else:\n            stack.append(int(tok))\n    return stack[0]"}
+{"func":"eval_rpn","starter":"def eval_rpn(tokens: list[str]) -> int:\n    # stack of operands; on an operator pop b then a, push a op b\n    pass","tests":[{"args":[["2","1","+","3","*"]],"expect":9},{"args":[["4","13","5","/","+"]],"expect":6},{"args":[["10","6","9","3","+","-11","*","/","*","17","+","5","+"]],"expect":22},{"args":[["3","-4","+"]],"expect":-1}],"solution":"def eval_rpn(tokens: list[str]) -> int:\n    stack = []\n    def trunc_div(a, b):\n        if b == 0:\n            raise ZeroDivisionError\n        q = abs(a) // abs(b)\n        return -q if (a < 0) != (b < 0) else q\n    ops = {\"+\": lambda a, b: a + b, \"-\": lambda a, b: a - b,\n           \"*\": lambda a, b: a * b, \"/\": trunc_div}\n    for tok in tokens:\n        if tok in ops:\n            b, a = stack.pop(), stack.pop()\n            stack.append(ops[tok](a, b))\n        else:\n            stack.append(int(tok))\n    return stack[0]"}
 </script>
 </div>
 
-*O(N) time, O(N) space.* **Pitfall:** operand 순서 — `b`를 pop한 뒤 `a`를 pop하고, `a op b`를 계산하세요. `int(a / b)`(0 방향으로 truncate)를 쓰세요; `a // b`는 floor라 음수에서 틀립니다.
+*O(N) time, O(N) space.* **Pitfall:** operand 순서 — `b`를 pop한 뒤 `a`를 pop하고 `a op b`를 계산하세요. `int(a / b)`는 큰 정수를 float로 바꿀 수 있으므로, 절댓값 정수 나눗셈에 부호를 복원해 0 방향 truncation을 구현합니다. `a // b`는 음수에서 floor라 다릅니다.
 
 ### 5. Min Stack <span class="badge badge-med">Medium</span>
 

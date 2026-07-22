@@ -7,19 +7,19 @@
 
 ### A
 
-**A/B test** — treatment를 control과 실트래픽에서 비교해 비즈니스 metric에 대한 인과 효과를 측정하는 online 실험. 배포 결정의 골드 스탠더드.
+**A/B test** — 무작위 배정된 treatment와 control을 실트래픽에서 비교해 metric에 대한 인과 효과를 추정하는 online 실험. 실험 단위·간섭·guardrail·통계 검정이 올바를 때 강한 배포 근거가 됨.
 
 **Ablation** — 한 구성 요소를 제거하거나 교체해 성능에 대한 그 기여를 분리하는 것. research deep-dive에서 핵심 증거 단위.
 
 **Activation function** — 네트워크가 비선형 함수를 모델링하게 해주는 element-wise 비선형성(ReLU, GELU, SwiGLU).
 
-**AdamW** — *decoupled* weight decay를 쓰는 Adam optimizer. transformer 학습의 기본값.
+**AdamW** — gradient 기반 L2 penalty와 분리된 *decoupled* weight decay를 쓰는 Adam 변형. transformer 학습에서 흔한 선택.
 
-**AIMv2** — Autoregressive로 pretrain된 vision encoder. 강한 dense/localization feature를 주는 CLIP/SigLIP의 대안.
+**AIMv2** — autoregressive objective로 pretrain된 vision encoder 계열. 논문이 평가한 task에서는 dense/localization feature용 대안으로 비교됨.
 
 **Alpha matte** — 전경을 배경에서 분리하는 픽셀별 opacity map($\alpha \in [0,1]$). image matting의 출력(하드한 binary mask와 대비).
 
-**AnyRes / dynamic resolution** — 이미지를 native aspect ratio로 tiling해 처리하며 가변 개수의 visual token을 만드는 것. OCR, 문서, 비디오에 결정적.
+**AnyRes / dynamic resolution** — 이미지를 native aspect ratio에 가까운 tile로 나눠 가변 개수의 visual token으로 처리하는 설계. OCR·문서·긴 영상에서 세부 보존과 token cost를 조절하는 데 유용.
 
 **ANN (approximate nearest neighbor)** — 정확성을 속도와 맞바꾸는 sub-linear vector search(HNSW, IVF, ScaNN). RAG와 embedding search의 검색 백본.
 
@@ -41,7 +41,7 @@
 
 **Beam search** — 각 단계에서 상위 $k$개의 부분 시퀀스를 유지하는 decoding. greedy보다 likelihood가 높지만 밋밋해질 수 있음.
 
-**BERT** — masked language modeling으로 pretrain된 bidirectional encoder. 이해 태스크를 위한 정전의 encoder-only 모델.
+**BERT** — masked language modeling으로 pretrain된 bidirectional encoder. Encoder-only language-model 계열의 대표적 기준점.
 
 **Bias–variance tradeoff** — 기대 오차를 underfitting(bias) vs 데이터에 대한 민감도(variance)로 분해. over/underfitting을 진단하는 렌즈.
 
@@ -55,7 +55,7 @@
 
 **Catastrophic forgetting** — 새 태스크로 학습할 때 이전에 배운 태스크를 잃는 현상. continual learning의 핵심 문제(ECLIPSE 참고).
 
-**Chain-of-thought (CoT)** — 답 이전에 중간 reasoning 단계를 내놓도록 모델을 prompting하거나 학습하는 것. reasoning 모델의 기반(substrate).
+**Chain-of-thought (CoT)** — 최종 답 전에 중간 reasoning token을 생성하도록 prompting·학습·sampling하는 기법 또는 그 rationale. 모델의 내부 reasoning이 사용자에게 그대로 공개된다는 뜻은 아니며, 공개된 설명이 faithful하다고 자동 보장되지도 않음.
 
 **CLIP** — Contrastive Language–Image Pretraining: 매칭되는 image/text 쌍이 높은 cosine similarity를 갖도록 정렬된 dual encoder. zero-shot 분류와 open-vocabulary 태스크를 가능케 함.
 
@@ -71,7 +71,7 @@
 
 **Cross-attention** — query는 한 스트림에서, key/value는 다른 스트림에서 오는 attention. VLM과 encoder–decoder 모델에서 모달리티 간 융합 메커니즘.
 
-**Cross-entropy** — 예측 분포와 실제 분포 사이의 divergence를 재는 loss. 기본 분류 목적함수.
+**Cross-entropy** — target 분포 $p$ 아래에서 예측 분포 $q$의 음의 로그확률 기대값 $H(p,q)=H(p)+D_{KL}(p\|q)$. 분류에 널리 쓰이는 proper loss.
 
 **Curriculum learning** — 수렴이나 최종 품질을 개선하기 위해 학습을 쉬운 것에서 어려운 예제 순으로 정렬.
 
@@ -83,11 +83,11 @@
 
 **DETR** — DEtection TRansformer: bipartite(Hungarian) matching을 통한 set prediction으로서의 end-to-end detection. anchor와 NMS를 제거.
 
-**Dice loss** — Dice/F1 겹침 계수에 기반한 segmentation loss. 전경–배경 클래스 불균형에 강건.
+**Dice loss** — Dice/F1 overlap 계수에 기반한 segmentation loss. foreground 크기로 정규화되어 class imbalance의 영향을 줄이는 데 도움이 되지만 작은 객체·빈 mask 처리와 calibration은 별도 확인.
 
-**Diffusion model** — 점진적 noising 과정을 역행하는 법을 학습하는 생성 모델. image/video/audio 합성에서 SOTA.
+**Diffusion model** — 점진적 noising process를 뒤집는 score 또는 denoising field를 학습하는 생성 모델 family. image·video·audio 생성에서 널리 사용되며, 최근에는 flow-matching 계열과 설계 공간을 공유함.
 
-**DINO / DINOv2 / DINOv3** — self-distillation을 통한 self-supervised ViT 학습. DINOv3는 *frozen* feature가 특화된 dense-task 모델을 능가하는 7B 백본(Gram anchoring이 긴 학습을 안정화).
+**DINO / DINOv2 / DINOv3** — self-distillation을 활용하는 self-supervised vision representation family. DINOv3는 최대 7B backbone과 Gram anchoring을 보고했으며, frozen-feature 우위는 논문이 평가한 task·protocol 범위의 결과.
 
 **Distillation (knowledge)** — 작은 student가 큰 teacher의 출력/logits/feature를 모방하도록 학습. 배포용으로 모델을 압축.
 
@@ -107,7 +107,7 @@
 
 **EMA (exponential moving average)** — 천천히 갱신되는 weight의 running average(self-distillation의 teacher)나 statistics. 매끄럽게 하고 안정화.
 
-**Encoder / decoder** — Encoder는 입력을 representation으로 매핑(이해). decoder는 출력을 autoregressive하게 생성(생성). 아키텍처: encoder-only(BERT), decoder-only(GPT), encoder–decoder(T5).
+**Encoder / decoder** — Encoder는 입력을 context-aware representation으로 매핑하고, decoder는 target representation 또는 sequence를 생성. GPT처럼 autoregressive한 decoder도 있지만, 모든 decoder가 autoregressive인 것은 아님. 아키텍처: encoder-only(BERT), decoder-only(GPT), encoder–decoder(T5).
 
 **Expert parallelism** — MoE expert를 여러 device에 sharding해 각각이 부분집합을 갖게 하는 것. MoE에 특유한 parallelism 차원.
 
@@ -135,11 +135,11 @@
 
 **GAN** — Generative Adversarial Network: minimax 게임으로 학습되는 generator와 discriminator. mode collapse와 학습 불안정에 취약.
 
-**GELU** — Gaussian Error Linear Unit. transformer의 표준인 매끄러운 activation.
+**GELU** — Gaussian Error Linear Unit. BERT·ViT 등 많은 transformer에서 쓰인 매끄러운 activation; 최근 LLM FFN에서는 SwiGLU 같은 gated activation도 흔함.
 
 **GEMM** — General matrix multiply. 딥넷에서 지배적인 compute 커널.
 
-**GQA (Grouped-Query Attention)** — 여러 query head가 하나의 key/value head를 공유하는 attention. 품질 손실을 거의 없이 KV cache를 줄임(MHA와 MQA 사이).
+**GQA (Grouped-Query Attention)** — query head들을 더 적은 수의 key/value head group에 매핑하는 attention. MHA보다 KV cache를 줄이고 MQA보다 표현력을 남기는 절충이며, 품질 영향은 모델과 학습 recipe에 따라 다름.
 
 **Gradient accumulation** — 메모리 한계 하에서 더 큰 batch를 흉내내기 위해, 갱신 전에 여러 micro-batch에 걸쳐 gradient를 합산.
 
@@ -149,9 +149,9 @@
 
 **Gram anchoring** — 긴 SSL 학습에서 dense feature의 열화를 막기 위해 그 Gram matrix를 regularize(DINOv3).
 
-**GRPO (Group Relative Policy Optimization)** — value network 대신 샘플링된 completion의 *그룹*에서 advantage를 추정하는 critic-free RL. 사실상의 RLVR 알고리즘.
+**GRPO (Group Relative Policy Optimization)** — 별도 value network 대신 sampled completion *group*을 이용해 advantage를 추정하는 critic-free policy-optimization family. RLVR의 여러 선택지 중 하나.
 
-**GSPO (Group Sequence Policy Optimization)** — MoE 모델에서 안정적인 RL을 위해 importance ratio를 *sequence* 수준으로 옮긴 GRPO 변형.
+**GSPO (Group Sequence Policy Optimization)** — importance ratio를 *sequence* 수준으로 옮긴 group-relative policy-optimization 변형. 제안 논문은 token-level 방식보다 MoE RL 안정성이 나아졌다고 보고.
 
 ### H
 
@@ -189,13 +189,13 @@
 
 ### L
 
-**Label smoothing** — calibration과 일반화를 개선하기 위해 하드한 one-hot target을 약간 부드럽게 한 것으로 대체.
+**Label smoothing** — hard one-hot target을 부드러운 target으로 바꾸는 regularization. 일반화에 도움이 될 수 있지만 calibration을 항상 개선하는 것은 아님.
 
-**LayerNorm / RMSNorm** — token마다 feature 차원에 걸쳐 activation을 normalize. RMSNorm은 효율을 위해 mean-centering을 빼며 현대 LLM의 표준.
+**LayerNorm / RMSNorm** — 보통 sample/token별 feature 차원에 걸쳐 activation scale을 normalize. RMSNorm은 mean-centering을 생략하며 현대 LLM에서 흔함.
 
 **Learning rate schedule** — LR이 어떻게 변하는지(warmup, cosine decay). 학습 품질의 주요 결정 요인. [lr-schedule widget](#/foundations/optimization)을 보세요.
 
-**LoRA / QLoRA** — Low-Rank Adaptation: base weight를 freeze하고 작은 low-rank 갱신 행렬을 학습. QLoRA는 base의 4-bit quantization을 더함 — 지배적인 parameter-efficient fine-tuning 방법.
+**LoRA / QLoRA** — Low-Rank Adaptation: base weight를 freeze하고 작은 low-rank update를 학습. QLoRA는 quantized base 위에서 adapter를 학습하는, 널리 쓰이는 parameter-efficient fine-tuning 방법.
 
 **Logits** — 분류기나 LM head가 출력하는 pre-softmax raw score.
 
@@ -241,7 +241,7 @@
 
 **Online vs offline evaluation** — Offline = 배포 전 held-out metric. online = 배포 후 A/B / 실시간 KPI. 강한 systems 답변은 둘 다 다룸.
 
-**ORM (Outcome Reward Model)** — *최종* 답만 점수 매기는 reward model. PRM(per-step)과 대비.
+**ORM (Outcome Reward Model)** — 완성된 전체 응답을 최종 outcome 기준으로 평가하는 reward model. 각 중간 step을 평가하는 PRM과 대비.
 
 **Overfitting** — 모델이 학습 노이즈를 맞춰 일반화가 나쁨. train–val 격차로 진단.
 
@@ -261,7 +261,7 @@
 
 **Positional encoding** — permutation-invariant한 transformer에 token 순서를 주입(sinusoidal, learned, RoPE).
 
-**PPO (Proximal Policy Optimization)** — clipped-objective actor–critic RL 알고리즘. 고전적 RLHF optimizer(value network가 필요 — GRPO가 없애는 비용).
+**PPO (Proximal Policy Optimization)** — policy update가 지나치게 커지지 않도록 clipped surrogate objective를 쓰는 policy-gradient family. 고전적 RLHF에서는 보통 value critic과 함께 사용하며, GRPO 계열은 별도 learned critic을 두지 않음.
 
 **PQ (Panoptic Quality)** — panoptic metric = segmentation quality(매칭된 segment의 mean IoU) × recognition quality(segment 매칭의 F1).
 
@@ -295,9 +295,9 @@
 
 **RLAIF** — RL from AI Feedback: alignment 데이터를 확장하기 위해 human 대신 AI critic이 생성한 preference.
 
-**RLHF** — RL from Human Feedback: human preference에 reward model을 맞춘 뒤 그것에 대해 policy를 최적화(PPO). 고전적 alignment 파이프라인.
+**RLHF** — RL from Human Feedback: human feedback으로 reward·preference signal을 만들고 policy를 개선하는 넓은 계열. 고전적 pipeline은 reward model + PPO지만, 실제 post-training에는 다른 online RL·preference optimization도 쓰임.
 
-**RLVR (RL with Verifiable Rewards)** — 학습된 reward model 대신 *결정론적 verifier*(맞으면→1, 아니면 0)를 쓰는 RL. reward hacking에 강건하지만 검증 가능한 도메인(math, code)에 국한. Tülu 3가 명명.
+**RLVR (RL with Verifiable Rewards)** — test·symbolic rule·grader처럼 결과를 검사할 수 있는 신호로 policy를 최적화하는 RL. reward가 꼭 binary·완전 결정적일 필요는 없고, verifier/harness도 game될 수 있음. Tülu 3가 이 표현을 널리 알림.
 
 **RMSNorm** — **LayerNorm / RMSNorm**을 보세요.
 
@@ -323,9 +323,9 @@
 
 **Softmax** — logits를 확률 분포로 매핑하는 함수. 분류와 attention의 정규화기(normalizer).
 
-**Speculative decoding** — 작은 모델(또는 추가 head: Medusa/EAGLE/MTP)로 여러 token을 초안 작성하고 큰 모델의 한 번의 pass로 검증. 이제 기본 서빙 레이어.
+**Speculative decoding** — 작은 draft model 또는 추가 head가 여러 token을 제안하고 target model이 병렬 검증하는 방식. acceptance rate와 workload가 맞을 때 latency를 줄이는 흔한 serving 선택지이며, distribution 보존에는 올바른 rejection/residual sampling이 필요.
 
-**SwiGLU** — 현대 transformer FFN의 표준인 gated activation(Swish × linear gate).
+**SwiGLU** — Swish branch와 linear gate를 곱하는 gated FFN activation. 현대 transformer에서 흔한 선택.
 
 ### T
 
@@ -347,7 +347,7 @@
 
 ### U
 
-**U-Net** — skip connection을 갖는 encoder–decoder CNN. segmentation과 diffusion denoiser 백본의 표준.
+**U-Net** — skip connection을 갖는 encoder–decoder CNN. segmentation과 초기/latent diffusion denoiser에서 널리 쓰였으며, 최근 생성 모델에는 DiT 계열도 흔함.
 
 **Underfitting** — 신호를 포착하기엔 모델이 너무 단순함(high bias). train과 val 오차가 모두 높음.
 
@@ -359,9 +359,9 @@
 
 **Vanishing / exploding gradients** — gradient가 많은 layer/timestep에 걸쳐 줄어들거나 커져 학습이 멈추거나 불안정해지는 것. residual, normalization, gating, clipping으로 해결.
 
-**ViT (Vision Transformer)** — 이미지 patch를 token으로 삼아 transformer를 적용. 지배적인 현대 vision 백본.
+**ViT (Vision Transformer)** — image patch를 token으로 삼아 transformer를 적용하는, 현대 vision의 주요 backbone family.
 
-**VLM (Vision-Language Model)** — 이미지(+비디오)와 텍스트를 함께 처리하는 모델(예: LLaVA, Qwen-VL, InternVL). 프론티어 모델은 frozen LLM에 vision encoder를 붙이는 대신 모달리티를 함께 pretrain함.
+**VLM (Vision-Language Model)** — image/video와 text를 함께 처리하는 모델(예: LLaVA, Qwen-VL, InternVL). vision encoder·projector·language model을 잇는 방식과 joint-training 범위는 모델마다 다름.
 
 **VLP (Vision-Language Pretraining)** — 태스크 fine-tuning 전에 시각과 텍스트 representation을 정렬하는 대규모 pretraining(contrastive, captioning, masked objective).
 
@@ -371,7 +371,7 @@
 
 **Warmup** — 초기 학습을 안정화하기 위해 처음 몇 step에 걸쳐 learning rate를 ~0에서 끌어올림.
 
-**Weight decay** — 매 step weight를 줄이는 L2 스타일 페널티. regularize하며, decoupled(AdamW) 형태가 transformer의 표준.
+**Weight decay** — update마다 parameter 크기를 줄이는 regularization. adaptive optimizer에서는 gradient에 L2 penalty를 더하는 것과 decoupled AdamW가 같은 궤적이 아님.
 
 **World model** — 예측/계획에 쓰이는, 환경 동역학의 학습된 모델. sample-efficient한 agent로 가는 제안된 경로(cf. JEPA).
 
@@ -389,7 +389,7 @@
 
 **Zero-shot** — 태스크별 학습 예제 없이, pretrain된 지식에 의존해 태스크를 수행(예: CLIP zero-shot 분류, ZIM zero-shot matting).
 
-**ZeRO** — per-GPU 메모리를 줄이는 optimizer-state/gradient/parameter sharding(DeepSpeed). ZeRO-3가 FSDP의 기반.
+**ZeRO** — optimizer state·gradient·parameter를 단계별로 shard해 per-device memory를 줄이는 DeepSpeed 계열 전략. ZeRO-3와 FSDP는 full-sharding이라는 핵심 아이디어가 유사하지만 구현은 독립적으로 발전함.
 
 ---
 

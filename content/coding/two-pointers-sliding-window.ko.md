@@ -129,6 +129,94 @@ sorted array에서 `target`에 합해지는 1-indexed 쌍을 반환하세요.
 - **Fast & slow pointers**: Linked List Cycle, Find the Duplicate Number, 그리고 list의 중점 찾기 모두 1×/2× 속도 쌍을 O(1) space로 씁니다.
 - **ML dressing**: "confidence ≥ threshold인 frame의 가장 긴 연속 구간"은 고정 제약 window입니다.
 
+## Linked List 정본 — pointer를 잃지 않는 법
+
+연결 리스트 문제의 핵심은 값이 아니라 **노드 객체의 연결 관계**입니다. `next`를 덮어쓰기 전에 원래 다음 노드를 저장하고, head가 바뀔 수 있는 연산에는 dummy sentinel을 두면 분기가 크게 줄어듭니다.
+
+```python
+class ListNode:
+    def __init__(self, val=0, next=None):
+        self.val = val
+        self.next = next
+
+
+def reverse_list(head):
+    """O(N) time, O(1) extra space; 기존 노드를 제자리에서 재연결."""
+    prev, cur = None, head
+    while cur is not None:
+        nxt = cur.next          # 1. 끊기 전에 남은 list를 보존
+        cur.next = prev         # 2. 현재 edge를 뒤집음
+        prev, cur = cur, nxt    # 3. 두 pointer를 전진
+    return prev
+
+
+def merge_sorted(a, b):
+    """오름차순인 두 acyclic list의 기존 노드를 재사용해 merge."""
+    dummy = tail = ListNode()
+    while a is not None and b is not None:
+        if a.val <= b.val:      # tie 규칙을 정하면 결과도 deterministic
+            tail.next, a = a, a.next
+        else:
+            tail.next, b = b, b.next
+        tail = tail.next
+    tail.next = a if a is not None else b
+    return dummy.next
+
+
+def middle_node(head):
+    """짝수 길이에서는 두 middle 중 두 번째를 반환."""
+    slow = fast = head
+    while fast is not None and fast.next is not None:
+        slow = slow.next
+        fast = fast.next.next
+    return slow
+
+
+def cycle_start(head):
+    """cycle 입구, 없으면 None. Floyd: O(N) time, O(1) space."""
+    slow = fast = head
+    while fast is not None and fast.next is not None:
+        slow = slow.next
+        fast = fast.next.next
+        if slow is fast:        # 값 비교가 아니라 node identity
+            break
+    else:
+        return None
+
+    slow = head
+    while slow is not fast:
+        slow = slow.next
+        fast = fast.next
+    return slow
+
+
+def remove_nth_from_end(head, n):
+    """끝에서 n번째(1-indexed) 노드를 제거; 범위 밖 n은 ValueError."""
+    if n <= 0:
+        raise ValueError("n must be positive")
+    dummy = ListNode(0, head)
+    fast = dummy
+    for _ in range(n):
+        fast = fast.next
+        if fast is None:
+            raise ValueError("n is larger than the list length")
+    slow = dummy
+    while fast.next is not None:
+        fast, slow = fast.next, slow.next
+    slow.next = slow.next.next
+    return dummy.next
+```
+
+불변식으로 기억하면 외울 코드가 줄어듭니다.
+
+- `reverse_list`: `prev`는 이미 뒤집힌 prefix의 head, `cur`는 아직 처리하지 않은 suffix의 head입니다.
+- `merge_sorted`: `dummy.next ... tail`은 정렬 완료된 prefix이고, `a`와 `b`는 각 list의 미사용 suffix입니다.
+- `middle_node`: fast가 두 칸 갈 때 slow는 한 칸 갑니다. 짝수 길이에서 첫 번째 middle이 필요하면 loop 조건을 바꿀지 명시하세요.
+- `remove_nth_from_end`: fast를 먼저 `n`칸 보내 두 pointer 간 거리를 유지합니다. Dummy 덕분에 원래 head 삭제도 일반 case가 됩니다.
+
+> [!WARNING] 연결 리스트 함정
+> `cur.next = prev` 뒤에 `cur = cur.next`를 하면 남은 list를 잃습니다. Cycle 검사는 `slow.val == fast.val`이 아니라 `slow is fast`로 같은 노드인지 비교하세요. Merge/reverse 함수가 **기존 노드를 mutate하는지** 새 list를 만드는지도 면접 전에 계약으로 말해야 합니다.
+
 ## Pitfalls
 
 > [!WARNING] 대비해 연습할 window 버그
@@ -150,7 +238,7 @@ sorted array에서 `target`에 합해지는 1-indexed 쌍을 반환하세요.
 
 **Short:** Two pointers: O(N) time, O(1) space, one pass.
 
-**Deep:** 각 원소를 고정하고 그 complement를 binary-search하여 O(N log N)로 할 *수도* 있습니다. 여기서는 two pointers가 엄격히 낫습니다. 각 비교가 한쪽 끝의 후보 하나를 버리기 때문입니다 — O(N) linear 수렴이죠. binary search는 정적인 sorted array에 여러 독립적인 target을 질의할 때만 이깁니다(sort를 amortize하고, 이후 query당 O(log N)). trade-off를 말하세요 — 흔한 탐침 질문입니다.
+**Deep:** 각 원소를 고정하고 complement를 binary-search하면 한 target당 O(N log N)입니다. two pointers는 한쪽 끝의 후보를 매 비교마다 버려 O(N)에 끝납니다. 정적 배열에 target 질의가 많아도 **Two Sum 전체 질의가 자동으로 O(log N)이 되는 것은 아닙니다**. O(log N) membership query와 혼동하지 마세요. 정말 많은 Two Sum 질의를 빠르게 하려면 O(N²) pair-sum 전처리처럼 다른 시간·메모리 trade-off가 필요합니다.
 </div></details>
 
 <details class="qa"><summary>Follow-ups</summary>
@@ -158,7 +246,7 @@ sorted array에서 `target`에 합해지는 1-indexed 쌍을 반환하세요.
 
 - **"3Sum / 4Sum?"** → sort하고, 바깥 index를 고정하고, 나머지를 two-pointer; duplicate를 조심스럽게 skip. O(N²)/O(N³).
 - **"정확히 k개의 distinct 정수를 가진 subarray?"** → at-most-k 트릭.
-- **"linked-list cycle의 *시작*을 탐지?"** → Floyd's: 만난 뒤 한 pointer를 head로 reset하고 둘을 1씩 전진; 입구에서 만납니다.
+- <strong>“linked-list cycle의 시작을 탐지?”</strong> → Floyd's: 만난 뒤 한 pointer를 head로 reset하고 둘을 1씩 전진; 입구에서 만납니다.
 </div></details>
 
 ## Cheat-sheet
@@ -173,5 +261,8 @@ sorted array에서 `target`에 합해지는 1-indexed 쌍을 반환하세요.
 | Min window substring | window + need/missing | O(N) | O(1) |
 | Exactly k distinct | atMost(k)−atMost(k−1) | O(N) | O(k) |
 | Cycle detection | fast & slow (Floyd) | O(N) | O(1) |
+| Reverse linked list | save `next`, reverse edge | O(N) | O(1) |
+| Merge sorted lists | dummy + tail | O(N+M) | O(1) |
+| Remove n-th from end | dummy + fixed pointer gap | O(N) | O(1) |
 
 **Related:** [Arrays & Strings](#/coding/arrays-strings) · [Hashing](#/coding/hashing) · [Binary Search](#/coding/binary-search) · [Patterns hub](#/coding/patterns)

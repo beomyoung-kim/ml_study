@@ -59,17 +59,21 @@ def search(nums: list[int], target: int) -> int:
             hi = mid - 1
     return -1
 
-# 2. Boundary / lower_bound (the workhorse). Loop while lo < hi,
-#    hi never below the candidate. Returns the FIRST index where pred is True.
+# 2. Boundary / lower_bound on an inclusive integer domain [lo, hi].
+#    Contract: pred is monotone False→True and pred(hi) is guaranteed True.
 def lower_bound(lo: int, hi: int, pred) -> int:
+    if lo > hi or not pred(hi):
+        raise ValueError("need a non-empty domain with a feasible hi sentinel")
     while lo < hi:
         mid = lo + (hi - lo) // 2
         if pred(mid):
             hi = mid          # keep mid: it might be the answer
         else:
             lo = mid + 1      # discard mid: definitely not the answer
-    return lo                 # == hi; smallest x with pred(x) True
+    return lo                 # == hi; smallest feasible x
 ```
+
+배열의 `bisect_left`처럼 "True가 없으면 끝 index"를 반환하고 싶다면 half-open domain `[0,n)`에 sentinel `n`을 두고, loop 안에서는 `pred(n)`을 호출하지 않는 별도 템플릿을 쓰세요. **inclusive answer search와 half-open insertion search의 계약을 섞지 않는 것**이 off-by-one 방지의 핵심입니다.
 
 > [!WARNING] 버그는 단 두 가지
 > **무한 루프:** `while lo < hi`에서 `lo = mid` (`mid + 1`이 아니라)로 하면 `hi = lo + 1`일 때 절대 전진하지 않습니다. 규칙: `mid`를 *유지하는* 쪽이 그쪽으로 줄어드는 쪽(`hi = mid`)이어야 하고, 다른 쪽은 하나를 더합니다(`lo = mid + 1`). **Off-by-one 경계:** predicate에서 `<` vs `<=`를 결정해 lower bound와 upper bound를 고르고, 원소가 두 개인 경우를 손으로 직접 테스트하세요.
@@ -139,7 +143,7 @@ def lower_bound(lo: int, hi: int, pred) -> int:
 | 변형 | 반전 | 핵심 아이디어 |
 | --- | --- | --- |
 | Real-valued search | 정수 대신 tolerance `ε` | `while hi - lo > eps` (혹은 고정 ~100회 반복) |
-| Search 2D matrix (LC 240) | 행 & 열이 정렬됨 | 우상단에서 계단식, `O(m+n)`; 혹은 평탄한 정렬 배열로 취급 `O(log mn)` |
+| Search 2D matrix | LC 240와 LC 74의 보장이 다름 | LC 240: 각 행·열 정렬 → 우상단 계단식 `O(m+n)`. LC 74: 행 경계까지 전역 정렬 → 평탄화해 `O(log mn)` |
 | First/last occurrence | 중복 | lower_bound와 upper_bound 실행 |
 | Rotated min (LC 153) | pivot 찾기 | `nums[mid]`를 `nums[hi]`와 비교 |
 | Peak / valley | local extremum | 더 높은 이웃 쪽으로 이동 |

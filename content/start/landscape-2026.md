@@ -3,12 +3,15 @@
 <div class="tag-row"><span class="tag">reasoning models</span><span class="tag">RLVR</span><span class="tag">native multimodal</span><span class="tag">agents</span><span class="tag">MoE</span><span class="tag">test-time compute</span></div>
 
 > [!TIP] Why this chapter exists
-> Interviewers calibrate you against *the current frontier*, not the one you learned in grad school. A 2026 candidate who talks like it's 2023 reads as stale. This chapter is the fastest way to sound current — and, more importantly, to reason about *why* the field moved.
+> If a role works on current research, interviewers may also assess whether you understand today's problem formulations and evaluation practices. Rather than asking you to memorize buzzwords, this chapter gives a quick July 2026 snapshot of *why* the major shifts happened and how far the evidence goes.
 
-> [!WARNING] On facts vs. hype
-> Model names and dates below are drawn from primary sources where possible. **Benchmark numbers for the newest models are frequently vendor-reported** — quote capabilities and mechanisms confidently, hedge exact scores. In an interview, calibrated hedging ("reported around 80% SWE-bench Verified, but I'd want to see the harness") is a *strength*.
+> [!WARNING] On fact versus hype
+> The model names and dates below come from primary sources whenever possible. **Many benchmark numbers for current models are vendor-reported** — cite capabilities and mechanisms confidently, but treat exact scores carefully. Calibrated caution in an interview ("SWE-bench Verified has been reported at roughly 80%, but I would want to inspect the harness") is a *strength*.
 
-## The five shifts that define 2026
+> [!NOTE] Currency boundary
+> Last comprehensive review: **2026-07-21**. What follows is a snapshot at that date, not a set of permanent textbook definitions. Distinguish `vendor-reported` results, preprints, and independent evaluations, and inspect the evaluation protocol, cost, and failure distribution before relying on rankings.
+
+## Seven axes for reading 2026
 
 ```mermaid
 flowchart LR
@@ -18,44 +21,46 @@ flowchart LR
   style D fill:#e0533f,color:#fff
 ```
 
-1. **Reasoning models went mainstream.** Long chain-of-thought with self-verification, trained largely by **RL with verifiable rewards (RLVR)**, is now a standard capability class — not a research curiosity.
-2. **Test-time compute is a first-class scaling axis.** You can buy accuracy by *thinking longer at inference*. Products expose this as "thinking budgets" / "effort" knobs.
-3. **Everything is Mixture-of-Experts.** Frontier models report **active vs. total** parameters. Sparse routing decouples capacity from per-token compute.
-4. **Multimodality is native, not bolted-on.** The "freeze an LLM, glue a vision encoder" (LLaVA-style) recipe is legacy at the frontier; leading models pretrain vision+text (+audio/video) jointly.
-5. **Agents are the headline.** Computer-use, tool-calling, and long-horizon autonomy are what the labs benchmark and sell now — displacing pure chat metrics.
+1. **Reasoning models became a major product category.** Several model families improve math, coding, and planning with inference budgets and post-training. Their recipes vary across RLVR, preference optimization, distillation, and other methods; this does not mean a model's internal chain of thought is exposed verbatim to users.
+2. **Test-time compute became a first-class scaling axis.** You can buy accuracy by letting a model *reason longer at inference time*. Products expose this as a "thinking budget" or "effort" control.
+3. **Mixture-of-Experts became a major scaling option.** Sparse routing partly decouples model capacity from per-token compute. Not every frontier model is an MoE, however, and closed models often do not disclose their architecture.
+4. **Multimodal learning moved earlier in training.** Recent models use multimodal data during pretraining or large-scale continual-training stages. This is a statement about the user experience and training recipe, not a requirement that the model use one shared transformer. A native-multimodal model may still retain a separate vision encoder and projector.
+5. **Agents expanded into a major evaluation category.** Computer use, tool calling, and long-horizon task completion are now evaluated alongside chat quality.
+6. **Efficiency is inseparable from model quality.** Low precision, attention kernels, KV caches, and speculative decoding determine the cost and latency at which a given level of quality can be delivered.
+7. **Evaluation reliability became a research problem of its own.** A score should be accompanied by a versioned harness, contamination analysis, cost, repeated-run reliability, and a failure distribution.
 
 ## 1 · Reasoning & test-time compute
 
-The single biggest intellectual shift. The chain of ideas an interviewer expects you to connect:
+The following chain of ideas is useful when explaining how your work connects to a current reasoning role.
 
 <dl class="kv">
-<dt>Process supervision</dt><dd><i>Let's Verify Step by Step</i> (Lightman et al., 2023; PRM800K) — scoring reasoning <b>steps</b> beats scoring only the final answer on MATH. The conceptual precursor to o1.</dd>
-<dt>Test-time scaling</dt><dd>Snell et al. (2024) — for a fixed model, allocating more inference compute (longer CoT, search, best-of-N) can beat scaling parameters. A <b>new</b> scaling law.</dd>
-<dt>o1 → R1</dt><dd>OpenAI's o1 (Sep 2024) was the first "accuracy rises with inference compute" model; <b>DeepSeek-R1</b> (arXiv Jan 2025, later <i>Nature</i> 2025) showed <b>pure RL</b> (R1-Zero, no SFT) can induce reasoning, and open-sourced the recipe.</dd>
-<dt>RLVR</dt><dd>Term coined by Ai2's <b>Tülu 3</b> (Nov 2024): replace a learned reward model with a <b>deterministic verifier</b> (correct→1, else 0). Ideal for math/code. Less reward-hackable than preference models.</dd>
-<dt>GRPO</dt><dd>The de-facto RLVR algorithm (DeepSeekMath, 2024): <b>critic-free</b>, advantage estimated from a <b>group</b> of sampled completions — no value network.</dd>
+<dt>Process supervision</dt><dd><i>Let's Verify Step by Step</i> (Lightman et al., 2023; PRM800K) — on MATH, scoring reasoning <b>steps</b> worked better than scoring only the final answer. A conceptual precursor to o1.</dd>
+<dt>Test-time scaling</dt><dd>Snell et al. (2024) — in the settings studied, allocating more inference compute to a fixed model through search, best-of-N, or adaptive allocation could be more efficient than adding pretraining compute. The effect depends on problem difficulty, the verifier, and the allocation policy.</dd>
+<dt>o1 → R1</dt><dd>OpenAI's o1 (September 2024) made inference-time reasoning a widely visible product axis. <b>DeepSeek-R1</b> (arXiv January 2025; later <i>Nature</i> 2025) reported observed reasoning behavior from RL without SFT in R1-Zero and released a technical report and model artifacts. Do not generalize this into one recipe shared by every reasoning model.</dd>
+<dt>RLVR</dt><dd>A term popularized by Ai2's <b>Tülu 3</b> (November 2024): reinforcement learning from signals whose outcomes can be checked by tests, symbolic rules, or graders instead of a learned preference reward. The reward need not be binary or flawless; the verifier and harness can themselves be attacked or misdesigned.</dd>
+<dt>GRPO</dt><dd>One critic-free family used widely in RLVR (DeepSeekMath, 2024): estimate advantage from a group of sampled completions without a separate value network. Failure modes such as group variance, length bias, and difficulty imbalance remain.</dd>
 </dl>
 
 > [!QUESTION] Likely interview question
-> "Contrast RLVR with RLHF." **Answer skeleton:** RLHF optimizes a *learned* reward model of human preference (dense but hackable, needs a critic in PPO); RLVR optimizes a *programmatic verifier* on domains where correctness is checkable (math, code, tool-use). RLVR is more robust to reward hacking but only applies where you can verify — hence the open problem of extending it to *non-verifiable* / open-ended tasks (rubric/generative reward models). See [Reasoning & Test-Time Compute](#/llm/reasoning).
+> "Contrast RLVR with RLHF." **Answer spine:** conventional RLHF optimizes a reward model learned from human preferences, whereas RLVR uses verifier signals for outcomes that can be checked in domains such as math, code, and tool use. Neither is automatically safe. A learned reward can be exploited as a proxy, while a verifier can be gamed through incomplete tests or harness flaws. For open-ended work, combine rubrics or judge models with human audit. See [Reasoning & Test-Time Compute](#/llm/reasoning).
 
-A genuinely *open* debate to show you follow the literature: does RLVR **create new reasoning ability** or merely **sample latent ability more efficiently** from the base model? (A NeurIPS 2025 line of work argues the latter.) Holding this as contested — not settled — signals maturity.
+A genuinely *open* debate that shows you follow the literature is how to separate the extent to which RLVR **learns new reasoning strategies** from the extent to which it **reweights or resamples existing successful paths** in the base model. The task, base model, verifier, and analysis differ across studies, so do not present one conclusion as universal.
 
 ## 2 · Post-training has fragmented
 
-The 2024 story was "DPO replaced PPO." The 2026 story is a **zoo of critic-free and preference methods**, and knowing the axes matters more than memorizing acronyms.
+The 2024 story was "DPO replaced PPO." The 2026 story is a **zoo of critic-free and preference methods**; knowing the axes matters more than memorizing acronyms.
 
-| Family | Members | Key idea | When |
+| Family | Members | Core idea | When it fits |
 | --- | --- | --- | --- |
-| Offline preference | DPO, KTO, ORPO, SimPO | Turn RLHF into a classification-style loss on chosen/rejected (or unpaired) data; reference-free variants | Cheap, stable, no rollout infra |
-| Critic-free online RL | GRPO, DAPO, Dr. GRPO, **GSPO** | Group-relative advantage, no value network; GSPO moves the importance ratio to the **sequence** level for stable **MoE** RL | Reasoning, verifiable rewards |
-| Feedback source | RLHF vs **RLAIF** / Constitutional AI | Who writes the preferences: humans vs. an AI critic against written principles | Scale preference data |
+| Offline preference | DPO, KTO, ORPO, SimPO | Turn RLHF into a classification-style loss over chosen/rejected—or unpaired—data; includes reference-free variants | Cheaper, stable, no rollout infrastructure |
+| Critic-free online RL | GRPO, DAPO, Dr. GRPO, **GSPO** | Group-relative advantage without a separate value network; the GSPO paper reports that sequence-level importance ratios stabilize MoE RL better than token-level alternatives | Reasoning, verifiable rewards |
+| Feedback source | RLHF versus **RLAIF** / Constitutional AI | Who produces preferences: humans versus an AI critic applying codified principles | Scaling preference data |
 
-Canonical modern stack: **SFT → preference alignment (DPO/variants) → RLVR (GRPO/GSPO)**. The broad drift is *away from* PPO-with-critic *toward* critic-free, group-relative, and preference-based methods. Details in [Post-Training & Alignment](#/llm/alignment).
+A common recipe family is **SFT → preference optimization → online RL/RLVR**, but not every model uses every stage or follows this order. Depending on data, tasks, and infrastructure, a model may use SFT alone, combine online preference learning with RLVR, or continue using PPO-family methods. See [Post-Training & Alignment](#/llm/alignment) for details.
 
-## 3 · Mixture-of-Experts, everywhere
+## 3 · Mixture-of-Experts, an important option
 
-Nearly every 2025–2026 frontier model is MoE. The anchor number worth memorizing: **DeepSeek-V3 activates ~37B of 671B total parameters per token** (top-k routing over hundreds of experts → a few percent of the dense-FFN compute). Llama 4, Qwen3, Mistral Large 3, and Grok are all MoE families.
+Several large public models released in 2025–2026 use MoE, while dense models remain important. One public anchor is **DeepSeek-V3, reported as activating about 37B of 671B total parameters per token**. When citing the number, check how shared parameters are counted and how active parameters are defined. Llama 4, some Qwen3 variants, and Mistral Large 3 are also MoE families, but none of this reveals the architecture of an undisclosed model.
 
 <figure>
 <svg viewBox="0 0 640 200" xmlns="http://www.w3.org/2000/svg" font-family="Inter, sans-serif" font-size="12">
@@ -79,70 +84,80 @@ Nearly every 2025–2026 frontier model is MoE. The anchor number worth memorizi
   <text x="500" y="130" fill="#98a3b2">small per-token FLOPs</text>
   <defs><marker id="a" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0 0 L6 3 L0 6" fill="#98a3b2"/></marker></defs>
 </svg>
-<figcaption>MoE: a router activates a few experts per token. Report both <b>active</b> (compute/latency) and <b>total</b> (capacity/memory) params — and expect follow-ups on load balancing and expert parallelism.</figcaption>
+<figcaption>MoE: the router activates a few experts for each token. Report both <b>active</b> parameters (compute/latency) and <b>total</b> parameters (capacity/memory), and expect follow-ups on load balancing and expert parallelism.</figcaption>
 </figure>
 
 ## 4 · Multimodal & vision foundation models
 
-- **Native multimodal pretraining** (Qwen3-VL, InternVL3, GPT-5, Gemini) has displaced the frozen-LLM-plus-adapter era for frontier work.
-- **Native / dynamic-resolution ViTs** and **AnyRes tiling** process true aspect ratios → variable visual-token counts (critical for OCR, documents, hour-long video).
-- **Vision encoders moved past CLIP** → **SigLIP 2** (sigmoid loss + self-distillation) and **AIMv2** (autoregressive pretraining), for better dense/localization features.
-- **Unified understanding + generation** ("any-to-any": Janus-Pro → BAGEL → Show-o2) is maturing, though dedicated VLMs still lead on pure understanding.
+- **Earlier integration of multimodal pretraining**—for example, the InternVL3 family—illustrates a shift toward using image-text data throughout training rather than attaching an adapter only during instruction tuning. Do not infer the internal architecture of a closed model without public evidence.
+- **Native- or dynamic-resolution ViTs** and **AnyRes tiling** are options for handling varied aspect ratios with a variable number of visual tokens. The resolution–token-budget trade-off is especially important for OCR, documents, and long video.
+- Vision-encoder choices have **expanded beyond CLIP-family models.** For example, **SigLIP 2** and **AIMv2** use different objectives and training recipes and are also evaluated for dense or localization features.
+- **Unified understanding and generation** ("any-to-any": Janus-Pro → BAGEL → Show-o2) is an active direction. Compare it with specialized models separately for each task, evaluation protocol, and cost regime.
 
-On the pure-vision side, two 2025 data points every CV candidate should know:
+Two useful public examples from 2025 when discussing current pure-vision directions:
 
-- **SAM 3** (Meta, Nov 2025): adds **Promptable Concept Segmentation** — text/exemplar prompts for open-vocabulary detect+segment+track, with a **presence head** decoupling recognition from localization.
-- **DINOv3** (Meta, Aug 2025): a **7B fully self-supervised** backbone whose *frozen* features beat specialized dense-task models; **Gram anchoring** stops dense-feature degradation over long training.
+- **SAM 3** (Meta, November 2025): added **Promptable Concept Segmentation**, expanding detection, segmentation, and tracking through text or exemplar concepts. A later **SAM 3.1** update means capabilities and speed must be attributed to a specific version.
+- **DINOv3** (Meta, August 2025): reported self-supervised vision backbones up to 7B parameters and Gram anchoring. Frozen-feature advantages are results within the paper's evaluated tasks and protocols, not a universal claim over every specialized model.
 
 See [Vision Foundation Models](#/cv/foundation-models), [VLM Pretraining](#/vlm/pretraining), and [Grounding](#/vlm/grounding).
 
-## 5 · Agents & computer-use
+## 5 · Agents & computer use
 
-The frontier capability class of 2026.
+A frontier capability category in 2026:
 
-- **OSWorld** (369 real desktop/web tasks) has a **human baseline ≈ 72%**; best models jumped from ~7% (2024) to **61.4%** (Claude Sonnet 4.5, verified Sep 2025). Closing fast.
-- **Native end-to-end GUI agents** (UI-TARS-style: screenshot → CoT → click/type) are displacing prompted-VLM frameworks; general VLMs are folding GUI grounding into the base model. **GUI grounding** (element → pixel coordinate) is the bottleneck.
-- **Visual program synthesis** (VisProg / ViperGPT lineage) — express a visual task as an executable program over vision specialists — is now being RL-trained ("thinking with images/code"). This is exactly the [Visual Reasoning Agents](#/vlm/visual-agents) direction.
-- **METR's finding** (a great talking point): the task length AI completes at 50% reliability has been **doubling roughly every 7 months** — "a Moore's Law for agents."
+- **OSWorld** evaluates real desktop and web interaction, but scores vary with the environment, version, human intervention, and whether results are self-reported or verified. Sonnet 4.5's 61.4% in 2025 was an Anthropic vendor-reported snapshot at that time; do not put it on one undifferentiated line with later model announcements.
+- **Native end-to-end GUI agents** (UI-TARS style: screenshot → reasoning/action → click/type) and prompted orchestration frameworks are being explored in parallel. GUI grounding (element → pixel coordinate), state-change recognition, and long-horizon recovery remain representative challenges.
+- **Visual program synthesis** in the VisProg / ViperGPT lineage represents visual tasks as executable programs over specialist tools. Some later systems combine this approach with RL. [Visual Reasoning Agents](#/vlm/visual-agents) covers this design axis.
+- **METR's time-horizon research** reports an empirical trend in which the length of software tasks agents can complete with 50% success has grown rapidly. The estimated doubling time varies substantially with the analysis window and methodology, however, and uncertainty is wide. "About seven months" was an early summary value, not a universal law.
 
-## 6 · Efficiency & systems (the parts that pay the bills)
+## 6 · Efficiency & systems — the parts that pay the bills
 
 <dl class="kv">
-<dt>Attention kernels</dt><dd>FlashAttention-3 (Hopper) → <b>FlashAttention-4</b> (Blackwell) — new versions exist because hardware scales <i>asymmetrically</i> (tensor-core throughput grows faster than shared-memory bandwidth / exp units).</dd>
-<dt>Low precision</dt><dd>FP8 is routine; <b>4-bit (NVFP4)</b> was used for a full <b>pretraining</b> run (NVIDIA, 12B/10T tokens). Know NVFP4 vs MXFP4 (block size + scale format).</dd>
-<dt>Speculative decoding</dt><dd>EAGLE-3 / Medusa / MTP are now a <b>default serving layer</b> (vLLM, TensorRT-LLM, SGLang), not an optimization.</dd>
-<dt>KV cache</dt><dd>PagedAttention (vLLM), <b>MLA</b> (low-rank latent K/V, DeepSeek), quantized KV.</dd>
-<dt>Hybrid attention</dt><dd>3:1 / 7:1 <b>linear + full attention</b> layouts (Qwen3-Next, MiniMax-01, Nemotron-H) are now consensus — not pure Transformer, not pure Mamba.</dd>
+<dt>Attention kernels</dt><dd>FlashAttention-3 (Hopper) → <b>FlashAttention-4</b> (Blackwell) — a new version exists because hardware scales <i>asymmetrically</i>: tensor-core throughput has grown faster than shared-memory bandwidth and exponential units.</dd>
+<dt>Low precision</dt><dd>FP8 training and inference have become more common on supported recent hardware/software stacks. NVIDIA research reports a 12B/10T-token pretraining experiment with <b>NVFP4</b>, but this does not make the format lossless or the default for every model and device. When comparing formats, inspect block size, scale format, accumulator, and evaluation protocol.</dd>
+<dt>Speculative decoding</dt><dd>EAGLE/Medusa/MTP-family methods are widely supported serving options. They help when draft overhead, acceptance rate, batch shape, and the latency target align; correct rejection or residual sampling is required to preserve the target distribution.</dd>
+<dt>KV cache</dt><dd>PagedAttention (vLLM), <b>MLA</b> (low-rank latent K/V, DeepSeek), and quantized KV.</dd>
+<dt>Hybrid attention</dt><dd>Several mixtures of linear or state-space blocks with full attention are being explored. Ratios such as 3:1 or 7:1 are design points from particular public models, not a universally agreed ratio.</dd>
 </dl>
 
-Details in [Mixed Precision & Efficiency](#/foundations/mixed-precision-efficiency) and [Distributed Training](#/foundations/distributed-training).
+See [Mixed Precision & Efficiency](#/foundations/mixed-precision-efficiency) and [Distributed Training](#/foundations/distributed-training) for details.
 
-## 7 · Evaluation is in crisis — and that's a great interview topic
+## 7 · Evaluation is in crisis — and that is a great interview topic
 
-As scores saturate, *trusting* them got hard:
+As scores on some popular benchmarks rise, determining what those scores mean and whether they are reproducible has become more important.
 
-- **The Llama 4 LMArena episode** (a chat-tuned variant used for the leaderboard) is the canonical "read benchmarks critically" case study.
-- **Berkeley RDI / BenchJack (2026):** an automated agent broke **8 major agent benchmarks by attacking the eval harness, not the task** (e.g., SWE-bench Verified → 100% via a `conftest.py` hook). Takeaway: **"benchmark integrity is now a security problem."**
-- **Cost-per-task and reliability curves** (not just top-1 accuracy) are becoming the reported unit, because test-time compute makes accuracy a function of spend.
+- Public leaderboards are hard to compare directly when model aliases, sampling settings, hidden prompts, judges, and decontamination conditions differ. More important than memorizing an incident name is the habit of requesting **versioned artifacts and a reproducible harness**.
+- **BenchJack (2026 preprint):** the paper identifies 219 exploitable flaws across 10 popular agent benchmarks and demonstrates that many can be scored highly without solving the intended task. Do not confuse the eight demonstrations summarized in a blog post with the ten benchmarks audited in the paper. The lesson is that **benchmark integrity is also a security problem**.
+- **Cost per task and reliability curves** should accompany top-1 accuracy. Increasing test-time compute moves latency and cost along with accuracy.
 
 > [!QUESTION] A favorite 2026 question
-> "SWE-bench Verified scores approach 90% — do you believe them?" A strong answer names contamination, harness reward-hacking (cite BenchJack), chat-tuned eval variants, and proposes private held-out sets + per-task cost/reliability reporting. See [Evaluation Metrics](#/foundations/evaluation-metrics).
+> "Very high scores are being reported on SWE-bench-family evaluations. How would you verify them?" A strong answer checks the benchmark and model version, contamination, harness exploits, sampling budget, and verification status, then proposes a private held-out set and reports per-task cost and repeated-run success. See [Evaluation Metrics](#/foundations/evaluation-metrics).
 
-## The through-line
+## The thread running through it all
 
-As raw accuracy saturates on old benchmarks, the field's attention has moved to **reliability, cost, long-horizon autonomy, and trustworthiness of measurement itself**. If you can articulate *that* meta-shift — and where your own work fits into it — you'll sound like someone who belongs at the frontier.
+As raw accuracy saturates on existing benchmarks, attention is shifting toward **reliability, cost, long-horizon autonomy, and the trustworthiness of measurement itself**. If you can explain *that* meta-shift—and where your own work fits within it—you will sound like someone working at the frontier.
 
-## Cheat-sheet
+## Cheat sheet
 
-| Ask | One-liner |
+| Question | One-line answer |
 | --- | --- |
-| Test-time compute | New scaling axis: spend inference compute (CoT/search) to raise accuracy (Snell 2024). |
-| RLVR vs RLHF | Verifier reward vs learned reward model; robust but only where correctness is checkable. |
-| GRPO / GSPO | Critic-free group-relative RL; GSPO does sequence-level ratios → stable MoE RL. |
-| MoE anchor | DeepSeek-V3: ~37B active of 671B total; report active vs total, mind load balancing. |
-| Native multimodal | Joint vision+text pretraining; dynamic-resolution ViT; SigLIP2/AIMv2 > CLIP. |
-| SAM 3 / DINOv3 | Promptable concept seg; 7B frozen SSL backbone beats specialized dense models. |
-| Agents | OSWorld human ≈72%, models ~61% (2025); GUI grounding is the bottleneck; METR ~7-mo doubling. |
-| Eval crisis | Contamination + harness hacking (BenchJack); report cost-per-task & reliability. |
+| Test-time compute | A new scaling axis: spend inference compute on CoT/search to improve accuracy (Snell 2024). |
+| RLVR vs RLHF | Verifier signal versus learned preference reward; both can game a proxy or harness and require audit. |
+| GRPO / GSPO | Critic-free group-relative RL; the GSPO paper reports better MoE stability with a sequence-level ratio. |
+| MoE anchor | DeepSeek-V3: ~37B active of 671B total; report active versus total and watch load balancing. |
+| Native multimodal | Multimodal data is integrated earlier in training; it does not necessarily imply a single-transformer architecture. |
+| SAM 3 / DINOv3 | Promptable concept segmentation; up-to-7B SSL backbone with Gram anchoring—state the version and evaluation scope. |
+| Agents | Separate verified/vendor OSWorld results and environment versions; METR doubling is a methodology-dependent trend, not a law. |
+| Evaluation crisis | Contamination plus harness hacking (BenchJack); report cost per task and reliability. |
 
 **Related:** [LLM Fundamentals](#/llm/fundamentals) · [Reasoning](#/llm/reasoning) · [Alignment](#/llm/alignment) · [Agents](#/llm/agents) · [Vision Foundation Models](#/cv/foundation-models)
+
+## Primary sources used for this update
+
+- [Tülu 3: RL with Verifiable Rewards](https://arxiv.org/abs/2411.15124) · [GSPO](https://arxiv.org/abs/2507.18071)
+- [Official SAM 3 / SAM 3.1 overview](https://ai.meta.com/blog/segment-anything-model-3/) · [Official DINOv3 publication](https://ai.meta.com/research/publications/dinov3/)
+- [FlashAttention-4](https://arxiv.org/abs/2603.05451) · [NVIDIA NVFP4 pretraining report](https://arxiv.org/abs/2509.25149)
+- [METR time horizons](https://metr.org/time-horizons/) · [BenchJack](https://arxiv.org/abs/2605.12673)
+
+> [!NOTE] How to read the sources
+> A paper or official document is a primary source for **what its authors reported**. It does not automatically establish that the result was independently reproduced or remains state of the art.

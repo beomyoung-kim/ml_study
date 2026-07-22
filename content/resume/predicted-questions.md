@@ -1,31 +1,34 @@
-# Predicted Questions & Answers
+# Predicted Questions & Answer Drafts
 
 <div class="tag-row"><span class="tag">research narrative</span><span class="tag">project probes</span><span class="tag">research→product</span><span class="tag">motivation</span><span class="tag">curveballs</span><span class="tag badge-new">flagship</span></div>
 
 > [!TIP] Why this chapter matters
-> This is the chapter that wins loops. Interviewers rarely quiz you on your CV to check facts — they use it to test whether you can **narrate a research arc**, **own a specific contribution**, and **defend choices under pressure**. Below is a bank of the questions most likely to come from *this* CV, each with the interviewer's hidden intent, **2–3 distinct model answers by angle**, a probable **follow-up**, and a one-line **rebuttal tip**. Internalize the *structure and the trade-offs*, not the sentences.
+> This chapter is a question bank for preparing both CV fact checks and research deep-dives. Interviewers may cross-check claims, personal contributions, design choices, and limitations. Each question includes a possible intent, an **unverified answer draft**, a follow-up, and a defense point. Do not memorize the wording; rewrite it around real evidence and trade-offs you are allowed to disclose.
+
+> [!IMPORTANT] These are answer drafts, not a system of record
+> The sentences below are rehearsal drafts derived from the resume, public papers, and local submissions. Use ownership that the resume states explicitly—creating ZIM, building the FaceSign anti-spoofing model, and independently developing the on-device model—while personally verifying any more detailed role, product requirement, conflict, internal comparison, or figure. Delete unverified narratives. Always disclose work under review as **under review**, and discuss methods, evaluation design, and trade-offs only within the approved public scope.
 
 ## How to use these answers
 
 <div class="proscons"><div><div class="pros-t">Do</div>
 <b>Internalize, don't memorize.</b> Learn the <i>spine</i> of each answer — the claim, the evidence, the trade-off — then rebuild it live in your own words. A recited answer dies on the first follow-up; a understood one survives ten.
 <br><br>
-<b>Pick the angle to the room.</b> Each question offers a <b>technical-depth</b>, an <b>impact/product</b>, and a <b>concise/executive</b> variant. Read the interviewer: a FAIR panel wants depth and defensibility; a hiring manager wants impact and fit; a recruiter wants the 30-second version.
+<b>Pick the angle for the round.</b> A technical deep-dive may emphasize mechanism and ablations, a hiring-manager conversation scope and impact, and a recruiter conversation short facts and logistics. Confirm the actual agenda; do not infer a question style from a person's or company's name.
 </div><div><div class="cons-t">Don't</div>
 <b>Don't overclaim.</b> For confidential work (FaceSign, the foreground API, ongoing/under-review), speak to <b>framing and impact</b>, never invented numbers: <i>"I can share the framing; the specific internal metrics are confidential."</i> That line reads as integrity, not evasion.
 <br><br>
-<b>Don't blur "I" and "we".</b> Credit collaborators, but make <i>your</i> contribution unambiguous — the single most common reason research-track candidates get dinged.
+<b>Don't blur "I" and "we".</b> Credit collaborators, but make <i>your actual</i> contribution clear. There is no basis for ranking how often this issue causes rejection, but an answer with no evidence of ownership is a weak signal.
 </div></div>
 
-**Tailor per company** using the [Company Playbooks](#/process/companies): Meta wants publish-and-ship ownership; NVIDIA rewards systems/GPU fluency and intellectual honesty; Apple probes on-device/privacy constraints; Adobe wants PyTorch rigor + product sense; ByteDance folds it into hard coding rounds; Mistral asks "why us, not a US lab?"; Microsoft MSR centers the job talk. Every answer below can be re-pointed at one of those.
+Use the [Company Playbooks](#/process/companies) as a starting point for **company tailoring**, then retarget the answer using the actual job description, recent public research, and a recruiter-confirmed loop. Do not infer interview format or value weights from the company name alone.
 
-Deep-dives for the raw material: [ZIM](#/resume/zim) · [ECLIPSE](#/resume/eclipse) · [PointWSSIS & BESTIE](#/resume/pointwssis-bestie) · [FaceSign](#/resume/facesign) · [On-Device Seg](#/resume/on-device-segmentation) · [Grounded VLM/Agents](#/resume/grounded-vlm-agents). Behavioral framing: [STAR & The Story Bank](#/behavioral/star). Map: [Your CV → Interview Map](#/resume/overview).
+Deep-dives for the raw material: [ZIM](#/resume/zim) · [ECLIPSE](#/resume/eclipse) · [PointWSSIS & BESTIE](#/resume/pointwssis-bestie) · [Phoenix](#/resume/phoenix-mask-refinement) · [FaceSign](#/resume/facesign) · [On-Device Seg](#/resume/on-device-segmentation) · [Grounded VLM/Agents](#/resume/grounded-vlm-agents) · [Spatial-Reasoning Agent (under review)](#/resume/neurips26-spatial-reasoning). For short answers by round, use [Resume-Based Interview-Stage Answers](#/resume/interview-stage-answers); for behavioral framing, [STAR & The Story Bank](#/behavioral/star); for the full map, [Your CV → Interview Map](#/resume/overview).
 
 ---
 
 ## A · Research narrative & motivation
 
-The opener of almost every research-track loop. They are testing whether there's a *thesis* to your career or just a list of papers.
+A common opener in research-track conversations. It tests whether you can explain consistent problem selection and a next direction beyond listing papers.
 
 <details class="qa"><summary>"Walk me through your research."</summary>
 <div class="qa-body">
@@ -36,10 +39,10 @@ The opener of almost every research-track loop. They are testing whether there's
 "There's one thread: **making visual perception accurate and trustworthy under real-world constraints.** I started in **weakly/semi-supervised segmentation** — DRS, BESTIE, PointWSSIS — because the bottleneck to deploying perception is labels, so I attacked the label-efficiency frontier: how to get instance masks from image tags or a few points. Then **continual learning** — SSUL and ECLIPSE — because deployed models must absorb new classes without forgetting or storing old data. Then I scaled up to **foundation models** with ZIM, a promptable zero-shot matting model built on SAM. Across all of it the pattern is the same: *define the real bottleneck, then solve it with a data + architecture co-design rather than brute force.* Most recently I've moved up the stack to **grounded VLMs and training-free visual reasoning agents** — connecting language reasoning to pixel- and region-level evidence, and diagnosing when perception tools silently fail. So: pixels → labels → continual → foundation → grounded reasoning. Same obsession, higher abstraction."
 
 **Answer B — impact-first (for a hiring manager).**
-"Two-sentence version: I build perception that ships. Seven first-author papers at CVPR/ICCV/ECCV/NeurIPS, an ICCV 2025 Highlight for ZIM, and a consistent record of carrying that research into NAVER Cloud products — a foreground-segmentation API that beat commercial alternatives in internal eval, the anti-spoofing model behind a government-certified face-auth service, and an on-device segmenter running at ~10 ms. The research and the product feed each other: production tells me which problems are real, papers make the solutions rigorous."
+"Two-sentence version: I build perception that ships. I have seven first/co-first-author papers at major venues, an ICCV 2025 Highlight for ZIM, and a record of contributing research to NAVER Cloud products — a foreground-segmentation API, anti-spoofing for a certified face-authentication service, and an on-device segmenter at about 10 ms. Within the public scope, the consistent link is that research rigor and product constraints make each other's problems clearer."
 
 **Answer C — concise/executive (30 sec).**
-"I'm a computer-vision applied scientist. My arc goes from label-efficient and continual segmentation, to a segmentation/matting foundation model (ZIM, ICCV 2025 Highlight), and now to grounded vision-language models and visual reasoning agents. The constant is perception that's accurate, efficient, and verifiable enough to put in front of millions of users — which I've done at NAVER Cloud."
+"I'm a computer-vision applied scientist. My arc goes from label-efficient and continual segmentation to a segmentation/matting foundation model, ZIM, which received an ICCV 2025 Highlight, and now to grounded vision-language models and visual reasoning agents. The constant is treating accuracy, efficiency, and verifiability together with real product constraints."
 
 **Follow-up:** "Which of these do you consider your best work, and why?"
 **Rebuttal tip:** Name ZIM for *reach* (foundation + Highlight + product), or PointWSSIS for *elegance* (redefining the proposal bottleneck) — but justify by **the idea**, not the venue. "Best" = clearest problem redefinition, not highest citation count.
@@ -55,7 +58,7 @@ The opener of almost every research-track loop. They are testing whether there's
 "The thread is **cheap or weak signals → reliable structured perception.** DRS and BESTIE: image tags → instance masks. PointWSSIS: a few points → full masks. ECLIPSE: a frozen model + tiny prompts → new classes without forgetting. ZIM: coarse SA-1B labels → fine alpha mattes via a label converter. Even the agents work is the same move at the top of the stack: noisy specialist tool outputs → a verifiable, self-diagnosing reasoning program. I'm consistently drawn to the gap between *what supervision you can afford* and *what fidelity the product needs*, and I close it with data + architecture design."
 
 **Answer B — honest about the environment (owns the constraint).**
-"Both, honestly, and I think that's a strength. Working at NAVER Cloud meant real products surfaced real bottlenecks — labeling cost, category drift, latency, boundary quality. But *which* bottleneck to elevate into a paper, and *how* to frame it so it generalizes beyond our product, was my call. PointWSSIS came from a labeling-budget pain point, but the contribution — that the proposal stage, not the mask head, is the true bottleneck in semi-supervised instance segmentation — is a general insight. That's the taste part."
+"Both the industry environment and my research interests influenced the work. For each project, I will verify from records whether it came from a specific product pain point and whether I owned the problem framing. The verifiable commonality is that the papers evaluated practical constraints such as labeling cost, continual updates, and boundary fidelity as generalizable research problems."
 
 **Follow-up:** "So what problem would you pick next, with total freedom?"
 **Rebuttal tip:** Have a real answer ready — "verifiable spatial reasoning: perception tools that report their own uncertainty so an agent knows when to distrust them." It proves the thread is forward-looking, not a retrofit.
@@ -71,13 +74,13 @@ The opener of almost every research-track loop. They are testing whether there's
 "It's not a pivot away from perception — it's perception finding its role in the new stack. End-to-end VLMs are strong but they **hallucinate** and produce *unsupported textual descriptions*: the answer can be right while the visual evidence is wrong — spurious success. My whole background is high-fidelity, region- and pixel-level perception. That's exactly the missing ingredient: grounding language reasoning in verifiable visual evidence, and giving agents *specialist tools* (like ZIM-quality masks or depth) so they can reason about 3D and time. The interesting new problem is that those tools **fail silently** — they return a plausible-but-wrong box or mask with no exception — so my current work turns those silent failures into *typed diagnoses* that drive targeted program repair. I'm not leaving perception; I'm making it the trustworthy tool layer under reasoning."
 
 **Answer B — market/product logic (impact).**
-"Products moved. Image editing, robotics, UI agents — they all need to *resolve a region from a language query* and act on it verifiably. A pure end-to-end model that describes an image isn't enough when a user says 'remove the person on the left' or a robot must reason about which object is behind another. My perception work is the substrate for that. The pivot is following where the value is, and I happen to have the exact background the value requires."
+"Applications such as image editing, robotics, and UI agents need to connect a language query to a region, object, or action and then inspect the result. Whether an end-to-end model or modular tool use is better depends on the task, but my perception research provides a foundation for analyzing grounding and tool reliability."
 
 **Answer C — concise.**
-"Because the frontier moved from 'can a model perceive?' to 'can a model reason over perception without lying about it?' Grounding and agentic tool-use are how you answer that, and my perception depth is the differentiator, not a sunk cost."
+"Alongside perception quality, it has become important to connect outputs to evidence and detect failures. Grounding and agentic tool use are design axes for that problem, and my perception depth is the bridge."
 
 **Follow-up:** "If frontier VLMs keep improving, doesn't your modular/agent approach become obsolete?"
-**Rebuttal tip:** Concede they're strong, then name the residual: **precise measurement, verifiable evidence, upgrading a module without retraining the whole model, and diagnostic repair.** Hybrid is the practical default even as end-to-end improves — that's your defensible position, not a bet against scale.
+**Rebuttal tip:** Acknowledge the strengths of end-to-end models, then discuss both the potential benefits and costs of modular approaches: precise measurement, inspectable traces, and module upgrades versus orchestration cost and tool-error accumulation. A hybrid is a design candidate to compare, not an automatic default.
 
 </div></details>
 
@@ -87,10 +90,10 @@ The opener of almost every research-track loop. They are testing whether there's
 **Testing:** rigor and independence — is the industry job the "real" work and the PhD a formality, or are they genuinely one program?
 
 **Answer A — integration (reframe).**
-"They're the same program, which is unusual and I think it's my edge. My PhD problems *come from* production — PointWSSIS from labeling cost, ECLIPSE from category drift in a live API, ZIM from an editing product needing fine masks. So my papers are pre-validated against reality, and my products get academic rigor: ablations, baselines, honest failure analysis. Seven first-author top-venue papers and an ICCV Highlight *while shipping* is the proof it's not a side project — most people do one or the other."
+"They run on separate schedules, but form a program in which problem selection and validation practice reinforce each other. Product experience exposes practical constraints such as labeling cost, category drift, latency, and boundary quality; research training enforces ablations, baselines, and failure analysis. My strength is being able to explain seven first/co-first-author papers, an ICCV Highlight, and deployment experience together. I will connect a paper directly to a product only when that relationship is factual."
 
 **Answer B — independence signal.**
-"I drive the research. I'm first author on seven papers, I set the problem framing, ran the experiments, wrote the code that's open-sourced and adopted. Prof. Sung Ju Hwang at KAIST MLAI advises the direction and sharpens the framing; the execution and the specific contributions are mine. The full-time role gives me data and product context academia rarely has."
+"First/co-first-author status is public, but it does not automatically prove contribution scope. For each project, I will create a table of which parts of architecture, data, evaluation, and writing I actually owned and which parts collaborators owned, then answer only with verifiable decisions."
 
 **Follow-up:** "How do you manage the time and the two sets of priorities?"
 **Rebuttal tip:** Don't romanticize the hustle. Frame it as *alignment* — you chose problems where the product need and the publishable question overlap, so you're not paying the cost twice. That's judgment, not just stamina.
@@ -106,10 +109,10 @@ Expect the interviewer to pick one project — usually ZIM or whichever matches 
 <details class="qa"><summary>ZIM — "Why couldn't you just fine-tune SAM on matting data?"</summary>
 <div class="qa-body">
 
-**Testing:** do you understand *why* the naive baseline fails — the core motivation of your own Highlight paper. Fumbling here is fatal.
+**Testing:** can you explain the paper's core motivation and the failure mode of the public-matte baseline accurately?
 
 **Answer A — the failure mode (technical).**
-"We tried; it collapses. Public matting data is dominated by **macro** targets — full portraits, salient whole objects. Fine-tune SAM on that and it *forgets its micro granularity*: give it a point prompt on a strand of hair or a small part and it regurgitates the whole person. You trade away the zero-shot promptability that made SAM valuable. Our ablation makes it stark — same architecture trained on public mattes gives fine-grained SAD around 120 versus about 10 for our converted data. **Data granularity dominates architecture.** So instead of fine-tuning on the wrong distribution, we built a **label converter** that turns SA-1B's ~1B coarse masks into fine alpha mattes, with Spatial Generalization Augmentation and Selective Transformation Learning to control noise — then trained on that."
+"In the paper's public-matte baseline, micro-level generalization degrades sharply because public matting data is biased toward macro targets. In the same-architecture comparison, fine-grained SAD is about 120 versus about 10 when trained on SA1B-Matte, showing that data granularity is load-bearing. We therefore use a **label converter** with SGA and STL to turn SA-1B-derived coarse masks into fine alpha mattes. I would not mix image counts with mask-instance counts; the public paper reports training on 1% and about 2.2M matte labels, and I would state those units explicitly."
 
 **Answer B — the design principle (concise).**
 "Because the problem isn't the loss, it's the data contract. SAM's supervision is coarse and hard-masked; matting needs soft, micro-level boundaries. Fine-tuning on macro portrait data destroys the promptable zero-shot behavior. We generated micro-granular matte labels at SA-1B scale via a converter, plus a hierarchical pixel decoder and prompt-aware masked attention to actually render fine detail. That's why it stays zero-shot *and* produces mattes."
@@ -117,8 +120,7 @@ Expect the interviewer to pick one project — usually ZIM or whichever matches 
 **Follow-up:** "What does the hierarchical pixel decoder buy you, concretely?"
 **Rebuttal tip:** SAM's stride-4 decoder + naive upsample causes **checkerboard artifacts** and loses fine structure; the multi-level (stride 2/4/8) fusion recovers high-res detail for ~10 ms overhead. Have that number and the mechanism ready — see [ZIM](#/resume/zim).
 
-</details>
-</div>
+</div></details>
 
 <details class="qa"><summary>ZIM — "Prompt-aware masked attention: where do you apply it, and why not everywhere?"</summary>
 <div class="qa-body">
@@ -142,13 +144,13 @@ Expect the interviewer to pick one project — usually ZIM or whichever matches 
 **Testing:** the stability–plasticity trade-off, and whether you can defend an extreme design choice.
 
 **Answer A — the trade + the levers (depth).**
-"Freezing Mask2Former after step 1 makes forgetting *structurally impossible* — old weights never move — which is why we beat distillation-based methods like CoMFormer on all-PQ over long class sequences, with only ~1.3% trainable parameters and no need to store old data. The cost is exactly what you'd fear: **error propagation** (a step-1 mistake is frozen in) and limited plasticity. We recover plasticity two ways: **deep visual prompts** at every transformer layer (deep vs shallow lifts new-class PQ meaningfully for ~100K params), and a stronger frozen init (Swin-L / COCO-pretrained) which raises the ceiling. And **logit manipulation** handles the no-obj semantic drift — the meaning of 'background' changes every step, so a fixed no-obj classifier is untrustworthy; we recompute it from the other classes' logits post-hoc. So it's not 'give up on new classes,' it's 'buy stability for free, then spend a little to rent back plasticity.'"
+"Freezing Mask2Former parameters after step 1 prevents old-weight drift and reduces forgetting, but it does not preserve final old-class outputs exactly. Error propagation can still arise through new prompts and aggregation, and plasticity is limited. The paper addresses this trade-off with deep visual prompts, stronger frozen initialization, and logit manipulation for the changing meaning of no-object. I would keep claims within the public ADE20K protocol and the result using about 1.3% trainable parameters."
 
 **Answer B — product framing (impact).**
-"In a live segmentation API, you add categories constantly and you often *can't* keep old training data for privacy/storage reasons. ECLIPSE lets you ship a small adapter per new category batch instead of retraining a 45M-param model or replaying old data. That maps directly to on-device or privacy-constrained update stories — Apple-flavored."
+"A product hypothesis is that a new-class adapter can help in settings where replaying old data or fully retraining is difficult. The paper alone, however, does not prove deployment in an actual API, on-device suitability, or privacy compliance. I would connect it to this trade-off only when the job description actually contains that constraint."
 
 **Follow-up:** "Why panoptic, not just semantic continual learning?"
-**Rebuttal tip:** Panoptic is strictly harder — instance matching *and* stuff *and* the shifting no-obj definition all at once, and PQ punishes recognition failures (RQ). Continual panoptic was under-studied vs semantic; that gap is part of the contribution. See [ECLIPSE](#/resume/eclipse).
+**Rebuttal tip:** Panoptic adds instance matching, stuff, and a changing no-object definition to semantic prediction, while PQ is also sensitive to recognition failures. Explain these as additional problem structure rather than a simplistic difficulty ranking. See [ECLIPSE](#/resume/eclipse).
 
 </div></details>
 
@@ -158,13 +160,29 @@ Expect the interviewer to pick one project — usually ZIM or whichever matches 
 **Testing:** whether you redefined a problem or just tuned one — the difference between a strong CVPR paper and an incremental one.
 
 **Answer A — the redefinition (depth).**
-"The insight is that in instance segmentation the bottleneck isn't the mask head, it's the **proposal stage**. Semi-supervised methods fight a false-negative / false-positive trade-off on pseudo-labels: lower the confidence threshold and you drown in false positives, raise it and you erase real instances — because *if there's no proposal, an expressive mask branch still outputs nothing.* So I changed the supervision: a few full masks plus many cheap **point** labels, where the point directly resolves the proposal ambiguity — it filters teacher proposals down to true positives. Then Adaptive Pyramid-Level Selection handles the missing scale information a point doesn't carry, and MaskRefineNet cleans rough masks when full labels are scarce. Result: COCO at 5% full labels goes from ~24.9 AP (prior SSIS) to 33.7, and at 50% we nearly match fully-supervised. The move is *relocating the bottleneck*, not tuning a threshold."
+"The insight is that one major bottleneck in semi-supervised instance segmentation is the proposal stage. Lowering the threshold increases false positives; raising it can miss instances. Point labels add location information and reduce proposal ambiguity, APS handles scale selection, and MaskRefineNet refines rough masks. The paper reports 33.7 AP versus a 24.9 comparison baseline in the COCO 5% full-label setting, and 38.8 versus the 39.7 fully supervised reference in the 50% setting. I would cite the protocol and label budget together and would not claim that points eliminate error entirely."
 
 **Answer B — the lineage (concise).**
 "BESTIE showed you can push image-tags → instances but you're capped by pseudo-label drift. PointWSSIS asks: what's the cheapest signal that removes the *proposal* bottleneck specifically? A point. It's a targeted intervention on the real bottleneck, which is why the gap at low label budgets is large, not marginal."
 
 **Follow-up:** "Does the point have to be the centroid?"
 **Rebuttal tip:** No — random-in-mask works about as well as centroid (SOLOv2 tolerates diverse in-region points), which makes the labeling even cheaper. That robustness is itself an ablation-backed selling point. See [PointWSSIS & BESTIE](#/resume/pointwssis-bestie).
+
+</div></details>
+
+<details class="qa"><summary>Phoenix — "Using adversarial attacks to generate data — isn't that just a fancier version of morphological noise?"</summary>
+<div class="qa-body">
+
+**Testing:** can you explain why existing refiners are insufficient and defend the adversarial reinterpretation as a principled choice rather than a trick — the core motivation of the ECCV '26 paper?
+
+**Answer A — failure mode + principle (technical).**
+"Morphological noise transforms ground-truth boundaries independently of the image or current model, whereas AMP creates hard perturbations along embedding-space directions that increase the current decoder loss. The paper's edge-correlation analysis and ablations report a different distribution and effect from morphology-only noise. I would not equate gradient magnitude with calibrated predictive uncertainty. A guidance mask controls expansion, contraction, and inversion, while CMRL learns the relationship among ground-truth, noisy, and refined masks."
+
+**Answer B — impact/lineage (concise).**
+"This work generalizes the pseudo-label-quality problem addressed by PointWSSIS's MaskRefineNet into training-pair generation for refiners. It combines AMP and CMRL and reports gains of up to 16.1 AP points under the paper's weakly and semi-supervised refinement protocols. Phoenix and ZIM use the SAM family while ECLIPSE uses Mask2Former, but they connect at a higher-level design axis: preserving a pretrained trunk and adapting with a small module."
+
+**Follow-up:** "Why attack embedding space rather than pixels?"
+**Rebuttal tip:** Efficiency plus semantic-level perturbation. It reuses the frozen 637M-parameter encoder's image embedding and updates only a lightweight decoder in about 6 ms per iteration, while perturbing high-level semantics rather than pixel noise. AMP alone gives +4.6, CMRL alone +1.5, and together +6.4, a **synergy** larger than the individual gains' sum because realistic noise makes the three-way contrast more meaningful. See [Phoenix](#/resume/phoenix-mask-refinement).
 
 </div></details>
 
@@ -196,23 +214,23 @@ Expect the interviewer to pick one project — usually ZIM or whichever matches 
 "Every later paper is traceable to these two: DRS → attention shaping → BESTIE; SSUL → unstable background → ECLIPSE. Early, but load-bearing."
 
 **Follow-up:** "SSUL was co-first-author — what was *your* part?"
-**Rebuttal tip:** Be specific and generous: name the piece you drove (the segmentation modeling / unknown-class handling) and credit the co-author's part (the incremental-learning framing) without diluting your ownership. Vague "we did it together" reads as a red flag on a co-authored paper.
+**Rebuttal tip:** Fill in `[design, experiments, and writing I owned] / [the co-author's part] / [joint decisions]` from source records. Do not preassign segmentation modeling or unknown-class handling to yourself.
 
 </div></details>
 
 <details class="qa"><summary>FaceSign — "Tell me about the anti-spoofing model. What accuracy did you hit?"</summary>
 <div class="qa-body">
 
-**Testing:** two things at once — do you understand face anti-spoofing deeply, *and* do you handle a confidentiality boundary gracefully (a real signal for Apple/regulated roles).
+**Testing:** do you understand the basic threats and evaluation in face anti-spoofing, and can you handle both confidentiality boundaries and actual ownership accurately?
 
 **Answer A — decline-then-deliver (the model to imitate).**
-"The specific accuracy, attack-set composition, and architecture are confidential — it's a government-certified payment and badge-auth service, so I'm contractually and ethically bound there. What I *can* give you is the framing. Anti-spoofing sits between capture and recognition: detect/align → **liveness / presentation-attack detection** → recognize. If a presentation attack — print, replay, 3D mask, and separately digital injection — gets through, it doesn't matter how good recognition is; the system fails. The hard part isn't the easy print attack, it's **domain generalization**: unseen phones, lighting, demographics, and novel attack instruments. We evaluate with the APCER/BPCER/ACER frame (ISO/IEC 30107) and choose an operating point against the recognition FRR based on the required security level. False rejects cost you conversions, so step-up fallback (password) matters as much as the detector."
+"Within the scope stated on my resume, I built the anti-spoofing model behind FaceSign. My detailed scope inside the model was `[confirmed architecture, training, and evaluation scope]`. I will not share accuracy, attack-set composition, or architecture that is not approved for disclosure. In general, presentation-attack detection covers print, replay, and 3D masks, while digital injection needs a separate pipeline-integrity layer; APCER and BPCER must also be distinguished from recognition FAR and FRR."
 
 **Answer B — the systems view (concise).**
-"I owned the anti-spoofing component. I can't share numbers on a certified security product, but I can talk about the threat model, the sensor trade-offs (RGB-only vs depth/IR), the evaluation frame, and the operating-point trade-off between security and approval rate. It's a *system* problem — sensing + model + risk policy — not just a classifier."
+"The public resume explicitly records that I built the anti-spoofing model. I will separate that model-level ownership from ownership of the whole FaceSign system, data, and deployment. I can explain `[one or two real model decisions]` within the record and disclosure boundary, then discuss the general FAS threat model, sensing, and operating-point trade-offs without presenting them as internal implementation facts."
 
-**Follow-up:** "How would you compare it to Apple Face ID?"
-**Rebuttal tip:** Don't invent a comparison. Face ID is famous for *hardware co-design* (structured-light dot projector); your work is service-side model + operations. Shared DNA: "sensing + model + policy as one system." No head-to-head numbers exist — say so. See [FaceSign](#/resume/facesign).
+**Follow-up:** "How would you compare it with a publicly documented hardware-co-designed biometric system?"
+**Rebuttal tip:** Use public architectures only as general examples; do not infer FaceSign's sensors, pipeline, or your role. If there is no head-to-head protocol, do not rank them. See [FaceSign](#/resume/facesign).
 
 </div></details>
 
@@ -222,10 +240,10 @@ Expect the interviewer to pick one project — usually ZIM or whichever matches 
 **Testing:** systems/efficiency reasoning and whether you understand *why* on-device matters — not just that you hit a number.
 
 **Answer A — frame-budget engineering (depth).**
-"10 ms isn't a magic number, it's a **frame-budget** result. Real-time UX is ~30 fps ≈ 33 ms/frame, and segmentation shares that budget with camera preprocessing, post-processing, other models, and the UI. Give segmentation ~10 ms and the whole pipeline holds; give it 20 and you drop frames. The reason it's *on mobile CPU* rather than server is privacy (frames never leave the device) and cost (no per-inference server bill), plus offline capability. I designed for the worst common denominator — CPU, not a specific NPU — so it runs everywhere. I got there by cutting the biggest levers first: input resolution, channel width, decoder depth; then distillation from a heavy teacher to keep boundary quality; QAT last, because quantizing first kills hair and fine boundaries before anything else."
+"My resume records that I independently developed this human-segmentation model and achieved about 10 ms on a mobile CPU. In a 30-fps pipeline's roughly 33 ms budget, I will attach the actual device, input, runtime, thread setting, and statistic to that figure. I will explain the real product reason for the CPU target and only the levers I actually compared—such as resolution, width, or decoder depth—along with the target-device quality–latency trade-off at each verified stage."
 
-**Answer B — the two-tier story (impact, Apple-flavored).**
-"It's the on-device half of a two-tier strategy: a heavy cloud foundation model (ZIM-class) provides quality and acts as a distillation teacher; a tiny distilled + quantized student runs on-device at ~10 ms for the frame budget and privacy. That 'cloud foundation + on-device specialist' split is exactly the pattern modern products need, and I've built both ends of it."
+**Answer B — the two-tier story (impact).**
+"Separating a cloud foundation model from an on-device specialist can optimize quality, latency, and cost differently. What my resume verifies is independent model development, about 10 ms on a mobile CPU, and ONNX-based in-house serving. I will not infer that ZIM was the teacher, that distillation or quantization was used, or that the model shipped directly inside a phone app without separate records."
 
 **Follow-up:** "You said ONNX serving — is it really on the phone CPU or on a server?"
 **Rebuttal tip:** Be precise, because the CV wording invites this: the *model* was designed and measured for a mobile-CPU budget; the *serving path* was ONNX-based in-house infra. Distinguish design target from deployment infra rather than overclaiming a phone deployment you can't detail. See [On-Device Seg](#/resume/on-device-segmentation).
@@ -235,10 +253,10 @@ Expect the interviewer to pick one project — usually ZIM or whichever matches 
 <details class="qa"><summary>Ongoing agents — "Your NeurIPS submission is under review. Walk me through it."</summary>
 <div class="qa-body">
 
-**Testing:** can you present unpublished work with real substance while respecting the "don't overclaim / don't leak" line — and without sounding vaporous.
+**Testing:** can you explain the problem and mechanism clearly while respecting the status and disclosure boundaries of work under review?
 
 **Answer A — problem-first framing (the safe, strong version).**
-"It's under review, so I'll give you the problem and the framing rather than final numbers or claim acceptance. The setting is **visual program synthesis** for 3D spatial reasoning — an LLM writes an executable program that calls specialist vision tools (detection, depth, segmentation). The failure I care about is **silent perception failure**: a tool returns a plausible-but-wrong output — a bad box, a wrong depth — and because there's no exception, the program runs to completion and emits a *confidently wrong* answer. My framework turns those silent failures into **typed diagnoses**, and uses the diagnosis to drive **targeted program repair**. The goal is to rival frontier VLMs on 3D spatial reasoning **without task-specific training**. The public lineage is VisProg / ViperGPT (program synthesis) and VADAR (dynamic API generation for 3D); my angle is the diagnose-and-repair loop on silent failures."
+"Because it is under review, I will not discuss comparative conclusions, models, benchmarks, or figures; I will explain only the approved problem and mechanism. The setting is visual program synthesis for 3D spatial reasoning, and the failure of interest is a **silent perception failure** in which a tool returns an incorrect box or depth without an exception. The submission compares a structured scene hypothesis with an execution trace to create a **typed diagnosis** and connect it to targeted repair. Its public lineage is VisProg, ViperGPT, and VADAR, and any exact differentiation claim will stay within the submission's related-work scope."
 
 **Answer B — why-it-matters (concise).**
 "Agents that call vision tools break not because the LLM plans badly but because the *tools* lie quietly. I make those silent failures observable and repairable, targeting frontier-level 3D spatial reasoning training-free. Details and numbers are pre-publication."
@@ -268,18 +286,18 @@ Expect the interviewer to pick one project — usually ZIM or whichever matches 
 
 ## C · Research → product & impact
 
-The Applied-Scientist differentiator. RS candidates who can't ship get filtered to engineering tracks; you have the opposite problem's cure — prove the shipping is real and rigorous.
+Applied-scientist roles may test research quality and delivery experience together. Prove public research results, product artifacts, and personal ownership separately.
 
-<details class="qa"><summary>"Your foreground-segmentation API beat Photoroom, Remove.bg, and Adobe. Prove it — how did you measure that?"</summary>
+<details class="qa"><summary>"How would you defend the internal-comparison claim for the foreground-segmentation API?"</summary>
 <div class="qa-body">
 
 **Testing:** rigor and honesty behind a big claim. A bold benchmark claim with no methodology is a red flag; with methodology it's a green one.
 
-**Answer A — methodology-first (rigor).**
-"It was an **internal evaluation**, so I'll be precise about scope: I can share the *framing*, not the confidential per-competitor numbers. We built an evaluation set representative of our product's real inputs — the failure-prone cases matter most: hair, fine boundaries, semi-transparency, multi-person, hard lighting. We scored with boundary-focused metrics (boundary F-score, SAD-style boundary error) plus human visual review, because mIoU alone hides exactly the boundary quality customers notice. Against the same inputs, our model + data pipeline came out ahead of those commercial APIs on *our* distribution. The honest caveat is it's our test set and our domain — I wouldn't claim universal superiority, and I'd say that in the room."
+**Answer A — verification first (rigor).**
+"My resume states that I developed the model and dataset for the foreground-segmentation API, that it is served internally, and that it outperformed the Photoroom, Remove.bg, and Adobe segmentation APIs in an internal evaluation. I can state that resume-backed headline while bounding it to a particular time, domain, and internal protocol rather than claiming universal superiority. Within the approved scope, I will explain the dataset source, sampling date, API versions, input/output normalization, metrics and human review, and confidence intervals; I will not invent undisclosed figures or slices."
 
-**Answer B — the moat (product).**
-"The win wasn't a bigger model, it was **data**. The differentiator was curating boundary-hard training data matched to our product distribution and a pipeline tuned for the boundaries users actually see. Off-the-shelf APIs optimize for a generic distribution; we optimized for ours. That's a defensible, repeatable advantage, and it's the same data-first lesson as ZIM — the data contract decides quality."
+**Answer B — when the public scope is narrow.**
+"I will clearly state the scope already disclosed on my resume—model and dataset development, internal serving, and the named three-API internal comparison. If the protocol or figures are not approved for disclosure, I will not improvise them; instead I will explain why foreground quality should include boundaries, transparency, failure slices, and latency in addition to mean IoU, along with the data and model decisions I actually owned."
 
 **Follow-up:** "Is this the same model as ZIM?"
 **Rebuttal tip:** No — don't conflate them. The API is a product line (internal serving); ZIM is a promptable zero-shot foundation model. Shared DNA (boundary quality, data curation), different artifacts. Claiming they're one model is the kind of overclaim that unravels under follow-up.
@@ -292,10 +310,10 @@ The Applied-Scientist differentiator. RS candidates who can't ship get filtered 
 **Testing:** whether you've actually shipped research, or just tossed a checkpoint over the wall. The interesting answer is the friction.
 
 **Answer A — the handoff frictions (systems).**
-"The public detail I can share is that it shipped and I presented it at TEAM NAVER DAN 24; the exact SLAs are internal. The real work was the *handoff*, and that's where research-to-product usually breaks: (1) **representation mismatch** — the editor expects a specific alpha format (premultiplied vs not, color spill handling), not just a raw matte; (2) **latency** — a ViT-B matte model runs on the order of ~180 ms on a V100, which is fine for a batch tool but must be managed for interactive UX via resolution control, model tiering, and caching; (3) **failure monitoring** — hair and semi-transparency are where mattes fail, so you need a fallback (e.g. hard-threshold) and monitoring; (4) **API compatibility** — existing clients expected hard masks, so the soft-matte output had to slot in without breaking them. Shipping is 20% model, 80% these contracts."
+"The publicly verifiable facts are the TEAM NAVER DAN 24 presentation and the CLOVA-X Image Editing integration. My direct production scope is `[confirmed ownership]`. A general matte-integration checklist includes alpha representation, resolution, latency, API compatibility, monitoring, and fallback, but I will not claim without evidence that this project used caching, tiering, or particular thresholds. I will choose one real, shareable friction and explain the decision and outcome."
 
 **Answer B — concise (impact).**
-"I open-sourced ZIM with a demo and integrated it into CLOVA-X image editing. The lesson: the model was the easy part. Format handoff to the editor, interactive-latency budgeting, and failure fallbacks for hair/transparency were where the real engineering went. Internal SLAs are confidential, but the framing is standard research-to-product hardening."
+"ZIM's public code and demo, and its CLOVA-X integration, are verifiable. Between them, I will describe only handoff and failure-hardening work confirmed by actual records; if it cannot be disclosed, I will distinguish a general checklist from public project results."
 
 **Follow-up:** "How would you extend it to video editing?"
 **Rebuttal tip:** SAM2-style memory + temporal consistency is the direction, and it's genuinely unsolved for matting — say so. Flickering alpha across frames is the hard part; don't pretend it's a trivial extension.
@@ -307,11 +325,11 @@ The Applied-Scientist differentiator. RS candidates who can't ship get filtered 
 
 **Testing:** product/business judgment and whether you understand *why* a company publishes.
 
-**Answer A — the strategic case.**
-"The published methods aren't the moat; the *data operations, integration, latency engineering, and domain adaptation* are. Open-sourcing ZIM, ECLIPSE, PointWSSIS, BESTIE bought us research brand, recruiting, and an ecosystem — Grounded-ZIM and downstream adopters (Inpaint-Anything, medical, 3D) came *because* it was open, which validates and extends the work for free. Meanwhile the foreground API and FaceSign — the things with direct commercial or security value — stayed internal. So the split is deliberate: publish the general method, protect the product-specific data and operations."
+**Answer A — draft strategic rationale.**
+"ZIM, ECLIPSE, PointWSSIS, and BESTIE have public code, which supports reproduction, follow-on use, and research adoption. Product data, customer evaluations, and security details, by contrast, may need protection. If I actually participated in deciding the disclosure boundary, I will explain the criteria and trade-offs. Otherwise I will not present the company's intent as my own decision; I will distinguish public outcomes from general IP principles."
 
 **Answer B — concise.**
-"Because the paper isn't the product. The advantage is in the data pipeline and the integration, which we don't publish. Open-sourcing the method is net-positive for brand, recruiting, and ecosystem — that's why the confidential things (the API, FaceSign) aren't open."
+"Open-source scope balances research reproducibility with product and security IP. I will describe the effect of public code through verifiable adoption and the nonpublic scope through company policy, without overstating it as a strategy I personally set."
 
 **Follow-up:** "So what *would* you keep closed here, if we hired you?"
 **Rebuttal tip:** Show you can reason about *their* IP, not just recite NAVER's policy — "product-specific data, eval sets tied to real customers, and anything safety/abuse-related; general methods I'd push to publish." That's the maturity they're checking for.
@@ -322,42 +340,39 @@ The Applied-Scientist differentiator. RS candidates who can't ship get filtered 
 
 ## D · Career, motivation & fit
 
-Recruiter and HM territory. These decide *fit*, and sloppy answers end loops even when the technical rounds are strong. Keep them honest, specific, and non-defensive.
+Recruiter and hiring-manager territory. These questions decide *fit*, and a loose answer can end a loop even when the technical rounds are strong. Keep answers honest, specific, and non-defensive.
 
 <details class="qa"><summary>"Why leave NAVER after 5+ years?"</summary>
 <div class="qa-body">
 
-**Testing:** are you running *toward* something (good) or *away* from something (risk)? Bitterness or vagueness both hurt.
+**Testing:** are you moving *toward* something or merely *away* from something? Both bitterness and vagueness are risky.
 
 **Answer A — toward the frontier (positive pull).**
-"Five years at NAVER Cloud gave me something rare — a full research-to-product loop, from foundation models to APIs used by millions. I'm proud of it and I'm not leaving unhappy. I'm moving because the problems I now care most about — grounded, verifiable multimodal reasoning and visual agents at frontier scale — are where [company] is pushing hardest, with the compute, the multimodal data, and the peers to do it at a level I can't reach alone. I want to go from 'strong regional product research' to 'global frontier research,' and bring my perception-to-product discipline into that environment."
+"My time at NAVER Cloud gave me experience across public research and product touchpoints. I am not leaving by inferring or criticizing the limits of my current organization; I am interested because `[the target team's latest official research or job description]` aligns specifically with my next question in grounded multimodal reasoning. The evidence I bring is `[public project or verified role]`, and the point I want to learn and contribute in the new environment is `[confirmed team agenda]`."
 
 **Answer B — scope and scale (concise).**
-"I've maxed out the loop I can run inside one org. I want frontier-scale multimodal problems, a bigger research community around me, and the chance to work on grounded reasoning at a scale that needs the infrastructure [company] has. It's a pull toward the work, not a push away from NAVER."
+"Rather than answering that I want to get away from my current role, I am looking for the intersection between `[a role characteristic supported by official evidence]` and my `[verified experience]`. I will offer a concrete hypothesis for growth and contribution and confirm the actual team scope in the interview."
 
 **Follow-up:** "What specifically can't you do at NAVER that you could here?"
-**Rebuttal tip:** Be concrete and flattering-but-true: scale of multimodal pretraining, a specific team/agenda (name it — SAM/perception at Meta, physical-AI at NVIDIA, on-device foundation models at Apple, Firefly at Adobe), and the peer density. Avoid anything that sounds like a complaint about NAVER.
+**Rebuttal tip:** Cite one recent official paper, product, or job description; connect it to your evidence and a question you still need to verify. Do not merely list brands or assert what your current employer cannot do.
 
 </div></details>
 
 <details class="qa"><summary>"Why this company specifically?" (per-company)</summary>
 <div class="qa-body">
 
-**Testing:** homework and genuine fit. Generic answers are lethal here. Use the [Company Playbooks](#/process/companies).
+**Testing:** can you explain the real intersection between the role and your experience using current official evidence? Use the [Company Research Playbook](#/process/companies).
 
-**Meta (FAIR/VLM):** "My perception-to-grounding thread is the missing piece for product VLMs — SAM lineage is literally my starting point for ZIM, and grounded, verifiable reasoning is FAIR-adjacent. I publish *and* ship, which is the FAIR/Applied bar."
+Fill these four fields for each company, then combine them into one paragraph.
 
-**NVIDIA Research:** "Spatial reasoning and perception tools are the substrate for physical AI and robotics (GEAR/GR00T), and I care about efficient, deployable stacks — my on-device and ONNX work shows the systems side, and I'd lean into the GPU/systems fluency your labs value."
+| Evidence | What to fill in |
+| --- | --- |
+| **Official, dated signal** | One recent job description, team page, paper, or product |
+| **My evidence** | A public result such as ZIM, ECLIPSE, or PointWSSIS, or a verified product role |
+| **Contribution hypothesis** | The actual intersection in precise masks, low-label adaptation, grounding, or efficiency |
+| **Uncertainty to verify** | Team scope, publication policy, compute/data access, or loop format |
 
-**Apple (MLR / Multimodal):** "My two-tier story is your story: cloud foundation quality (ZIM) + on-device specialists at a real frame budget (~10 ms), under privacy and hardware constraints. I've shipped perception under exactly the accuracy-vs-latency-vs-battery trade-offs you optimize for, and I'm comfortable working without external visibility (FaceSign)."
-
-**Adobe (Firefly/Research):** "Grounded, region-controllable editing is precisely where ZIM and grounding meet Firefly — precise masks for generative fill, region-grounded edit programs. I have the PyTorch rigor and the creative-product sense the role needs."
-
-**ByteDance Seed:** "Vision generative foundation + controllable perception is where my matting/segmentation foundation work plugs in — SeedEdit/Seedream-style editing needs exactly the boundary and region quality I build, and I move fast."
-
-**Mistral AI:** "I value the open-weight conviction — I open-sourced most of my work for the same reasons. My contribution is bringing rigorous multimodal/perception grounding into a lab that's mostly LLM-centric, and I'm comfortable with the take-home-plus-defense format because defending my own work is what I do."
-
-**Microsoft MSR:** "MSR's job-talk, agenda-driven model fits how I already work — I've run a coherent multi-year agenda (label-efficient → continual → foundation → grounded) while collaborating across academia and product. I'd bring a perception-grounding agenda and strong collaboration signal."
+Answer scaffold: *"In `[dated official source]`, I saw the specific agenda `[X]`. What I learned from my verified project `[Y]` connects to the concrete gap `[Z]` in that problem. In the first year, I would like to test `[a falsifiable hypothesis]`, while confirming the team's actual priorities with you."* Do not infer company culture, interview format, or IP strategy from a name alone.
 
 **Follow-up:** "What would you want to work on in your first year?"
 **Rebuttal tip:** Name a real project on *their* roadmap that your skills uniquely serve — not a generic "learn the codebase." Specificity proves the fit is real.
@@ -370,13 +385,13 @@ Recruiter and HM territory. These decide *fit*, and sloppy answers end loops eve
 **Testing:** logistical seriousness — recruiters kill candidates who wobble here late.
 
 **Answer A — clear commitment.**
-"Yes — my CV says open to relocation and I mean it. I'm happy to discuss timing, visa sponsorship, and the KAIST PhD logistics openly; I've structured the PhD to be compatible with a move, and I'd want to align start dates so nothing is left ambiguous. If the role is remote-friendly or hybrid, I'm flexible on that too."
+"I will complete this answer only after confirming my actual intent and constraints: relocation `[possible / not possible / conditional]`, visa-sponsorship need `[ ]`, PhD defense and graduation timeline `[ ]`, and possible start-date range `[ ]`. I will not state unconfirmed adviser flexibility or a remote option as fact."
 
 **Answer B — concise.**
-"Fully willing to relocate; I'd just want to coordinate visa timeline and my PhD completion so we set a realistic start date. No hesitation on the move itself."
+"The conditions currently confirmed are `[ ]`, and I will coordinate the required visa and possible start date with the recruiter." Change this to a categorical answer only after the decision is final.
 
 **Follow-up:** "Does the PhD need to finish first?"
-**Rebuttal tip:** Have a real plan — remote completion, a defense timeline, or advisor flexibility. "It's in parallel and I've planned for continuity" beats a vague "we'll figure it out."
+**Rebuttal tip:** Confirm the defense timeline, earliest employment date, visa requirements, and physical-presence requirements with the relevant parties. Do not promise remote completion or adviser approval before confirmation.
 
 </div></details>
 
@@ -386,10 +401,10 @@ Recruiter and HM territory. These decide *fit*, and sloppy answers end loops eve
 **Testing:** self-awareness and fit to the specific track (RS vs AS vs MLE). The wrong self-label mismatches you to the loop.
 
 **Answer A — the applied-scientist identity.**
-"Applied scientist, genuinely both. I find the accuracy–cost Pareto with real experiments — ablations, baselines, honest failure analysis — *and* I close the last mile: ONNX export issues, latency budgets, production handoffs. My papers come from product bottlenecks and my products carry academic rigor. If your role is pure long-horizon RS I can do the research depth; if it's AS I'm already living that hybrid. I'd rather be judged on 'ships rigorous research' than on a title."
+"Applied scientist is the closest identity. In public papers I worked with ablations, baselines, and failure analysis; in resume-listed product work I handled latency and deployment constraints. I will mention a specific ONNX issue or handoff ownership only when there is a verified example. I will also confirm the target role's expected research-versus-delivery balance first."
 
 **Answer B — concise.**
-"Both, by design. Seven first-author papers say researcher; a shipped foundation model, a production API, and a certified auth component say engineer. Applied science is the intersection, and it's deliberate."
+"The two evidence axes are my first/co-first-author research record and the resume-listed contributions to models, APIs, and a certified service. I will verify each product's release status and my contribution scope, then explain the applied-science intersection."
 
 **Follow-up:** "Which do you enjoy more?"
 **Rebuttal tip:** Honest but role-aware — lean research for an RS panel, lean shipping for AS/MLE, but always tie back to "the loop between them is what I actually love." Don't disown either half.
@@ -400,7 +415,7 @@ Recruiter and HM territory. These decide *fit*, and sloppy answers end loops eve
 
 ## E · Hard, curveball & weakness probes
 
-The rounds that separate offers from near-misses. The meta-rule: **name the weakness before they do, then show the compensating strength or the plan.** Defensiveness is the only fatal answer.
+For hard questions, state the scope and mitigation plan precisely instead of hiding weaknesses. Both defensiveness and inventing facts or fake failures are major risks.
 
 <details class="qa"><summary>"Your work looks incremental — a lot of segmentation variants. Where's the big idea?"</summary>
 <div class="qa-body">
@@ -408,13 +423,13 @@ The rounds that separate offers from near-misses. The meta-rule: **name the weak
 **Testing:** can you defend the *significance* of your work without getting rattled — a deliberate provocation.
 
 **Answer A — reframe to problem-redefinition (confident).**
-"I'd push back on 'variant.' Each of these *redefined the bottleneck*, which is the opposite of incremental. PointWSSIS didn't tune a segmenter — it showed the proposal stage, not the mask head, is the true bottleneck in semi-supervised instance segmentation. ECLIPSE didn't add a continual-learning trick — it showed you can drop distillation entirely and beat it by freezing + prompting, which inverts the field's assumption. ZIM showed *data granularity dominates architecture* for matting foundations, earning an ICCV Highlight (top ~3%) precisely because reviewers saw it as a reframing, not a fine-tune. The unifying big idea is 'define the real bottleneck and solve it with data+architecture co-design.' That's a research philosophy, not a pile of variants."
+"I would answer that concern with each paper's problem reformulation and evidence. PointWSSIS tests the proposal bottleneck, ECLIPSE a freezing-plus-prompting alternative, and ZIM the combination of data granularity and promptable matting. I would not infer the reason for a venue decision as though I knew the reviewers' minds. The common research philosophy is to state the real bottleneck, co-design data and architecture, and separate the effects with ablations."
 
 **Answer B — the arc as the big idea.**
 "The big idea is the *arc*, not any single paper: driving perception up the ladder from cheap supervision to trustworthy reasoning. Individually each paper is a sharp contribution; together they're a coherent bet that perception's value is in being *label-efficient, updatable, and verifiable*. That's exactly the bet the field is now making with grounded agents."
 
 **Follow-up:** "Fine — which single result would survive if the field forgot everything else?"
-**Rebuttal tip:** Pick one and commit: "data granularity beats architecture for foundation models" (ZIM) or "relocate the bottleneck, don't tune the head" (PointWSSIS). Waffling here confirms the accusation; a crisp pick refutes it.
+**Rebuttal tip:** Choose one and justify it with a public ablation: data granularity was load-bearing in ZIM, while PointWSSIS reformulated the proposal bottleneck through supervision. Do not turn either into an exaggerated universal law.
 
 </div></details>
 
@@ -430,7 +445,7 @@ The rounds that separate offers from near-misses. The meta-rule: **name the weak
 "I'm T-shaped: deep in perception, broad and current across multimodal — attention/transformers, VLM training and eval, grounding, agents. The frontier I want is vision-language, where my depth is the scarce half and the LLM side is learnable and already part of my daily work."
 
 **Follow-up:** "OK — implement multi-head attention / explain RoPE right now."
-**Rebuttal tip:** *Practice the from-scratch primitives cold* before the loop — attention (correct head split, 1/√d_k scaling, causal mask), KV-cache, LoRA, top-k/top-p, RoPE. This is the #1 rejection reason for strong researchers. Honesty about depth only helps if you can back it when tested. Prep via the LLM and ML-coding chapters.
+**Rebuttal tip:** Implement and explain the from-scratch primitives the role requires — attention with correct head splitting, $1/\sqrt{d_k}$ scaling and causal masks, plus KV cache, LoRA, sampling, and RoPE. There is no basis for calling any one item the number-one rejection reason, but fundamentals outside your specialty may be evaluated separately.
 
 </div></details>
 
@@ -446,7 +461,7 @@ The rounds that separate offers from near-misses. The meta-rule: **name the weak
 "Single company, but not single problem — I went from image tags to foundation models to agents. The constant is the research method, and that's what transfers. I'd treat a new domain as another bottleneck to define."
 
 **Follow-up:** "Why never switch companies or domains before now?"
-**Rebuttal tip:** Frame stability as *depth earned*, not inertia: "staying let me run the full research-to-product loop end to end, repeatedly — rare and valuable. Now I want the domain and scale jump." Own it as a choice.
+**Rebuttal tip:** Explain the depth and repeated responsibilities you actually gained during the tenure with concrete examples. Use only verified facts for any claim of complete end-to-end ownership or motivation for the next move.
 
 </div></details>
 
@@ -455,11 +470,11 @@ The rounds that separate offers from near-misses. The meta-rule: **name the weak
 
 **Testing:** honesty, reflection, and research judgment — a canned success dressed as failure fails the round.
 
-**Answer A — real failure + the lesson (STAR-lite).**
-"Early on I over-invested in *offline iterative* pseudo-label refinement for weakly-supervised instance seg — the intuition being more refinement rounds = better labels. It barely moved the needle and cost a lot of compute; the gains flattened almost immediately. The lesson reshaped BESTIE and PointWSSIS: I switched to **online, per-mini-batch self-refinement**, which was cheaper and actually worked, and I learned to *test the assumption cheaply first* before building the expensive version. Now I prototype the smallest ablation that could kill an idea before committing engineering to it."
+**Answer A — research-failure scaffold.**
+"In `[project]`, the hypothesis I owned was `[ ]`. Under `[matched experimental condition or log]`, I observed `[falsifying signal]` and stopped at `[time]`. My pivot was `[ ]`, and the result was `[a public result or the remaining failure]`. Since then, I apply `[a specific change in experiment order]`." Use the offline-refinement example only if it was a real event that you can explain from records.
 
-**Answer B — a framing/scope failure (concise).**
-"I once chased a quantize-first path for the on-device model because it was the fastest lever — and it killed boundary quality (hair, fingers) before anything else. The failure taught me the *order* of compression matters: resolution/width/decoder and distillation first, quantization last. It's now a rule I bring to every efficiency project."
+**Answer B — engineering-failure scaffold.**
+"I first tried `[actual optimization or deployment decision]`, but `[quality or latency failure]` appeared under `[measurement protocol]`. I isolated the cause with `[ablation or profile]` and changed to `[alternative]`." A quantize-first path, boundary collapse, and distillation order are not established by the resume; use them only if actual logs support them.
 
 **Follow-up:** "What would you do differently now?"
 **Rebuttal tip:** The answer *is* the differently — "kill ideas with the cheapest possible experiment first." Make sure your failure has a concrete, transferable rule attached, not just "I learned to persevere."
@@ -469,13 +484,13 @@ The rounds that separate offers from near-misses. The meta-rule: **name the weak
 <details class="qa"><summary>"You publish a lot. Will you actually ship here, or just chase papers?"</summary>
 <div class="qa-body">
 
-**Testing:** the flip side of the RS worry — whether your publishing habit crowds out product delivery. Common at product-AI orgs (Apple AIML, MS MAI, ByteDance applied).
+**Testing:** how do you set priorities and ownership when publication goals conflict with product delivery?
 
 **Answer A — evidence of shipping.**
-"My publishing *comes from* shipping, not instead of it. The foreground API in production, FaceSign in a certified service, an on-device model at ~10 ms, ZIM integrated into CLOVA-X — those are shipped, not papers. I publish because rigor makes the product better and because I chose problems where the two align. I don't have a paper-vs-product tension; I have a habit of turning one into the other. If a quarter needs pure delivery, I'll deliver — I've done far more unpublished product work than published papers."
+"Public and resume evidence includes the foreground API, a FaceSign contribution, an on-device model at about 10 ms, and the touchpoint between ZIM and CLOVA-X. For each, I will distinguish my role from the actual release status. I will not claim that research and delivery are always aligned; if there is a real case of conflict, I will explain how I adjusted scope, deadline, and publication."
 
 **Answer B — concise.**
-"Look at the ratio: everything I published, I also shipped or open-sourced, and plenty I shipped I never published (the API, FaceSign). Papers are a byproduct of doing the product work rigorously, not a competing goal."
+"I have research with public code and product contributions listed on the resume. Rather than claim that every paper shipped or compare the volume of unpublished work, I will distinguish the research artifact and product artifact in two verifiable examples."
 
 **Follow-up:** "What if we asked you to not publish for a year?"
 **Rebuttal tip:** Accept it cleanly — "product and impact come first; I've worked under strict non-disclosure already (FaceSign)." Any hesitation reads as prioritizing your CV over the team.
@@ -487,21 +502,21 @@ The rounds that separate offers from near-misses. The meta-rule: **name the weak
 
 **Testing:** whether apparent gaps hide a problem — usually they don't, but the interviewer wants to see you not flinch.
 
-**Answer A — the confidential-work explanation.**
-"The 'quiet' stretches are when I was heaviest on *unpublishable* product work — FaceSign is a government-certified security product I can't publish, and the foreground API and on-device model are internal. So the paper timeline undercounts the actual output. I was shipping the whole time; some of the most demanding work simply doesn't show up on Google Scholar."
+**Answer A — explain the actual timeline.**
+"During `[period]`, I focused on `[approved resume-listed role or artifact]`. I will attribute the gap to security or internal-product disclosure limits only when the actual policy and timeline confirm that causal story. For activity without public evidence, I will state only the role and dates and will not inflate its impact."
 
 **Answer B — concise.**
-"No gap in output — a gap in *publishable* output. Certified-security and internal-product work (FaceSign, the API) filled those periods and by nature can't be published."
+"The work during the interval between papers was `[verified project and responsibility]`. I will distinguish public artifacts from the nonpublic scope."
 
 **Follow-up:** "How do I verify impact I can't see?"
-**Rebuttal tip:** Offer what's checkable — the DAN 24 talk, the public FaceSign product page, the "used by millions" scale, and references — while holding the confidential numbers. "I can point you to public evidence and references; the internal metrics stay internal" is the credible line.
+**Rebuttal tip:** Start with verifiable evidence such as the DAN 24 talk, a public product page, and papers or code. Provide references only with the person's prior consent and within company procedure, and do not disclose internal metrics. "I can point you to public evidence; internal metrics stay inside the company" is credible.
 
 </div></details>
 
 <details class="qa"><summary>"Rapid-fire fundamentals: BatchNorm vs LayerNorm — why LN in transformers?"</summary>
 <div class="qa-body">
 
-**Testing:** breadth under pressure. One or two whiffs on fundamentals can sink an otherwise strong loop — this is a stand-in for the whole breadth round.
+**Testing:** breadth under pressure. Getting one question wrong does not automatically mean rejection, but the interviewer may evaluate both conceptual precision and how you correct the limits of what you know.
 
 **Answer A — crisp mechanism.**
 "BatchNorm normalizes across the batch dimension per feature, so it depends on batch statistics — bad for variable-length sequences and small batches, and it couples examples. LayerNorm normalizes across the feature dimension per token, independent of batch and sequence length, which is exactly what transformers need: per-token stability regardless of batch size or sequence position, and it behaves identically at train and inference (no running stats). That's why transformers use LN — and why RMSNorm (LN without mean-centering) is now common for efficiency."
@@ -539,16 +554,16 @@ The rounds that separate offers from near-misses. The meta-rule: **name the weak
 | "You're a vision person / LLM depth?" | **Own the boundary**, show the bridge, then *prove it cold* | "T-shaped; the vision half is the scarce one." |
 | Co-authored paper (SSUL) | Specific **I vs we**, credit generously | Name your part, name theirs, no blur. |
 | "Why leave NAVER?" | **Pull, not push** | "Toward frontier-scale, not away from NAVER." |
-| Rapid-fire fundamentals | Over-prepare breadth; specialty won't cover a gap | One whiff can sink the loop. |
+| Rapid-fire fundamentals | Practice retrieval for role-relevant breadth | State assumptions and correct errors; do not overread one question as an automatic pass/fail rule. |
 | Failed bet | Real failure + **transferable rule** | "Kill ideas with the cheapest experiment first." |
-| Big-idea challenge | Commit to **one** durable result | "Data granularity beats architecture" (ZIM). |
-| Every answer | Pick the **angle** to the room; internalize don't memorize | Depth for FAIR, impact for HM, 30 sec for recruiter. |
+| Big-idea challenge | Commit to **one** durable result | "The ablation showed data granularity was load-bearing" (ZIM). |
+| Every answer | Pick the **angle** for the round; internalize, don't memorize | Deep-dive: mechanism; HM: scope/impact; recruiter: short facts/logistics. |
 
 **Golden rules:** (1) Never invent a number — describe the mechanism or say it's confidential. (2) Make *your* contribution unambiguous. (3) Name a weakness before they do. (4) Tailor every answer with the [Company Playbooks](#/process/companies).
 
 ## Cross-links
 
-- Deep-dives (the raw technical material behind every answer above): [ZIM](#/resume/zim) · [ECLIPSE](#/resume/eclipse) · [PointWSSIS & BESTIE](#/resume/pointwssis-bestie) · [FaceSign](#/resume/facesign) · [On-Device Seg](#/resume/on-device-segmentation) · [Grounded VLM/Agents](#/resume/grounded-vlm-agents)
+- Deep-dives (the raw technical material behind every answer above): [ZIM](#/resume/zim) · [ECLIPSE](#/resume/eclipse) · [PointWSSIS & BESTIE](#/resume/pointwssis-bestie) · [Phoenix](#/resume/phoenix-mask-refinement) · [FaceSign](#/resume/facesign) · [On-Device Seg](#/resume/on-device-segmentation) · [Grounded VLM/Agents](#/resume/grounded-vlm-agents) · [Spatial-Reasoning Agent (under review)](#/resume/neurips26-spatial-reasoning)
 - [Your CV → Interview Map](#/resume/overview) — which project to lead with, per company
 - [STAR & The Story Bank](#/behavioral/star) — behavioral framing for the failure/conflict/ownership questions
 - [Company Playbooks](#/process/companies) — what each target company probes, to re-point every answer

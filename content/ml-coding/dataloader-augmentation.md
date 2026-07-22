@@ -1,11 +1,57 @@
 # Dataloaders & Augmentation
 
-> [!TIP] Say this first
-> "A `DataLoader` is an iterator: shuffle indices once per epoch, slice them into batches, fetch each sample by index, and `collate` the list into stacked arrays. Augmentation is a `Compose` of transforms applied per sample — the one subtlety is keeping labels (boxes, masks) in sync with geometric transforms." Lead with the interface, not the code.
+> [!NOTE] Goal of this chapter
+> Training requires data to flow **a little at a time, shuffled, and in batches**. A **DataLoader** does that job; **augmentation** creates diversity by transforming samples. Here you will build both from the ground up and see how a training pipeline actually works. The [NumPy Primer](#/ml-coding/numpy-primer) is enough prerequisite.
 
-This problem tests **interface design and edge cases** more than any algorithm. Interviewers use it to see whether you've actually written training pipelines — the tells are `drop_last`, `collate_fn`, label-synced augmentation, and knowing what `num_workers` really does.
+## What and why
 
-## Dataset + DataLoader
+A neural network does not consume the entire dataset at once. It learns incrementally from **batches**, or small groups of examples; see minibatches in [Optimization](#/foundations/optimization). Two components create and deliver those groups:
+
+- A **Dataset** is a store that returns “sample $i$.” Its entire interface is `__len__`, the number of examples, and `__getitem__(i)`, which returns one.
+- A **DataLoader** is an iterator that **shuffles** indices, **slices** them into batches, fetches each sample, and **collates** the list into arrays.
+
+**Data augmentation** creates a new version of a sample on the fly by flipping or cropping an image or changing its color. More varied training examples make rote memorization harder and can improve **generalization**; see [Regularization & Generalization](#/foundations/regularization-generalization).
+
+<figure>
+<svg viewBox="0 0 640 210" xmlns="http://www.w3.org/2000/svg" font-family="Inter, sans-serif" font-size="12">
+  <!-- dataset -->
+  <text x="70" y="20" text-anchor="middle" fill="#0ea5e9" font-weight="700">Dataset</text>
+  <g fill="none" stroke="#0ea5e9" stroke-width="1.6">
+    <rect x="30" y="30" width="80" height="26" rx="4"/><rect x="30" y="60" width="80" height="26" rx="4"/>
+    <rect x="30" y="90" width="80" height="26" rx="4"/><rect x="30" y="120" width="80" height="26" rx="4"/>
+    <rect x="30" y="150" width="80" height="26" rx="4"/>
+  </g>
+  <text x="70" y="48" text-anchor="middle" fill="currentColor">sample 0</text>
+  <text x="70" y="78" text-anchor="middle" fill="currentColor">sample 1</text>
+  <text x="70" y="108" text-anchor="middle" fill="currentColor">sample 2</text>
+  <text x="70" y="138" text-anchor="middle" fill="currentColor">sample 3</text>
+  <text x="70" y="168" text-anchor="middle" fill="currentColor">sample 4</text>
+  <!-- shuffle -->
+  <path d="M115 95 H175" stroke="#98a3b2" stroke-width="1.5" marker-end="url(#d1)"/>
+  <text x="215" y="90" text-anchor="middle" fill="#6366f1" font-weight="700">shuffle</text>
+  <text x="215" y="106" text-anchor="middle" fill="#98a3b2">permute indices</text>
+  <text x="215" y="122" text-anchor="middle" fill="#98a3b2">[3,0,4,1,2]</text>
+  <!-- augment -->
+  <path d="M258 95 H318" stroke="#98a3b2" stroke-width="1.5" marker-end="url(#d1)"/>
+  <text x="360" y="90" text-anchor="middle" fill="#e0533f" font-weight="700">augment</text>
+  <text x="360" y="106" text-anchor="middle" fill="#98a3b2">flip·crop·norm</text>
+  <!-- batch -->
+  <path d="M402 95 H452" stroke="#98a3b2" stroke-width="1.5" marker-end="url(#d1)"/>
+  <rect x="460" y="60" width="150" height="70" rx="8" fill="none" stroke="#12a150" stroke-width="1.8"/>
+  <text x="535" y="52" text-anchor="middle" fill="#12a150" font-weight="700">batch</text>
+  <g fill="#12a150"><rect x="472" y="75" width="18" height="40" rx="3"/><rect x="496" y="75" width="18" height="40" rx="3"/><rect x="520" y="75" width="18" height="40" rx="3"/></g>
+  <text x="535" y="150" text-anchor="middle" fill="#98a3b2">→ model</text>
+  <defs><marker id="d1" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0 0 L6 3 L0 6" fill="#98a3b2"/></marker></defs>
+</svg>
+<figcaption>A training input pipeline: shuffle indices from the Dataset, apply augmentation, collate samples into a batch, and feed it to the model. The DataLoader repeats this process every epoch.</figcaption>
+</figure>
+
+> [!TIP] Interview one-liner
+> “A `DataLoader` is an iterator. It shuffles indices once per epoch, slices them into batches, fetches each sample by index, and `collate`s the list into stacked arrays. Augmentation is a `Compose` of transforms applied per sample; the subtlety is keeping labels—boxes and masks—synchronized with geometric transforms.” Lead with the **interface**, not the code. The tells that you have built real pipelines are `drop_last`, `collate_fn`, label synchronization, and `num_workers`.
+
+## Dataset + DataLoader from scratch
+
+The following is a minimal NumPy implementation of PyTorch's `Dataset`/`DataLoader`. Real frameworks use the same skeleton.
 
 ```python
 from __future__ import annotations
@@ -60,11 +106,37 @@ class DataLoader:
         return n // self.bs if self.drop_last else math.ceil(n / self.bs)
 ```
 
-**Key design choices:** `shuffle` reorders indices, never the data. `drop_last` avoids a partial final batch (matters for BatchNorm stats and fixed-shape compilation). `collate_fn` is the extension point for ragged data (variable-size detection targets).
+**Key design choices, in plain language:**
+
+- **`shuffle`:** reorder the **indices**, not the data itself. This is cheap and simple.
+- **`drop_last`:** discard the partial final batch. It matters when BatchNorm statistics or compilation require a fixed batch size.
+- **`collate_fn`:** combine a list of samples into arrays. Customize it for ragged data, such as a variable number of detection boxes.
 
 ## Augmentation: the label-sync subtlety
 
-The trap: a flip or crop applied to the image **must apply the matching transform to boxes and masks**. Getting this wrong silently corrupts labels — a bug that looks like a mysterious accuracy ceiling.
+The most common trap: when you flip or crop an image, **apply the corresponding transform to its boxes and masks as well**. Omitting it silently misaligns the target, producing a bug that looks like a mysterious accuracy ceiling.
+
+<figure>
+<svg viewBox="0 0 640 190" xmlns="http://www.w3.org/2000/svg" font-family="Inter, sans-serif" font-size="12">
+  <!-- original -->
+  <text x="150" y="20" text-anchor="middle" fill="#98a3b2">original</text>
+  <rect x="60" y="30" width="180" height="120" rx="6" fill="none" stroke="#98a3b2" stroke-width="1.5"/>
+  <circle cx="110" cy="95" r="26" fill="#0ea5e9" opacity="0.5"/>
+  <rect x="82" y="67" width="56" height="56" rx="4" fill="none" stroke="#e0533f" stroke-width="2.5"/>
+  <text x="150" y="170" text-anchor="middle" fill="#e0533f">box: [x1,y1,x2,y2]</text>
+  <!-- arrow -->
+  <path d="M255 90 H320" stroke="#98a3b2" stroke-width="1.5" marker-end="url(#f1)"/>
+  <text x="288" y="80" text-anchor="middle" fill="#6366f1">flip →</text>
+  <!-- flipped: image AND box both flip -->
+  <text x="480" y="20" text-anchor="middle" fill="#12a150">horizontal flip (synced ✓)</text>
+  <rect x="360" y="30" width="180" height="120" rx="6" fill="none" stroke="#98a3b2" stroke-width="1.5"/>
+  <circle cx="490" cy="95" r="26" fill="#0ea5e9" opacity="0.5"/>
+  <rect x="462" y="67" width="56" height="56" rx="4" fill="none" stroke="#e0533f" stroke-width="2.5"/>
+  <text x="450" y="170" text-anchor="middle" fill="#e0533f">box: [W−x2, y1, W−x1, y2]</text>
+  <defs><marker id="f1" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0 0 L6 3 L0 6" fill="#98a3b2"/></marker></defs>
+</svg>
+<figcaption>Flipping an image also moves the object, so its box must flip with it. Flip only the image and the ground truth becomes misaligned.</figcaption>
+</figure>
 
 ```python
 class Compose:
@@ -77,6 +149,8 @@ class Compose:
 
 class RandomHorizontalFlip:
     def __init__(self, p=0.5, seed=None):
+        if not 0 <= p <= 1:
+            raise ValueError("p must be in [0, 1]")
         self.p, self.rng = p, np.random.default_rng(seed)
     def __call__(self, s):
         if self.rng.random() < self.p:
@@ -96,12 +170,26 @@ class RandomCrop:
         self.size, self.rng = size, np.random.default_rng(seed)
     def __call__(self, s):
         _, H, W = s["image"].shape
+        if not 0 < self.size <= min(H, W):
+            raise ValueError("crop size must fit inside the image")
         top = int(self.rng.integers(0, H - self.size + 1))
         left = int(self.rng.integers(0, W - self.size + 1))
         sl = (slice(top, top + self.size), slice(left, left + self.size))
         s["image"] = s["image"][:, sl[0], sl[1]]
         if "mask" in s:
             s["mask"] = s["mask"][sl]                     # same crop window
+        if "boxes" in s:
+            boxes = np.asarray(s["boxes"], dtype=np.float32).copy()
+            boxes -= np.array([left, top, left, top], dtype=np.float32)
+            boxes[:, [0, 2]] = np.clip(boxes[:, [0, 2]], 0, self.size)
+            boxes[:, [1, 3]] = np.clip(boxes[:, [1, 3]], 0, self.size)
+            keep = (boxes[:, 2] > boxes[:, 0]) & (boxes[:, 3] > boxes[:, 1])
+            s["boxes"] = boxes[keep]
+            if "labels" in s:                              # aligned instance fields
+                labels = np.asarray(s["labels"])
+                if len(labels) != len(keep):
+                    raise ValueError("labels and boxes must have equal length")
+                s["labels"] = labels[keep]
         return s
 
 
@@ -109,6 +197,8 @@ class Normalize:
     def __init__(self, mean, std):
         self.mean = np.array(mean, np.float32)[:, None, None]
         self.std = np.array(std, np.float32)[:, None, None]
+        if np.any(self.std <= 0):
+            raise ValueError("std must be positive")
     def __call__(self, s):
         s["image"] = (s["image"] - self.mean) / self.std   # per-channel
         return s
@@ -183,7 +273,7 @@ Flip a `(C, H, W)` image left-right. Reverse the width axis — and `.copy()` so
 
 ### 3. Flip boxes with the image (label sync)
 
-The label-sync subtlety: when the image flips, `xyxy` boxes must flip too. For image width `W`, a box `[x1,y1,x2,y2]` becomes `[W−x2, y1, W−x1, y2]`.
+Here we use continuous, half-open `xyxy` coordinates with $0\le x_1\le x_2\le W$. Under this convention, a horizontal flip maps `[x1,y1,x2,y2]` to `[W−x2,y1,W−x1,y2]`. Older inclusive integer-pixel boxes use `W-1-x`; do not mix the conventions.
 
 <div class="widget" data-widget="code">
 <script type="application/json" class="code-config">
@@ -195,7 +285,7 @@ The label-sync subtlety: when the image flips, `xyxy` boxes must flip too. For i
 
 ### 4. Seeded random crop
 
-Crop a `size × size` window from a `(C, H, W)` image. Seed a fresh generator so a given `seed` always crops the same window (drawing `top` then `left`).
+Crop a `size × size` window from a `(C, H, W)` image. Seed a fresh generator so a given `seed` always crops the same window, drawing `top` then `left`. For detection, apply the same pair to boxes and keypoints, clip boxes to the crop, and jointly remove zero-area instances and their aligned labels. The `RandomCrop` reference above implements this policy.
 
 <div class="widget" data-widget="code">
 <script type="application/json" class="code-config">
@@ -220,7 +310,7 @@ Crop a `size × size` window from a `(C, H, W)` image. Seed a fresh generator so
 
 **Short:** it forks/spawns worker processes that each hold a copy of the Dataset and prefetch batches in parallel, hiding data-loading latency behind GPU compute.
 
-**Deep:** the main process would otherwise block on disk I/O and augmentation between GPU steps. Workers produce batches into a queue; `prefetch_factor` controls buffering and `pin_memory=True` speeds host→device copies. Pitfalls: each worker inherits the parent RNG state, so without per-worker seeding (via `worker_init_fn` or the base seed + worker id) they generate identical augmentations; too many workers thrash RAM/CPU; and non-fork-safe objects (open file handles, CUDA tensors) must be created *inside* the worker, not passed in.
+**Deep:** workers produce batches into a queue; `prefetch_factor` controls buffering and `pin_memory=True` helps host→device copies. PyTorch assigns each worker a default PyTorch seed, but if a Dataset or transform constructs its own NumPy generator or uses another library's RNG, seed it explicitly from `get_worker_info().seed`. With persistent workers, also define how desired randomness and reproducibility are refreshed each epoch.
 </div></details>
 
 <details class="qa"><summary>How do you handle variable-size targets (detection)?</summary>
@@ -236,11 +326,11 @@ Crop a `size × size` window from a `(C, H, W)` image. Seed a fresh generator so
 
 **Short:** a `DistributedSampler` shards indices so each rank sees a disjoint subset, and you call `sampler.set_epoch(e)` each epoch to keep shuffling synchronized and different across epochs.
 
-**Deep:** with DDP, each of $N$ ranks runs its own DataLoader over $1/N$ of the dataset — no sample is seen twice per epoch. `set_epoch` seeds the shuffle deterministically from the epoch number so all ranks agree on the permutation before sharding. If the dataset isn't divisible by $N$, the sampler pads (duplicates a few samples) to keep batch counts equal, which matters for gradient all-reduce staying in lockstep. See [Distributed Training](#/foundations/distributed-training).
+**Deep:** under DDP, every rank processes a different shard of the same global permutation. If the dataset length is not divisible by the number of ranks and `drop_last=False`, `DistributedSampler` may pad indices and duplicate a few samples. With `drop_last=True`, it drops the tail instead. Check whether duplication biases evaluation metrics. `set_epoch(e)` changes the permutation each epoch.
 </div></details>
 
 ### Follow-ups
-- **Advanced augmentation?** RandAugment/TrivialAugment (policy search), Mosaic & Copy-Paste (YOLO/instance-seg) — all require careful label transforms.
+- **Advanced augmentation?** RandAugment/TrivialAugment (policy search), Mosaic & Copy-Paste (YOLO/instance-seg)—all require careful label transforms. See [Vision Data Augmentation](#/cv/augmentation).
 - **Class imbalance?** `WeightedRandomSampler` or per-class oversampling in the sampler, not the collate.
 - **Deterministic runs?** Seed Python, NumPy, and torch RNGs + `set_epoch`; disable nondeterministic cudnn kernels.
 - **I/O bottleneck?** Move JPEG decode into workers or GPU (DALI), use memory-mapped/sharded formats.
@@ -259,4 +349,4 @@ Crop a `size × size` window from a `(C, H, W)` image. Seed a fresh generator so
 | `num_workers` | parallel prefetch; seed per worker |
 | Distributed | `DistributedSampler` + `set_epoch` |
 
-**Cross-links:** [Distributed Training](#/foundations/distributed-training) · [Object Detection](#/cv/detection) · [Segmentation](#/cv/segmentation) · [The ML Coding Round](#/ml-coding/intro)
+**Next:** [NumPy Primer](#/ml-coding/numpy-primer) · [Vision Data Augmentation](#/cv/augmentation) · [Regularization & Generalization](#/foundations/regularization-generalization) · [Object Detection](#/cv/detection) · [The ML Coding Round](#/ml-coding/intro)

@@ -1,151 +1,152 @@
 # Offers, Levels & Negotiation
 
-<div class="tag-row"><span class="tag">leveling</span><span class="tag">comp structure</span><span class="tag">competing offers</span><span class="tag">red flags</span></div>
+<div class="tag-row"><span class="tag">leveling</span><span class="tag">comp structure</span><span class="tag">written offer</span><span class="tag">risk-adjusted comparison</span></div>
 
 > [!TIP] Why this chapter exists
-> Negotiation is the one stage where an hour of preparation is worth tens of thousands of dollars per year, compounding. But it only works if you did the *leveling* work first — **the level is the number**, and everything else is a rounding adjustment. This chapter covers how research roles are leveled, what a comp package is actually made of, the tactics that move it, and the red flags that end candidacies (including in negotiation itself).
+> Negotiation is not primarily about maximizing one number. It is about **comparing role scope, level, compensation structure, risk, and non-cash terms on the same basis and confirming them in writing**. Titles and packages are not portable across companies, so collect the facts first and then make requests according to your priorities.
 
-> [!WARNING] Numbers are aggregates, not quotes
-> All figures reference **levels.fyi self-reported aggregates (2025–2026)** and fluctuate widely by team, location, and stock performance. Use them to *calibrate a range*, never as a hard target you announce. Frontier-lab comp in particular is volatile and partly press-reported — hedge it.
+> [!WARNING] This is an educational decision framework
+> This document is not legal, tax, investment, or financial advice. Tax, option exercise, securities, immigration, and employment contracts vary by **jurisdiction, employing entity, residency status, and contract date**. Base actual decisions on the recruiter's written offer and official plan documents; when needed, have qualified local legal, tax, or financial professionals review them.
 
-## The leveling map (research ICs)
+## Do not translate level names directly across companies
 
-Titles differ per company; seniority maps roughly like this *[community/aggregate]*:
+`Senior`, `Staff`, `Researcher`, `Applied Scientist`, `ICT`, and numeric levels can represent different scopes even when the labels look the same. Do not use public aggregates or an acquaintance's level as a one-to-one conversion table. Verify the following instead.
 
-| Rough seniority | Meta | Microsoft | Apple | NVIDIA | Signal |
-| --- | --- | --- | --- | --- | --- |
-| Fresh PhD / entry | E4 | 59–60 (Researcher) | ICT3 | IC1–IC2 | Independent papers, supervised projects |
-| Experienced PhD + industry | **E5** | 63–64 (Senior Researcher) | ICT4–5 | IC3–IC4 | First-author record, mentoring, product transfer |
-| Staff / Principal track | E6+ | 65–67 (Principal→Partner) | ICT5–6 | IC5–IC6 | Org-level agenda, cross-team impact |
+| Item to verify | Question for the recruiter/HM | Evidence to compare |
+| --- | --- | --- |
+| Official title and level | “What title and internal level will appear in the written offer?” | Offer letter, req |
+| Expected scope | “What problems and decision scope would I own independently in the first 6–12 months?” | HM response, role description |
+| Promotion bar | “What scope of impact and evidence does the next level require?” | Official career framework, if one exists |
+| Evaluation and calibration | “When, by whom, and from what packet is the level for this role decided?” | Recruiter-confirmed process |
+| Compensation band | “What band and components apply to the proposed level and location?” | Written breakdown |
 
-> [!NOTE] "PhD ⇒ senior" is a myth
-> Leveling is calibrated by the **interview packet + years of experience + publication/impact**, not by the degree alone. For Beomyoung, the combination — **7 first-author papers, an ICCV 2025 Highlight, *and* 5 years shipping at NAVER Cloud** — is a genuinely strong **E5-analog / senior** case, but the final call is the HC/HM's, informed by loop performance. The single highest-leverage move is arguing the level *up* during the loop, before any number exists.
+Do not assume that a degree, publication count, or years of experience automatically determines a level. Support your case with **decisions made independently, scope of impact, mentoring, product or research outcomes, and scope of the next role**, not just `years of experience`. Keep person-specific leveling evidence in [Your CV → Interview Map](#/resume/overview) rather than duplicating it in the generic chapters.
 
-## What a comp package is made of
+## Decompose the package by component
 
 ```mermaid
 flowchart TD
-  TC[Total Compensation TC] --> B[Base salary<br/>band-capped, low flex]
-  TC --> E[Equity / RSU / PSU<br/>4-yr vest · biggest lever]
-  TC --> S[Sign-on bonus<br/>cash · bridges vesting cliffs]
-  TC --> BO[Target bonus %<br/>fixed to level]
-  TC --> R[Refreshers<br/>annual equity top-ups]
-  style E fill:#e0533f,color:#fff
-  style S fill:#0ea5e9,color:#fff
+  O[Written offer] --> B[Base salary]
+  O --> V[Variable cash / target bonus]
+  O --> E[Equity / options]
+  O --> S[Sign-on / relocation]
+  O --> N[Non-cash terms]
+  E --> T[Vesting · liquidity · tax · termination terms]
+  N --> P[Role scope · publication · location · start date]
 ```
 
-<dl class="kv">
-<dt>Base</dt><dd>Band-capped per level; exceeding often needs VP approval → <b>low flex (~5–15%)</b>. But it compounds and sets bonus/refresh baselines.</dd>
-<dt>Equity (RSU/PSU)</dt><dd>4-year vest (schedules vary: 25/25/25/25, or front/back-loaded). Usually the <b>largest lever</b> — a single budget decision. NVIDIA brands RSUs <b>"NSU"</b>; startups (Mistral) use options; ByteDance is <b>private/pre-IPO</b> (illiquid at internal marks).</dd>
-<dt>Sign-on</dt><dd>Cash, often <b>high flex</b>: bridges unvested equity you'd forfeit and counters a competing offer without touching the band.</dd>
-<dt>Bonus %</dt><dd>Usually fixed to level — low negotiability.</dd>
-<dt>Refreshers</dt><dd>Annual equity grants; the reason year-1 TC ≠ steady-state TC. Ask about the *refresh* policy, not just the initial grant.</dd>
-</dl>
-
-> [!WARNING] The 4-year cliff illusion
-> Many "TC" numbers **average a front-loaded initial grant over 4 years** and assume refreshers that aren't guaranteed. Ask for the **vesting schedule** and **historical refresh** behavior. A big year-1 number with a cliff and thin refreshers can be worth far less than a flatter package.
-
-## How research comp differs by company type
-
-| Type | Comp shape | Negotiation reality |
+| Component | What you must verify | Common comparison error |
 | --- | --- | --- |
-| **FAANG** (Meta, Apple, NVIDIA, Adobe, MS) | Base + large RSU + sign-on; TC benchmarked | Push level + equity + sign-on; competing offers move it |
-| **Base-heavy** (Adobe ~71% base) | Lighter equity, higher base | TC can trail FAANG at same "level"; lean on level + equity |
-| **Private / pre-IPO** (ByteDance) | Large RSUs, **illiquid at internal marks** | Discount equity; ask buyback/liquidity terms; level drives the delta |
-| **Startup / frontier** (Mistral) | Lower base + big equity upside | Negotiate equity **quantity + strike**; model realistic (illiquid) outcomes; RS carry a premium over REs |
+| Base | Currency, pay frequency, employment location, review timing | Comparing only headlines without accounting for exchange-rate or after-tax differences |
+| Bonus | Target and actual payout conditions, first-year proration, whether guaranteed | Counting the target as guaranteed cash |
+| Public equity | Grant denomination, vesting, settlement and tax, stock-price reference date | Treating the current stock price as a guaranteed future value |
+| Private equity / option | Share count, dilution basis, strike, latest valuation basis, exercise and post-termination terms, liquidity | Treating an internal valuation as equivalent to cash |
+| Sign-on / relocation | Payment date, repayment or clawback terms, tax treatment | Comparing a first-year-only amount as recurring total compensation |
+| Refresh | Official policy, whether discretionary, eligibility, timing | Including a future grant as a confirmed amount |
+| Non-cash terms | Role scope, publication/open-source, compute/data, work location, travel, visa | Looking only at money and omitting career or life constraints |
 
-> [!NOTE] Research-specific, non-cash levers
-> For RS/AS roles, negotiate the things money can't buy back later: **publication freedom + conference travel**, **open-source release rights**, **compute/GPU quota + data access**, the **pure-research vs product-coupled ratio**, and **mentoring/intern** allocation. These shape your next paper — and your next job — more than a sign-on does.
+## Create a dated offer snapshot
 
-## The tactics that actually move the number
+Market data ages quickly, and self-reported aggregates are affected by sample, region, and stock price. If you use them, record the source and access date and keep them separate from the offer itself.
+
+```text
+Company / team / req:
+Offer received (YYYY-MM-DD):
+Employment entity / work location:
+Title / internal level:
+
+Guaranteed cash:
+Variable cash and conditions:
+Equity type / amount / valuation basis:
+Vesting / liquidity / exercise / termination terms:
+Sign-on / relocation / clawback:
+Benefits and non-cash terms:
+
+Recruiter-confirmed but not yet written:
+Still unverified:
+Decision deadline and time zone:
+Sources checked and dates:
+Questions for legal/tax/financial review:
+```
+
+If an oral explanation differs from a document, identify the discrepancy by saying, “I would like to confirm my understanding,” and request corrected written material.
+
+## Compare three numbers
+
+Instead of one `TC` number, calculate these separately.
+
+1. **Guaranteed value** — base and contractually guaranteed cash, with clawbacks and taxes shown separately.
+2. **Conditional value** — amounts such as bonus and public equity that depend on payout or price conditions. Record the assumptions and reference date.
+3. **Uncertain value** — amounts such as private equity/options and discretionary refreshers with substantial liquidity, dilution, or performance uncertainty. Separate optimistic, base, and pessimistic scenarios.
+
+Converting currency is not enough when comparing offers across countries. Tax, insurance, pension, immigration, cost of living, working hours, relocation, and the legal structure of equity all differ, so **separate the gross-headline ranking from the actual decision ranking**.
+
+## Negotiation sequence
 
 ```mermaid
 sequenceDiagram
-  participant Y as You
+  participant C as Candidate
   participant R as Recruiter
-  Y->>R: (during loop) argue for the higher level
-  R-->>Y: Verbal offer + level
-  Y->>R: "Thank you — can I get it in writing to review?"
-  R-->>Y: Written offer
-  Y->>R: Counter: level + equity + sign-on, with a reason
-  R-->>Y: Revised offer (1–2 rounds typical)
-  Y->>R: Align deadline with competing offers
-  R-->>Y: Final
+  C->>R: Confirm role, level, and package components
+  R-->>C: Verbal offer
+  C->>R: Request written offer and plan documents
+  R-->>C: Documents + deadline
+  C->>C: Build comparison table and review unverified items
+  C->>R: Make a prioritized, evidence-based request
+  R-->>C: Explain possible changes / fixed items
+  C->>R: Reconfirm final terms in writing
 ```
 
-1. **Real competing offers are the #1 lever.** Bidding wars can lift TC **40–80%** (occasionally more with multiple FAANG bidders). Cluster your [pipeline](#/process/pipeline) timelines so offers overlap.
-2. **Push level and equity, not base.** Base is band-capped; **level-up is the biggest lifetime lever**, and equity/sign-on are single budget decisions with more give.
-3. **Get it in writing, then counter.** Never accept (or reject) a verbal number on the call. Ask for the written offer, then make **one clear counter** with a *reason* ("to match my competing offer / to reflect the senior scope we discussed").
-4. **Share ranges and total-comp goals**, and let them assemble the components. Disclose concurrent processes — it's expected and raises your priority.
-5. **Discount illiquid equity honestly.** 90-day option-exercise windows, tax on paper gains, pre-IPO marks. Model realistic outcomes; get every grant detail in writing.
+1. **Express appreciation and interest first**, but you do not need to accept immediately during the call.
+2. Request the title, level, location, each compensation component, vesting, and deadline in writing.
+3. Rank what matters. Examples: scope/level, guaranteed cash, equity terms, start date, publication, and compute.
+4. Present requests together as `evidence → specific change → effect on the acceptance decision`.
+5. If told a change is impossible, ask which components are fixed by policy and which can be reconsidered.
+6. Before the final decision, verify that every agreed change appears in the documents.
 
-> [!DANGER] Never fabricate a competing offer
-> At this comp level, companies may **ask for verification**. A forged or inflated offer, if caught, is an instant-fail integrity issue that can be back-channeled across the industry. Share real ranges; if you don't have a competing offer, negotiate on scope and market data instead — don't invent one.
+> [!EXAMPLE] Evidence-based counter
+> “After reviewing the offer and the team's scope, I remain very interested in the role. Given the {independent ownership/scope of impact} we discussed and {verifiable market or competing-offer evidence}, could you reconsider {the level or specific component}? My first priority is {priority 1}, followed by {priority 2}. If you can share what range is possible, I will evaluate the complete package.”
 
-### Location changes the math
+## Competing offers and timeline
 
-US vs Singapore vs Seoul vs Paris differ in **currency, RSU liquidity, relocation, and tax**. Keep **separate target / walk-away ranges per location**. Paris (Mistral) base runs ~30–50% below US labs, partly offset by lower cost-of-living and **favorable BSPCE tax** (~12.8% + social charges vs 40–50% CA marginal) — so a lower headline can be competitive net-of-tax. Don't compare gross headline numbers across geographies.
+- Describe only processes actually underway and written offers that actually exist. Use your judgment and follow document terms when deciding how much of a company name or amount to disclose.
+- Do not assume a competing offer will automatically improve a proposal. It can, however, provide a concrete basis for communicating deadlines and comparison criteria.
+- Do not invent an offer, inflate an amount, or fabricate a deadline. Besides damaging trust, doing so can create documentary, relationship, and legal risk.
+- Not every company will extend a deadline. Ask early, “What extension may be possible, and when can I receive the material needed for a decision?”
+- Manage process alignment alongside the tracking table in [The RS/AS Pipeline](#/process/pipeline).
 
-<details class="qa"><summary>"What are your compensation expectations?" — early in the process.</summary>
-<div class="qa-body">
+## How to answer an early compensation question
 
-**Short:** Don't anchor yourself. Redirect to a market range and total-comp framing, and turn the question around to leveling.
+Laws and practices vary by region, so do not assume you must disclose current pay. Within what you are comfortable answering, redirect the conversation to this role and its band.
 
-**Deep:** Script: *"I'm flexible and focused on the role, team, and growth. For total comp I'm calibrating to the market band for RS/AS at this level in {location}. Happy to get specific once I understand the leveling — what band does this role typically fall in?"* This does three things: refuses the low anchor, signals you know comp is level-driven, and extracts the band *they* have in mind. See [Recruiter & HM Screens](#/process/recruiter-hm).
-</div></details>
+> “I would first like to understand the role's scope and level accurately. Could you share the location-specific compensation band and components for this req? With that context, I can discuss the complete package.”
 
-<details class="qa"><summary>How do I choose between a higher base and more equity?</summary>
-<div class="qa-body">
+If you must state an expected range, specify the `currency`, `region`, `level assumption`, and `whether it is base or total package`; provide a range and its assumptions rather than a single number. See [Recruiter & HM Screens](#/process/recruiter-hm) for the detailed recruiter conversation.
 
-**Short:** Prefer equity/level if you believe in the company and can tolerate risk; prefer base if the equity is illiquid or the company is volatile.
+## Final pre-decision check
 
-**Deep:** Base is guaranteed and compounds (raises, bonus, refresh baselines are % of it). Equity is higher-expected-value but **risk-and-liquidity-adjusted** — public RSUs (Meta/NVIDIA/Apple) are near-cash on vest; pre-IPO (ByteDance) and startup options (Mistral BSPCE) are not. Discount illiquid equity heavily and don't let a big *nominal* grant substitute for a fair base + level. For a candidate optimizing a multi-year research career, **level** usually dominates both — it gates scope, future comp, and your next offer's leveling.
-</div></details>
+- [ ] The title, level, team/reporting line, work location, and employing entity are in writing.
+- [ ] I separated base, bonus conditions, and the equity type, vesting, liquidity, and post-termination terms.
+- [ ] I verified clawback terms for sign-on and relocation payments.
+- [ ] I confirmed the offer deadline's date and time zone, plus any approved extension.
+- [ ] I verified important non-cash terms such as publication/open-source, compute/data, remote work, and relocation.
+- [ ] Oral promises appear in the final document or an official addendum.
+- [ ] Appropriate professionals reviewed any tax, option, contract, or immigration issues that require it.
+- [ ] I determined whether the offer clears my walk-away threshold without optimistic equity value.
 
-## Red flags & common rejection reasons
+For rejection patterns beyond negotiation, avoid duplicating the list here and use [Common Mistakes & Red Flags](#/playbook/mistakes) as the canonical reference.
 
-Knowing *why* research candidates get rejected is as useful as the tactics — most are avoidable.
+## Cheat Sheet
 
-<div class="proscons"><div><div class="pros-t">What passes</div>
-<ul>
-<li>Can implement attention / a training loop from scratch under time pressure</li>
-<li>Defends own papers: baselines, ablations, limitations</li>
-<li>Broad ML: RL, diffusion, LLM primitives, MoE, RLVR</li>
-<li>Clear I-vs-we; concrete, reflective behavioral answers</li>
-<li>Exact team-fit + real motivation for <i>this</i> org</li>
-</ul></div><div><div class="cons-t">What sinks candidates</div>
-<ul>
-<li><b>Unprepared for from-scratch implementation</b> — "used ML daily" ≠ ready to code flash-attention</li>
-<li><b>Breadth gaps</b> — one hole (RL/diffusion) sinks fundamentals</li>
-<li><b>Can't defend own work</b> — fatal for RS</li>
-<li>Weak coding hygiene / can't debug real ML code (AS/MLE)</li>
-<li>Obscured contribution in the job talk; unclear I-vs-we</li>
-<li><b>Fit mismatch</b> at senior levels — sometimes redirected to eng</li>
-<li><b>Integrity issues in negotiation</b> — inflated/forged offers</li>
-</ul></div></div>
-
-> [!QUESTION] "We can't move on comp — take it or leave it." Is that real?
-> **Short:** Sometimes true (rigid band), often a test. Separate *base* (genuinely capped) from *equity/sign-on* (usually has room), and ask specifically about those.
->
-> **Deep:** Reply: *"I understand base is band-constrained — is there flexibility on the equity grant or a sign-on to bridge the gap?"* If every lever is truly frozen, then the real negotiation was the **level**, which is decided earlier. That's why level is the whole game: by offer time, the band may already be fixed. If the number and level are both final and below your walk-away, it's information — decline gracefully and keep the relationship (teams re-open reqs).
-
-### Follow-ups you should be ready for
-
-- *"What other companies are you talking to, and where are they in the process?"* — answer honestly with stage, not necessarily numbers; it sets urgency.
-- *"If we match your competing offer, will you sign?"* — only say yes if it's true. A soft yes you renege on burns the recruiter relationship.
-- *"What would it take to get you to join?"* — the gift question. Have a concrete, reasonable answer (level + a TC range + one non-cash item like compute/publication freedom).
-
-## Cheat-sheet
-
-| Ask | One-liner |
+| Question | One-line principle |
 | --- | --- |
-| The number *is* the level | Argue level up during the loop — before any offer exists |
-| Base vs equity vs sign-on | Base low-flex (band); equity biggest lever; sign-on bridges cliffs |
-| #1 tactic | Real competing offers (40–80% swings); cluster timelines to overlap |
-| Never | Fabricate an offer — verification is common; getting caught is fatal |
-| Illiquid equity | Discount pre-IPO (ByteDance) / options (Mistral BSPCE); get terms in writing |
-| Non-cash levers | Publication freedom, open-source rights, compute quota, research/product ratio |
-| Location | Separate target/walk-away per geo; compare net-of-tax, not headline |
-| Top rejections | From-scratch coding gaps · breadth holes · can't defend own work · fit mismatch |
+| Level comparison | Compare scope, impact, and promotion bar—not names |
+| Number sources | Record the access date and sample limitations; keep them separate from the actual offer |
+| Package | Separate guaranteed, conditional, and uncertain value |
+| Private equity | Do not count it as cash; review documents, scenarios, and professional advice |
+| Counter | Make a specific request supported by evidence and priorities |
+| Competing offer | State facts only and communicate the deadline clearly |
+| Final authority | Written offer and official plan documents, not oral promises |
+| Legal and tax | Verify with jurisdiction-specific professionals; this document is not advice |
 
-**Related:** [The RS/AS Pipeline](#/process/pipeline) · [Recruiter & HM Screens](#/process/recruiter-hm) · [Company Playbooks](#/process/companies) · [Common Mistakes & Red Flags](#/playbook/mistakes) · [The Research Job Talk](#/research/job-talk)
+**Related:** [The RS/AS Pipeline](#/process/pipeline) · [Recruiter & HM Screens](#/process/recruiter-hm) · [Company Playbooks](#/process/companies) · [Common Mistakes & Red Flags](#/playbook/mistakes) · [Questions to Ask Them](#/playbook/questions-to-ask)
