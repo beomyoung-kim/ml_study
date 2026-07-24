@@ -116,6 +116,63 @@ $$
 > [!EXAMPLE] Softmax 수치 안정성 & KL의 비대칭
 > $\operatorname{softmax}(z)_k=e^{z_k}/\sum_j e^{z_j}$는 큰 $z$에서 overflow합니다 — **log-sum-exp 트릭**으로 max를 빼세요: $\log\sum_j e^{z_j}=m+\log\sum_j e^{z_j-m}$. Temperature $T$($z/T$)는 argmax($T\to0$)에서 uniform($T\to\infty$)까지 보간하는 손잡이(distillation·sampling). **KL 비대칭**: forward KL $D_{\mathrm{KL}}(p_\text{data}\|q)$는 *mode-covering*(모든 mode를 덮어 흐릿), reverse KL은 *mode-seeking*(한 mode에 집중) — VAE/variational inference의 단골 논점.
 
+### Classification에서 CE와 MSE를 통계적으로 비교하면?
+
+먼저 무엇에 MSE를 적용하는지 구분해야 합니다. probability $q$와 one-hot label 사이의 squared error는 **Brier score**이며 유효한 proper scoring rule입니다. 반면 raw logit에 MSE를 적용하면 $z$와 $z+c\mathbf1$이 같은 categorical distribution을 나타낸다는 비식별성을 무시하므로 자연스러운 probability loss가 아닙니다.
+
+실제 binary label이 $Y\sim\operatorname{Bernoulli}(r)$이고 모델이 positive probability $q$를 낸다고 합시다. 모집단 expected risk는
+
+$$
+R_{\mathrm{CE}}(q)=-r\log q-(1-r)\log(1-q),
+\qquad
+R_{\mathrm{Brier}}(q)=r(1-q)^2+(1-r)q^2.
+$$
+
+둘을 미분하면 각각 $q=r$에서 유일한 minimum을 갖습니다. 즉 둘 다 충분한 데이터와 표현력이 있으면 **진짜 조건부 확률을 정직하게 보고하도록** 유도하는 strictly proper scoring rule입니다.
+
+<figure>
+<svg viewBox="0 0 700 285" xmlns="http://www.w3.org/2000/svg" font-family="Inter, sans-serif" font-size="11" role="img" aria-labelledby="ce-mse-title-ko ce-mse-desc-ko">
+  <title id="ce-mse-title-ko">Cross-entropy와 Brier score의 expected risk 및 logit gradient 비교</title>
+  <desc id="ce-mse-desc-ko">왼쪽은 실제 positive 확률이 0.7일 때 cross-entropy와 Brier excess risk가 모두 예측 0.7에서 최소임을 보인다. 오른쪽은 정답이 1일 때 확신에 찬 오답 구간에서 cross-entropy logit gradient는 크지만 sigmoid 뒤 MSE gradient는 0으로 작아짐을 보인다.</desc>
+  <text x="175" y="18" text-anchor="middle" fill="currentColor">통계: expected excess risk (r=0.7)</text>
+  <line x1="48" y1="230" x2="315" y2="230" stroke="#98a3b2"/><line x1="48" y1="230" x2="48" y2="42" stroke="#98a3b2"/>
+  <g fill="#98a3b2" font-size="10">
+    <text x="48" y="247" text-anchor="middle">0</text><text x="115" y="247" text-anchor="middle">.25</text><text x="181" y="247" text-anchor="middle">.5</text><text x="234" y="247" text-anchor="middle">.7</text><text x="315" y="247" text-anchor="middle">1</text>
+    <text x="181" y="269" text-anchor="middle">예측 probability q</text>
+  </g>
+  <path d="M58 47 C85 95,125 145,181 195 C207 216,224 228,234 230 C251 227,276 196,305 61" fill="none" stroke="#e0533f" stroke-width="2.5"/>
+  <path d="M58 118 C104 161,163 207,234 230 C266 220,289 202,305 181" fill="none" stroke="#6366f1" stroke-width="2.5"/>
+  <circle cx="234" cy="230" r="5" fill="#12a150"/>
+  <text x="90" y="65" fill="#e0533f">CE−H(r)=KL(r‖q)</text>
+  <text x="72" y="135" fill="#6366f1">Brier−min=(q−r)²</text>
+  <text x="234" y="215" text-anchor="middle" fill="#12a150">둘 다 q*=r=.7</text>
+  <line x1="350" y1="28" x2="350" y2="250" stroke="#98a3b2" opacity=".45"/>
+  <text x="525" y="18" text-anchor="middle" fill="currentColor">최적화: true class가 y=1일 때</text>
+  <line x1="390" y1="230" x2="665" y2="230" stroke="#98a3b2"/><line x1="390" y1="230" x2="390" y2="42" stroke="#98a3b2"/>
+  <g fill="#98a3b2" font-size="10">
+    <text x="390" y="247" text-anchor="middle">0</text><text x="459" y="247" text-anchor="middle">.25</text><text x="528" y="247" text-anchor="middle">.5</text><text x="596" y="247" text-anchor="middle">.75</text><text x="665" y="247" text-anchor="middle">1</text>
+    <text x="528" y="269" text-anchor="middle">true-class probability p</text>
+  </g>
+  <path d="M390 48 L665 230" fill="none" stroke="#e0533f" stroke-width="2.5"/>
+  <path d="M390 230 C420 207,451 191,482 198 C530 209,589 225,665 230" fill="none" stroke="#6366f1" stroke-width="2.5"/>
+  <circle cx="396" cy="52" r="4" fill="#e0533f"/><circle cx="396" cy="229" r="4" fill="#6366f1"/>
+  <text x="475" y="70" fill="#e0533f">CE: |∂L/∂z|=1−p</text>
+  <text x="480" y="190" fill="#6366f1">MSE: ∝p(1−p)²</text>
+  <text x="525" y="112" text-anchor="middle" fill="#98a3b2">p→0인 확신에 찬 오답:</text>
+  <text x="525" y="129" text-anchor="middle" fill="#98a3b2">CE 신호는 남고 MSE 신호는 사라짐</text>
+</svg>
+<figcaption><b>통계적으로</b> CE와 probability-space MSE(Brier)는 모두 정답 확률 $r$에서 expected risk가 최소입니다. 차이는 주로 likelihood 해석과 <b>logit-space 최적화 geometry</b>에 있습니다. CE는 틀린 클래스에 포화된 모델에도 큰 수정 신호를 주지만, softmax/sigmoid 뒤 MSE에는 추가 Jacobian이 곱해져 신호가 작아집니다.</figcaption>
+</figure>
+
+| 관점 | Cross-entropy | MSE on probabilities (Brier) |
+| --- | --- | --- |
+| 확률 모델 | Bernoulli/categorical NLL | squared probability error; proper score |
+| 확신에 찬 오답 | $-\log q_y\to\infty$ — 강한 penalty | bounded — 비교적 완만 |
+| logit gradient | softmax/sigmoid Jacobian이 상쇄되어 $q-y$ | Jacobian이 한 번 더 곱해져 포화 시 작음 |
+| 실무 해석 | likelihood training의 자연스러운 기본값 | calibration 평가·일부 예측 문제에서 유용 |
+
+따라서 좋은 답은 “MSE는 분류에서 틀렸다”가 아닙니다. **CE는 categorical likelihood에 정확히 대응하고, 확신에 찬 오답에서도 유용한 logit gradient를 주기 때문에 기본값**입니다. Brier는 bounded하므로 label noise나 outlier에 덜 공격적일 수 있고 calibration을 보는 데 유용합니다. 반대로 CE의 unbounded penalty가 항상 더 좋은 calibration·robustness를 보장하는 것은 아닙니다. softmax가 왜 exponential을 쓰는지와 CE 결합 미분은 [손실 & Gradient](#/ml-coding/losses-gradients)에 있습니다.
+
 ## §4 · Expectation, variance, 그리고 CLT (심화)
 
 - **큰 수의 법칙(LLN):** 표본 평균이 $\mathbb E[X]$로 수렴 — 그래서 empirical risk $\hat R=\frac1n\sum_i \ell_i$가 true risk를 근사합니다.

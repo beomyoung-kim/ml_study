@@ -99,7 +99,71 @@ $$
 
 ### 왜 $\sqrt{d}$로 나누나요?
 
-$q,k$ 성분이 대략 독립이고 평균 0·분산 1이라는 초기화 근사 아래, 내적 $q\cdot k=\sum_{i=1}^d q_ik_i$의 분산은 $\approx d$입니다. 스케일이 없으면 차원과 함께 logit 크기가 커져 softmax가 포화하고 gradient가 매우 작아질 수 있습니다. $\sqrt{d}$로 나누면 이 근사에서 점수 분산을 $\approx 1$로 유지합니다. 학습 후 성분이 완전히 독립이라는 주장이 아니라 초기 scale을 안정시키는 동기입니다([선형대수 & 미적분](#/foundations/linear-algebra-calculus) 참고).
+$q,k$의 성분이 대략 독립이고 각각 평균 0·분산 1이라는 초기화 근사를 둡시다. 한 좌표의 곱은
+
+$$
+\mathbb E[q_i k_i]=0,\qquad
+\operatorname{Var}(q_i k_i)=\mathbb E[q_i^2]\mathbb E[k_i^2]=1
+$$
+
+이고, 서로 독립인 $d$개 항을 더하면 분산이 더해집니다.
+
+$$
+\operatorname{Var}(q\cdot k)
+=\operatorname{Var}\!\left(\sum_{i=1}^{d}q_i k_i\right)
+\approx d
+$$
+
+여기서 중요한 구분은 **분산이 $d$이면 전형적인 크기인 표준편차는 $\sqrt d$** 라는 것입니다. 양수와 음수가 섞여 상쇄되므로 합의 크기가 $d$로 커지는 것이 아닙니다. 따라서
+
+$$
+\operatorname{Std}(q\cdot k)\approx\sqrt d,\qquad
+\operatorname{Var}\!\left(\frac{q\cdot k}{\sqrt d}\right)\approx 1
+$$
+
+이 됩니다. 즉 $d$가 아니라 $\sqrt d$로 나누는 이유는 **logit의 표준편차**를 상수 크기로 되돌리기 위해서입니다.
+
+<figure>
+<svg viewBox="0 0 680 270" xmlns="http://www.w3.org/2000/svg" font-family="Inter, sans-serif" font-size="11" role="img" aria-labelledby="scale-title-ko scale-desc-ko">
+  <title id="scale-title-ko">Attention score scaling과 softmax saturation 비교</title>
+  <desc id="scale-desc-ko">왼쪽 그래프는 scaling 전 score 표준편차가 차원의 제곱근으로 커지고 scaling 후에는 1로 유지됨을 보인다. 오른쪽은 차원 64에서 logit 차이 8과 scaling 후 차이 1의 softmax와 gradient를 비교한다.</desc>
+  <!-- left plot -->
+  <text x="175" y="18" text-anchor="middle" fill="currentColor">차원이 커질 때 score 표준편차</text>
+  <line x1="48" y1="215" x2="310" y2="215" stroke="#98a3b2"/>
+  <line x1="48" y1="215" x2="48" y2="35" stroke="#98a3b2"/>
+  <g fill="#98a3b2" font-size="10">
+    <text x="48" y="232" text-anchor="middle">1</text><text x="117" y="232" text-anchor="middle">16</text>
+    <text x="190" y="232" text-anchor="middle">64</text><text x="285" y="232" text-anchor="middle">256</text>
+    <text x="38" y="218" text-anchor="end">0</text><text x="38" y="173" text-anchor="end">4</text>
+    <text x="38" y="128" text-anchor="end">8</text><text x="38" y="83" text-anchor="end">12</text>
+    <text x="38" y="39" text-anchor="end">16</text><text x="175" y="252" text-anchor="middle">head dimension d</text>
+  </g>
+  <polyline points="48,204 117,170 190,125 285,35" fill="none" stroke="#e0533f" stroke-width="2.5"/>
+  <g fill="#e0533f"><circle cx="48" cy="204" r="3"/><circle cx="117" cy="170" r="3"/><circle cx="190" cy="125" r="3"/><circle cx="285" cy="35" r="3"/></g>
+  <text x="220" y="69" fill="#e0533f">scaling 없음: √d</text>
+  <line x1="48" y1="204" x2="285" y2="204" stroke="#12a150" stroke-width="2.5"/>
+  <text x="151" y="197" fill="#12a150">÷√d: 1</text>
+  <!-- divider -->
+  <line x1="335" y1="28" x2="335" y2="235" stroke="#98a3b2" opacity=".45"/>
+  <!-- right comparison -->
+  <text x="510" y="18" text-anchor="middle" fill="currentColor">d=64: 같은 신호, 다른 softmax</text>
+  <text x="365" y="48" fill="#98a3b2">scaling 전 Δ=8</text>
+  <rect x="365" y="61" width="235" height="24" rx="4" fill="none" stroke="#98a3b2"/>
+  <rect x="365" y="61" width="234.9" height="24" rx="4" fill="#e0533f" opacity=".82"/>
+  <text x="668" y="77" text-anchor="end" fill="currentColor">0.9997 / 0.0003</text>
+  <text x="365" y="106" fill="#98a3b2">÷√64=8 후 Δ=1</text>
+  <rect x="365" y="119" width="235" height="24" rx="4" fill="none" stroke="#98a3b2"/>
+  <rect x="365" y="119" width="172" height="24" rx="4" fill="#12a150" opacity=".82"/>
+  <text x="668" y="135" text-anchor="end" fill="currentColor">0.731 / 0.269</text>
+  <path d="M365 178 H600" stroke="#98a3b2"/>
+  <circle cx="375" cy="178" r="5" fill="#e0533f"/><text x="388" y="182" fill="currentColor">Δ=8: p(1−p)≈0.0003</text>
+  <circle cx="375" cy="207" r="5" fill="#12a150"/><text x="388" y="211" fill="currentColor">Δ=1: p(1−p)≈0.197</text>
+  <text x="482" y="238" text-anchor="middle" fill="#98a3b2">큰 logit gap → 거의 one-hot → 작은 gradient</text>
+</svg>
+<figcaption>$d=64$이면 scaling 전 score의 표준편차는 약 8입니다. 두 logit의 차이가 8이면 softmax가 거의 one-hot이고 binary softmax의 민감도 $p(1-p)$도 거의 0입니다. $\sqrt{64}=8$로 나누면 차이가 1 수준으로 돌아와 학습 가능한 gradient가 남습니다.</figcaption>
+</figure>
+
+이 scaling은 softmax가 항상 균일해야 한다는 뜻이 아닙니다. 학습이 필요하면 큰 attention score를 만들 수 있지만, **초기 차원 수만으로** 분포가 포화되는 것을 막는 장치입니다. 또한 위 독립·단위분산 가정은 동기를 설명하는 초기화 근사이지, 학습 후 모든 $q,k$ 성분이 계속 독립이라는 주장이 아닙니다([선형대수 & 미적분](#/foundations/linear-algebra-calculus) 참고).
 
 ## Masking (마스킹)
 
@@ -109,6 +173,74 @@ $q,k$ 성분이 대략 독립이고 평균 0·분산 1이라는 초기화 근사
 </script>
 </div>
 
+행을 query 위치 $i$, 열을 key 위치 $j$라고 합시다. position $i$는 과거와 자기 자신($j\le i$)은 볼 수 있고 미래($j>i$)는 볼 수 없습니다. 따라서 Boolean mask와 additive mask는 같은 허용 영역을 서로 다르게 표현합니다.
+
+$$
+\text{allowed}_{ij}=[j\le i],\qquad
+M_{ij}=
+\begin{cases}
+0,&j\le i\\
+-\infty,&j>i
+\end{cases},\qquad
+A=\operatorname{softmax}(S+M)
+$$
+
+<figure>
+<svg viewBox="0 0 720 275" xmlns="http://www.w3.org/2000/svg" font-family="Inter, sans-serif" font-size="10.5" role="img" aria-labelledby="mask-title-ko mask-desc-ko">
+  <title id="mask-title-ko">Causal attention mask가 score를 attention weight로 바꾸는 과정</title>
+  <desc id="mask-desc-ko">행은 query, 열은 key다. additive mask의 대각선과 왼쪽 아래는 0으로 허용되고 오른쪽 위 미래 위치는 마이너스 무한대로 차단된다. softmax 후 미래 위치의 확률은 0이다.</desc>
+  <defs><marker id="mask-arrow-ko" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0 0 L6 3 L0 6" fill="#98a3b2"/></marker></defs>
+  <text x="120" y="18" text-anchor="middle" fill="currentColor">① raw score S</text>
+  <text x="360" y="18" text-anchor="middle" fill="currentColor">② additive mask M</text>
+  <text x="610" y="18" text-anchor="middle" fill="currentColor">③ softmax(S+M)</text>
+  <!-- row/column labels -->
+  <g fill="#98a3b2">
+    <text x="120" y="38" text-anchor="middle">key j →</text><text x="360" y="38" text-anchor="middle">key j →</text><text x="610" y="38" text-anchor="middle">key j →</text>
+    <text x="31" y="136" text-anchor="middle" transform="rotate(-90 31 136)">query i →</text>
+    <text x="271" y="136" text-anchor="middle" transform="rotate(-90 271 136)">query i →</text>
+    <text x="521" y="136" text-anchor="middle" transform="rotate(-90 521 136)">query i →</text>
+  </g>
+  <!-- matrices -->
+  <g transform="translate(50 48)">
+    <rect width="140" height="140" fill="none" stroke="#0ea5e9" stroke-width="1.4"/>
+    <g stroke="#98a3b2" opacity=".45"><path d="M35 0V140M70 0V140M105 0V140M0 35H140M0 70H140M0 105H140"/></g>
+    <g fill="currentColor" text-anchor="middle">
+      <text x="17.5" y="22">s₀₀</text><text x="52.5" y="22">s₀₁</text><text x="87.5" y="22">s₀₂</text><text x="122.5" y="22">s₀₃</text>
+      <text x="17.5" y="57">s₁₀</text><text x="52.5" y="57">s₁₁</text><text x="87.5" y="57">s₁₂</text><text x="122.5" y="57">s₁₃</text>
+      <text x="17.5" y="92">s₂₀</text><text x="52.5" y="92">s₂₁</text><text x="87.5" y="92">s₂₂</text><text x="122.5" y="92">s₂₃</text>
+      <text x="17.5" y="127">s₃₀</text><text x="52.5" y="127">s₃₁</text><text x="87.5" y="127">s₃₂</text><text x="122.5" y="127">s₃₃</text>
+    </g>
+  </g>
+  <g transform="translate(290 48)">
+    <path d="M0 0H35V35H70V70H105V105H140V140H0Z" fill="#12a150" opacity=".2"/>
+    <path d="M35 0H140V105H105V70H70V35H35Z" fill="#e0533f" opacity=".25"/>
+    <rect width="140" height="140" fill="none" stroke="#6366f1" stroke-width="1.4"/>
+    <g stroke="#98a3b2" opacity=".45"><path d="M35 0V140M70 0V140M105 0V140M0 35H140M0 70H140M0 105H140"/></g>
+    <g text-anchor="middle">
+      <g fill="#12a150"><text x="17.5" y="22">0</text><text x="17.5" y="57">0</text><text x="52.5" y="57">0</text><text x="17.5" y="92">0</text><text x="52.5" y="92">0</text><text x="87.5" y="92">0</text><text x="17.5" y="127">0</text><text x="52.5" y="127">0</text><text x="87.5" y="127">0</text><text x="122.5" y="127">0</text></g>
+      <g fill="#e0533f"><text x="52.5" y="22">−∞</text><text x="87.5" y="22">−∞</text><text x="122.5" y="22">−∞</text><text x="87.5" y="57">−∞</text><text x="122.5" y="57">−∞</text><text x="122.5" y="92">−∞</text></g>
+    </g>
+  </g>
+  <g transform="translate(540 48)">
+    <path d="M0 0H35V35H70V70H105V105H140V140H0Z" fill="#12a150" opacity=".2"/>
+    <path d="M35 0H140V105H105V70H70V35H35Z" fill="#e0533f" opacity=".12"/>
+    <rect width="140" height="140" fill="none" stroke="#12a150" stroke-width="1.4"/>
+    <g stroke="#98a3b2" opacity=".45"><path d="M35 0V140M70 0V140M105 0V140M0 35H140M0 70H140M0 105H140"/></g>
+    <g text-anchor="middle">
+      <g fill="currentColor"><text x="17.5" y="22">1</text><text x="17.5" y="57">a</text><text x="52.5" y="57">b</text><text x="17.5" y="92">a</text><text x="52.5" y="92">b</text><text x="87.5" y="92">c</text><text x="17.5" y="127">a</text><text x="52.5" y="127">b</text><text x="87.5" y="127">c</text><text x="122.5" y="127">d</text></g>
+      <g fill="#e0533f"><text x="52.5" y="22">0</text><text x="87.5" y="22">0</text><text x="122.5" y="22">0</text><text x="87.5" y="57">0</text><text x="122.5" y="57">0</text><text x="122.5" y="92">0</text></g>
+    </g>
+  </g>
+  <path d="M200 118H270" stroke="#98a3b2" marker-end="url(#mask-arrow-ko)"/><text x="235" y="108" text-anchor="middle" fill="#98a3b2">더하기</text>
+  <path d="M440 118H520" stroke="#98a3b2" marker-end="url(#mask-arrow-ko)"/><text x="480" y="108" text-anchor="middle" fill="#98a3b2">행별 softmax</text>
+  <text x="360" y="215" text-anchor="middle" fill="#12a150">대각선 + 왼쪽 아래: 과거/현재 → 허용</text>
+  <text x="360" y="236" text-anchor="middle" fill="#e0533f">오른쪽 위: 미래 → −∞ → exp(−∞)=0</text>
+  <text x="360" y="259" text-anchor="middle" fill="#98a3b2">각 output row의 허용된 weight만 합이 1</text>
+</svg>
+<figcaption>왼쪽 아래를 지우는 것이 아니라 <b>왼쪽 아래와 대각선을 허용</b>합니다. `np.tril(...)`의 `True`가 이 영역입니다. additive 표현에서는 허용 위치에 0을 더하고 미래 위치에 $-\infty$를 더합니다.</figcaption>
+</figure>
+
+- `score=0`은 mask가 아닙니다. softmax에서 $e^0=1$이라 여전히 양의 확률을 받습니다. 막힌 위치가 정확히 확률 0이 되려면 softmax **전에** $-\infty$ 또는 dtype에 맞는 충분히 큰 음수를 넣어야 합니다.
 - **Causal mask(인과 마스크)** 는 position $t$가 미래($>t$)를 보지 못하게 막습니다 — 다음 단어를 생성하는 autoregressive decoding에 필수입니다(미리 답을 보면 안 되니까요).
 - **Key-padding mask** 는 `[PAD]`(길이 맞추기용 빈칸) key로의 attention을 막습니다; shape은 `(B,1,1,Tk)`로 head와 query에 대해 broadcast됩니다.
 - 논리 **AND** 로 결합합니다(둘 다 허용해야 함). mask는 softmax **이전**에 적용합니다. Boolean mask의 막힌 항목은 `-inf`로 두되, 모든 key가 막힌 row는 의미가 없으므로 호출자가 최소 한 key를 허용하거나 명시적 zero-output 정책을 정해야 합니다.
@@ -116,6 +248,61 @@ $q,k$ 성분이 대략 독립이고 평균 0·분산 1이라는 초기화 근사
 ## Multi-head attention
 
 왜 큰 attention 하나가 아니라 여러 개를 쓸까요? 직관: head 하나는 "한 가지 관점"으로만 참고합니다. $d$차원을 $h$개의 작은 부분공간으로 나누면, **같은 연산량으로** 여러 관점(문법·위치·의미 등)을 동시에 보고 마지막에 합칩니다.
+
+### `num_heads`가 커지면 파라미터와 계산량은?
+
+먼저 무엇을 고정했는지 말해야 합니다. 표준 비교는 model width $D=d_{\text{model}}$를 고정하고 head 수 $H$만 바꿉니다. 이때 head dimension은
+
+$$
+d_h=\frac{D}{H}
+$$
+
+이므로 head가 많아질수록 각 head는 좁아집니다. bias를 생략한 표준 MHA의 projection parameter는
+
+$$
+\underbrace{3D^2}_{W^Q,W^K,W^V}+\underbrace{D^2}_{W^O}=4D^2
+$$
+
+로 **$H$와 무관**합니다. $H$개의 작은 projection matrix를 따로 적더라도 전체 column 수가 $H d_h=D$라 합은 같습니다.
+
+연산량도 같은 방식으로 상쇄됩니다. batch $B$, 길이 $T$에서 multiply–accumulate(MAC) 기준으로:
+
+$$
+\text{projection}\approx4BTD^2,\qquad
+\text{attention matmul}
+=H\cdot 2BT^2d_h
+=2BT^2D.
+$$
+
+즉 $D$가 고정이면 `num_heads`를 8에서 16으로 늘려도 이론적인 주요 matmul 수는 거의 그대로입니다. 다만 **intermediate memory는 같지 않습니다**. 각 head가 별도의 $T\times T$ score/weight를 가지므로 naive attention은 $O(BHT^2)$ 원소를 materialize합니다.
+
+| $D$ 고정에서 $H$ 증가 | 변화 |
+| --- | --- |
+| head dimension $d_h=D/H$ | 감소 |
+| Q/K/V/O parameter $\approx4D^2$ | 거의 동일 |
+| projection MAC $4BTD^2$ | 동일 |
+| QKᵀ + AV MAC $2BT^2D$ | 동일 |
+| naive score/weight memory $BHT^2$ | $H$에 선형 증가 |
+| 실제 wall-clock | hardware·kernel shape에 따라 증가 또는 감소 |
+
+FLOP이 같다고 속도가 같은 것은 아닙니다. head는 병렬성을 주지만 $d_h$가 너무 작으면 작은 matmul·더 많은 softmax row·kernel scheduling overhead 때문에 GPU 활용률이 나빠질 수 있습니다. 반대로 head가 너무 적고 행렬 shape가 불리하면 병렬 자원을 충분히 못 쓸 수 있습니다. FlashAttention은 $BHT^2$ matrix를 HBM에 저장하지 않지만 head 수에 따른 tile scheduling과 shape 효율까지 없애지는 않습니다. 따라서 `num_heads`는 latency를 단조롭게 줄이는 knob가 아니라 **품질과 target hardware에서 benchmark할 architecture hyperparameter**입니다.
+
+> [!WARNING] 비교 기준을 바꾸면 결론도 바뀝니다
+> $d_h$를 고정한 채 $H$를 늘리면 $D=Hd_h$ 자체가 커집니다. 이 경우 parameter는 대략 $4D^2$, projection compute도 $D^2$로 커집니다. “head 수를 늘려도 비용이 같다”는 말은 반드시 **$D$를 고정하고 split만 바꿀 때**의 이야기입니다.
+
+### MHA는 parameter-saving approximation인가?
+
+아닙니다. 같은 $D$의 single-head attention과 표준 MHA는 projection parameter와 주요 matmul 예산이 거의 같습니다. MHA의 목적은 큰 attention을 싸게 근사하는 것이 아니라 **한 query가 서로 다른 learned subspace에서 여러 attention distribution을 동시에 갖게 하는 것**입니다.
+
+single head는 query마다 하나의 weight vector $A_i$를 만들고 모든 value channel에 그 동일한 token-mixing pattern을 적용합니다. MHA는
+
+$$
+A_i^{(1)},A_i^{(2)},\ldots,A_i^{(H)}
+$$
+
+처럼 head마다 별도 pattern을 만들 수 있어, 한 head는 가까운 문법 관계를 보고 다른 head는 먼 coreference나 위치 관계를 볼 수 있습니다. $D$를 $H$개로 나누는 것은 이 표현력을 **고정된 전체 width/compute budget 안에서** 얻기 위한 설계이지 parameter reduction이 아닙니다. 일부 head가 학습 후 중복되거나 pruning 가능하다는 관찰도 있지만, 그것이 MHA의 기본 목적을 approximation으로 바꾸지는 않습니다.
+
+효율을 위해 K/V를 실제로 공유하는 구조는 **MQA/GQA**입니다. 이들은 query head 수는 유지하면서 KV head 수를 줄여 parameter 일부와 특히 inference KV cache를 줄이는 명시적인 품질–효율 절충입니다.
 
 <figure>
 <svg viewBox="0 0 640 190" xmlns="http://www.w3.org/2000/svg" font-family="Inter, sans-serif" font-size="12">
@@ -155,7 +342,7 @@ $q,k$ 성분이 대략 독립이고 평균 0·분산 1이라는 초기화 근사
 </script>
 </div>
 
-head를 batch 같은 축으로 나누면 하나의 `@`로 모든 head를 한 번에 계산할 수 있습니다. **복잡도:** head당 점수 행렬에 대해 $O(T^2 d)$ 연산과 $O(T^2)$ 메모리가 듭니다 — 긴 시퀀스에서 attention이 비싼 근본 이유입니다.
+head를 batch 같은 축으로 나누면 하나의 `@`로 모든 head를 한 번에 계산할 수 있습니다. head당 $O(T^2d_h)$ 연산과 $O(T^2)$ score memory, 전체로는 $O(T^2D)$ 연산과 naive 구현에서 $O(HT^2)$ score memory가 듭니다 — 긴 시퀀스에서 attention이 비싼 근본 이유입니다.
 
 ## PyTorch 모듈
 
@@ -204,7 +391,7 @@ if __name__ == "__main__":
 
 **짧게:** head는 모델이 서로 다른 학습된 부분공간에서 서로 다른 관계(구문, 위치, coreference)에 동시에 attend한 뒤 이를 결합하게 해줍니다.
 
-**깊게:** 단일 head는 query당 하나의 softmax 분포만 만듭니다 — attend할 "이유" 하나뿐이죠. $d$를 $d/h$ 크기의 $h$개 부분공간으로 나누면 *동일한* 총 연산량으로 $h$개의 독립적인 attention 패턴을 얻습니다 (projection이 비례해서 작아집니다). 경험적으로 서로 다른 head가 특화되며, 표현 공간에서의 값싼 ensemble의 한 형태입니다. $h\cdot(d/h)=d$ 이므로 비용은 그대로입니다.
+**깊게:** 단일 head는 query당 하나의 softmax 분포만 만들어 모든 value channel에 같은 token-mixing pattern을 적용합니다. $D$를 $D/H$ 크기의 $H$개 부분공간으로 나누면 고정된 $D$와 거의 같은 parameter/FLOP 예산에서 $H$개의 pattern을 얻습니다. 이는 parameter-saving approximation이 아니라 structured expressivity를 추가하는 설계입니다. 다만 naive score memory는 $O(BHT^2)$이고 실제 속도는 head dimension과 kernel에 따라 달라집니다. KV cache 절감이 목적이면 K/V head를 공유하는 MQA/GQA를 구분하세요.
 </div></details>
 
 <details class="qa"><summary>메모리 병목은 무엇이고 FlashAttention은 어떻게 해결하나요?</summary>
@@ -238,7 +425,8 @@ if __name__ == "__main__":
 | Softmax axis | **key** 기준 (`axis=-1`) |
 | Masking | softmax **이전**에 적용, $-\infty$로 채움; AND로 결합 |
 | Head split | $(B,T,D)\!\to\!(B,H,T,D/h)$ |
-| Complexity | $O(T^2 d)$ 시간, $O(T^2)$ 점수 메모리 |
+| Head 수 | $D$ 고정이면 parameter/FLOP은 거의 동일, $d_h$는 감소, naive score memory는 $O(BHT^2)$ |
+| Complexity | 전체 attention $O(T^2D)$ 시간, naive score memory $O(BHT^2)$ |
 | Prod kernel | `F.scaled_dot_product_attention`가 조건에 따라 Flash/memory-efficient/math backend를 선택 |
 
 **Cross-links:** [NumPy 프라이머](#/ml-coding/numpy-primer) · [Positional Encoding & RoPE](#/ml-coding/positional-encoding-rope) · [A Transformer Block](#/ml-coding/transformer) · [CNN · RNN · Transformer](#/foundations/architectures) · [LLM Fundamentals](#/llm/fundamentals)

@@ -112,6 +112,49 @@ Uniform affine quantization: $x_q=\mathrm{clip}(\mathrm{round}(x/s)+z)$, scale $
 
 순진한 attention 구현은 $n\times n$ score를 HBM에 materialize합니다. FlashAttention은 Q/K/V를 **tile**하고 on-chip memory에서 online softmax를 계산해 full score matrix를 HBM에 저장하지 않으면서 같은 attention 결과를 수치 오차 범위에서 계산합니다. 메모리 트래픽과 peak memory를 크게 줄이지만, 연산이 실제로 memory-bound에서 compute-bound로 바뀌는지는 sequence length·head dimension·dtype·GPU와 kernel에 달렸습니다.
 
+핵심은 FLOP을 없애는 것이 아니라 **HBM 왕복을 없애는 것**입니다. 두 방식 모두 dense attention의 $O(n^2d)$ dot product를 계산합니다. naive 구현은 score와 softmax weight라는 $n^2$ intermediate를 HBM에 썼다가 다시 읽습니다. FlashAttention은 query block과 key/value block을 빠른 SRAM에 올려 한 tile의 score만 만들고, output 통계에 반영한 뒤 버립니다.
+
+<figure>
+<svg viewBox="0 0 720 270" xmlns="http://www.w3.org/2000/svg" font-family="Inter, sans-serif" font-size="11" role="img" aria-labelledby="fa-title-ko fa-desc-ko">
+  <title id="fa-title-ko">Naive attention과 FlashAttention의 memory traffic 비교</title>
+  <desc id="fa-desc-ko">Naive attention은 전체 score와 probability matrix를 HBM에 저장하고 다시 읽는다. FlashAttention은 Q K V tile을 SRAM으로 가져와 online softmax와 output 누적을 수행하고 전체 이차 행렬을 저장하지 않는다.</desc>
+  <defs><marker id="fa-arrow-ko" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0 0 L6 3 L0 6" fill="#98a3b2"/></marker></defs>
+  <text x="18" y="30" fill="#e0533f">Naive</text>
+  <rect x="85" y="10" width="92" height="42" rx="5" fill="none" stroke="#0ea5e9" stroke-width="1.5"/><text x="131" y="35" text-anchor="middle" fill="currentColor">Q, K, V · HBM</text>
+  <rect x="230" y="10" width="95" height="42" rx="5" fill="#e0533f" opacity=".18" stroke="#e0533f"/><text x="277" y="29" text-anchor="middle" fill="currentColor">S=QKᵀ</text><text x="277" y="43" text-anchor="middle" fill="#98a3b2">n×n · HBM</text>
+  <rect x="380" y="10" width="105" height="42" rx="5" fill="#e0533f" opacity=".18" stroke="#e0533f"/><text x="432" y="29" text-anchor="middle" fill="currentColor">P=softmax(S)</text><text x="432" y="43" text-anchor="middle" fill="#98a3b2">n×n · HBM</text>
+  <rect x="550" y="10" width="92" height="42" rx="5" fill="none" stroke="#12a150" stroke-width="1.5"/><text x="596" y="35" text-anchor="middle" fill="currentColor">O=PV · HBM</text>
+  <g stroke="#98a3b2" marker-end="url(#fa-arrow-ko)"><path d="M177 31H220"/><path d="M325 31H370"/><path d="M485 31H540"/></g>
+  <text x="360" y="78" text-anchor="middle" fill="#e0533f">큰 intermediate를 write → read → write: IO가 병목</text>
+  <line x1="18" y1="96" x2="702" y2="96" stroke="#98a3b2" opacity=".4"/>
+  <text x="18" y="130" fill="#12a150">Flash</text>
+  <rect x="85" y="108" width="112" height="50" rx="5" fill="none" stroke="#0ea5e9" stroke-width="1.5"/><text x="141" y="128" text-anchor="middle" fill="currentColor">Q, K, V · HBM</text><text x="141" y="145" text-anchor="middle" fill="#98a3b2">block 단위로 읽기</text>
+  <rect x="250" y="108" width="220" height="96" rx="6" fill="#12a150" opacity=".14" stroke="#12a150" stroke-width="1.7"/>
+  <text x="360" y="128" text-anchor="middle" fill="currentColor">on-chip SRAM</text>
+  <rect x="270" y="142" width="78" height="38" rx="4" fill="none" stroke="#6366f1"/><text x="309" y="158" text-anchor="middle" fill="currentColor">score tile</text><text x="309" y="172" text-anchor="middle" fill="#98a3b2">QᵦKᵦᵀ</text>
+  <rect x="372" y="142" width="78" height="38" rx="4" fill="none" stroke="#6366f1"/><text x="411" y="158" text-anchor="middle" fill="currentColor">online</text><text x="411" y="172" text-anchor="middle" fill="#98a3b2">softmax + O</text>
+  <rect x="550" y="108" width="92" height="50" rx="5" fill="none" stroke="#12a150" stroke-width="1.5"/><text x="596" y="128" text-anchor="middle" fill="currentColor">O · HBM</text><text x="596" y="145" text-anchor="middle" fill="#98a3b2">최종값만 write</text>
+  <g stroke="#98a3b2" marker-end="url(#fa-arrow-ko)"><path d="M197 133H240"/><path d="M470 133H540"/></g>
+  <path d="M450 190C500 235 210 235 270 190" fill="none" stroke="#98a3b2" stroke-dasharray="4 3" marker-end="url(#fa-arrow-ko)"/>
+  <text x="360" y="248" text-anchor="middle" fill="#12a150">다음 K/V tile: running max·denominator·output만 유지 · n×n HBM 저장 없음</text>
+</svg>
+<figcaption>FlashAttention은 approximate/sparse attention이 아니라 <b>같은 dense attention을 IO-aware한 순서로 계산</b>합니다. floating-point reduction 순서가 달라 bitwise 동일하지는 않을 수 있지만 수학적 연산은 같습니다.</figcaption>
+</figure>
+
+### Online softmax는 어떻게 정확한가?
+
+한 query row에서 지금까지 본 tile의 최대값 $m$, softmax 분모 $\ell$, 아직 정규화하지 않은 value numerator $r$를 유지합니다. 새 score tile $s_j$와 value $v_j$가 오면:
+
+$$
+\begin{aligned}
+m'&=\max(m,\max_j s_j),\\
+\ell'&=e^{m-m'}\ell+\sum_j e^{s_j-m'},\\
+r'&=e^{m-m'}r+\sum_j e^{s_j-m'}v_j,\qquad o=\frac{r'}{\ell'}.
+\end{aligned}
+$$
+
+새 tile에서 더 큰 maximum이 나타나도 이전 누적값에 $e^{m-m'}$를 곱해 같은 기준으로 rescale하므로, 모든 score를 한꺼번에 본 stable softmax와 같은 결과를 복원합니다. backward는 $n^2$ probability를 저장하는 대신 tile을 **재계산**해 activation memory를 줄입니다. 즉 약간의 recompute로 훨씬 큰 memory traffic을 아끼는 trade-off입니다.
+
 <dl class="kv">
 <dt>FA-2</dt><dd>Warp/threadblock 간 더 나은 work partitioning.</dd>
 <dt>FA-3</dt><dd>Hopper/H100: async copy(TMA) + warp specialization + FP8.</dd>
@@ -125,8 +168,49 @@ Uniform affine quantization: $x_q=\mathrm{clip}(\mathrm{round}(x/s)+z)$, scale $
 
 Autoregressive decoding은 과거 K/V를 cache합니다. cache는 context에 따라 커지고 long-context 메모리를 지배합니다.
 
+새 token $t$를 생성할 때 필요한 query는 $q_t$ 하나뿐입니다. 하지만 이 query는 모든 과거 key $K_{1:t}$와 dot product를 만들고 그 weight로 $V_{1:t}$를 섞어야 합니다. 과거 token의 K/V는 모델과 prefix가 같으면 변하지 않으므로 layer마다 저장해 재사용합니다. 그 결과 과거 전체의 projection을 다시 계산하는 낭비는 사라지지만, 매 step cache 전체를 읽는 bandwidth와 저장 공간이 새 병목이 됩니다.
+
+$$
+\text{KV bytes}=2\;LBT\,H_{kv}d_h\;b
+$$
+
+$2$는 K와 V, $L$은 layer 수, $B$는 batch, $T$는 cached token 수, $H_{kv}$는 KV head 수, $d_h$는 head dimension, $b$는 원소당 byte입니다. 예를 들어 $L=32,B=1,T=8192,H_{kv}=8,d_h=128$, BF16($b=2$)이면 **1 GiB**입니다. 같은 설정에서 $H_{kv}=32$인 MHA라면 4 GiB이므로 GQA가 cache를 왜 크게 줄이는지 바로 보입니다.
+
+<figure>
+<svg viewBox="0 0 720 270" xmlns="http://www.w3.org/2000/svg" font-family="Inter, sans-serif" font-size="11" role="img" aria-labelledby="kv-title-ko kv-desc-ko">
+  <title id="kv-title-ko">Autoregressive decoding의 KV cache 성장과 읽기</title>
+  <desc id="kv-desc-ko">각 transformer layer에 과거 token의 key와 value가 저장된다. 현재 token은 새 K와 V 한 칸을 append하고 새 query는 저장된 모든 과거 K와 V를 읽는다. cache는 token 수와 layer 수에 선형으로 증가한다.</desc>
+  <defs><marker id="kv-arrow-ko" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0 0 L6 3 L0 6" fill="#98a3b2"/></marker></defs>
+  <text x="120" y="22" text-anchor="middle" fill="currentColor">layer별 KV cache</text>
+  <g fill="#98a3b2"><text x="85" y="48">t₁</text><text x="125" y="48">t₂</text><text x="165" y="48">t₃</text><text x="205" y="48">…</text><text x="245" y="48">tₜ₋₁</text><text x="290" y="48">tₜ</text></g>
+  <g>
+    <text x="15" y="78" fill="#98a3b2">L1 · K</text><text x="15" y="108" fill="#98a3b2">L1 · V</text>
+    <text x="15" y="158" fill="#98a3b2">L2 · K</text><text x="15" y="188" fill="#98a3b2">L2 · V</text>
+    <text x="15" y="228" fill="#98a3b2">… L · K/V</text>
+    <g fill="#0ea5e9" opacity=".62">
+      <rect x="70" y="60" width="32" height="22"/><rect x="107" y="60" width="32" height="22"/><rect x="144" y="60" width="32" height="22"/><rect x="181" y="60" width="32" height="22"/><rect x="218" y="60" width="45" height="22"/>
+      <rect x="70" y="90" width="32" height="22"/><rect x="107" y="90" width="32" height="22"/><rect x="144" y="90" width="32" height="22"/><rect x="181" y="90" width="32" height="22"/><rect x="218" y="90" width="45" height="22"/>
+      <rect x="70" y="140" width="32" height="22"/><rect x="107" y="140" width="32" height="22"/><rect x="144" y="140" width="32" height="22"/><rect x="181" y="140" width="32" height="22"/><rect x="218" y="140" width="45" height="22"/>
+      <rect x="70" y="170" width="32" height="22"/><rect x="107" y="170" width="32" height="22"/><rect x="144" y="170" width="32" height="22"/><rect x="181" y="170" width="32" height="22"/><rect x="218" y="170" width="45" height="22"/>
+      <rect x="70" y="210" width="193" height="24"/>
+    </g>
+    <g fill="#e0533f"><rect x="275" y="60" width="32" height="22"/><rect x="275" y="90" width="32" height="22"/><rect x="275" y="140" width="32" height="22"/><rect x="275" y="170" width="32" height="22"/><rect x="275" y="210" width="32" height="24"/></g>
+  </g>
+  <line x1="340" y1="25" x2="340" y2="245" stroke="#98a3b2" opacity=".45"/>
+  <rect x="390" y="48" width="112" height="44" rx="5" fill="#e0533f" opacity=".18" stroke="#e0533f"/><text x="446" y="67" text-anchor="middle" fill="currentColor">현재 token</text><text x="446" y="83" text-anchor="middle" fill="#98a3b2">qₜ, kₜ, vₜ 계산</text>
+  <rect x="560" y="48" width="120" height="44" rx="5" fill="#12a150" opacity=".16" stroke="#12a150"/><text x="620" y="67" text-anchor="middle" fill="currentColor">K/V append</text><text x="620" y="83" text-anchor="middle" fill="#98a3b2">token마다 선형 성장</text>
+  <path d="M502 70H550" stroke="#98a3b2" marker-end="url(#kv-arrow-ko)"/>
+  <path d="M446 100C446 151 344 151 308 108" fill="none" stroke="#6366f1" stroke-width="1.6" marker-end="url(#kv-arrow-ko)"/>
+  <text x="505" y="139" text-anchor="middle" fill="#6366f1">qₜ가 cache의 모든 K를 읽어 score 계산</text>
+  <path d="M308 178C370 206 478 205 545 177" fill="none" stroke="#12a150" stroke-width="1.6" marker-end="url(#kv-arrow-ko)"/>
+  <text x="500" y="226" text-anchor="middle" fill="#12a150">weight로 모든 V를 읽어 output 생성</text>
+  <text x="190" y="260" text-anchor="middle" fill="#98a3b2">파랑=재사용 · 빨강=이번 step에 추가</text>
+</svg>
+<figcaption>KV cache는 compute를 공짜로 만드는 기술이 아니라 <b>과거 projection 재계산을 cache read로 교환</b>하는 기술입니다. 긴 context·큰 batch에서는 cache를 읽는 bandwidth와 메모리 capacity가 지배적일 수 있습니다.</figcaption>
+</figure>
+
 <dl class="kv">
-<dt>PagedAttention (vLLM)</dt><dd>KV cache의 virtual-memory 스타일 paging → 거의 zero fragmentation, 높은 batch throughput.</dd>
+<dt>PagedAttention (vLLM)</dt><dd>KV cache를 고정 크기 block으로 비연속 할당해 fragmentation과 미리 예약한 빈 공간을 줄입니다. FlashAttention과 달리 핵심은 attention 수학이 아니라 <b>cache memory management</b>입니다.</dd>
 <dt>GQA / MQA</dt><dd>Query head 간 K/V head를 공유해 cache 축소(아키텍처 수준).</dd>
 <dt>MLA</dt><dd>Multi-head Latent Attention(DeepSeek): K/V를 low-rank latent로 압축. GQA 대비 ~2.7–4.7× KV 감소 보고 <span class="badge badge-med">secondary</span>.</dd>
 <dt>Quantized KV</dt><dd>INT8 ≈ 2×, FP4 ≈ 4× cache 감소.</dd>
@@ -142,6 +226,47 @@ Autoregressive decoding은 과거 K/V를 cache합니다. cache는 context에 따
 
 싼 **drafter**가 여러 token을 제안하고 target 모델이 병렬로 verify합니다. greedy decoding은 target과 같은 token만 이어 붙이면 결과가 일치합니다. sampling에서는 rejection과 residual sampling까지 포함한 **정확한 speculative sampling 알고리즘**을 써야 target 분포를 보존합니다. 단순히 draft token을 검사해 prefix만 취한다고 같은 분포가 자동 보장되지는 않습니다.
 
+중요한 속도 원리는 target이 draft를 **token별로 순차 호출해 검사하는 것이 아니라**, draft token 전체를 입력으로 한 번 forward하여 여러 위치의 target logit을 병렬 계산한다는 점입니다. 예를 들어 네 token을 draft하고 앞의 두 개가 맞으면, 한 번의 target 호출로 두세 token을 진행할 수 있어 target weight read를 여러 token에 amortize합니다.
+
+<figure>
+<svg viewBox="0 0 720 235" xmlns="http://www.w3.org/2000/svg" font-family="Inter, sans-serif" font-size="11" role="img" aria-labelledby="spec-title-ko spec-desc-ko">
+  <title id="spec-title-ko">Speculative decoding의 draft와 병렬 verify 과정</title>
+  <desc id="spec-desc-ko">작은 drafter가 A B C D 네 token을 순차 제안한다. 큰 target은 네 위치의 logits를 한 번의 병렬 forward로 계산한다. A와 B는 accept되고 C에서 mismatch가 나면 corrected token X를 채택하고 나머지 draft는 버린다.</desc>
+  <defs><marker id="spec-arrow-ko" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0 0 L6 3 L0 6" fill="#98a3b2"/></marker></defs>
+  <text x="20" y="48" fill="#98a3b2">작은 drafter</text>
+  <rect x="125" y="25" width="70" height="42" rx="5" fill="#0ea5e9" opacity=".62"/><text x="160" y="50" text-anchor="middle" fill="currentColor">A</text>
+  <rect x="215" y="25" width="70" height="42" rx="5" fill="#0ea5e9" opacity=".62"/><text x="250" y="50" text-anchor="middle" fill="currentColor">B</text>
+  <rect x="305" y="25" width="70" height="42" rx="5" fill="#0ea5e9" opacity=".62"/><text x="340" y="50" text-anchor="middle" fill="currentColor">C</text>
+  <rect x="395" y="25" width="70" height="42" rx="5" fill="#0ea5e9" opacity=".62"/><text x="430" y="50" text-anchor="middle" fill="currentColor">D</text>
+  <g stroke="#98a3b2" marker-end="url(#spec-arrow-ko)"><path d="M195 46H205"/><path d="M285 46H295"/><path d="M375 46H385"/></g>
+  <text x="520" y="50" fill="#98a3b2">싸지만 순차 proposal</text>
+  <path d="M295 76V104" stroke="#98a3b2" marker-end="url(#spec-arrow-ko)"/>
+  <text x="20" y="134" fill="#98a3b2">큰 target</text>
+  <rect x="125" y="105" width="340" height="52" rx="6" fill="#6366f1" opacity=".18" stroke="#6366f1" stroke-width="1.5"/>
+  <text x="295" y="126" text-anchor="middle" fill="currentColor">[prefix, A, B, C, D] 한 번 forward</text>
+  <text x="295" y="145" text-anchor="middle" fill="#98a3b2">각 위치의 target distribution을 병렬 계산</text>
+  <text x="520" y="134" fill="#6366f1">비싼 target 호출 1회</text>
+  <path d="M295 157V183" stroke="#98a3b2" marker-end="url(#spec-arrow-ko)"/>
+  <text x="20" y="212" fill="#98a3b2">결과</text>
+  <g>
+    <rect x="125" y="184" width="70" height="36" rx="5" fill="#12a150" opacity=".62"/><text x="160" y="206" text-anchor="middle" fill="currentColor">A ✓</text>
+    <rect x="215" y="184" width="70" height="36" rx="5" fill="#12a150" opacity=".62"/><text x="250" y="206" text-anchor="middle" fill="currentColor">B ✓</text>
+    <rect x="305" y="184" width="70" height="36" rx="5" fill="#e0533f" opacity=".58"/><text x="340" y="206" text-anchor="middle" fill="currentColor">C ✕</text>
+    <rect x="395" y="184" width="70" height="36" rx="5" fill="#12a150" opacity=".28"/><text x="430" y="206" text-anchor="middle" fill="currentColor">X 채택</text>
+  </g>
+  <text x="520" y="201" fill="#12a150">2 draft accept + correction</text><text x="520" y="218" fill="#98a3b2">C 뒤의 draft는 폐기</text>
+</svg>
+<figcaption>greedy decoding에서는 target token과 일치하는 가장 긴 prefix를 accept하고 첫 mismatch에서 target token을 사용합니다. sampling에서는 단순 equality 대신 아래의 rejection/residual sampling이 필요합니다.</figcaption>
+</figure>
+
+표준 speculative sampling에서 drafter 분포를 $q$, target 분포를 $p$라 하면 제안 $x\sim q$를
+
+$$
+a(x)=\min\!\left(1,\frac{p(x)}{q(x)}\right)
+$$
+
+의 확률로 accept합니다. reject되면 $\max(p-q,0)$을 정규화한 **residual distribution**에서 correction token을 뽑습니다. 이 보정이 drafter의 편향을 정확히 제거하기 때문에 최종 sample의 marginal distribution이 target $p$와 같아집니다. draft $\gamma$개가 모두 accept되면 이미 계산된 다음 위치의 target distribution에서 token 하나를 더 뽑아 한 target 호출로 최대 $\gamma+1$ token을 진행할 수 있습니다. `q(x)=0`인 token은 애초에 draft되지 않으며 실제 구현은 zero division과 finite precision을 안전하게 처리해야 합니다.
+
 <dl class="kv">
 <dt>Medusa</dt><dd>Target 모델의 추가 prediction head가 여러 미래 token을 draft.</dd>
 <dt>EAGLE-1/2/3</dt><dd>Target의 hidden state 위의 작은 drafter + draft <i>tree</i>. EAGLE-3는 multi-layer feature를 융합, acceptance &gt;75% 보고 <span class="badge badge-med">vendor</span>.</dd>
@@ -149,6 +274,12 @@ Autoregressive decoding은 과거 K/V를 cache합니다. cache는 context에 따
 </dl>
 
 주요 serving runtime이 지원하는 선택지이지만 모든 workload의 기본값은 아닙니다. acceptance가 낮거나 batch가 이미 compute-bound이면 overhead가 이득을 지울 수 있으므로 실제 요청 분포에서 측정합니다.
+
+| 기술 | 없애려는 낭비 | 줄이지 않는 것 |
+| --- | --- | --- |
+| FlashAttention | attention 중 $n^2$ intermediate의 HBM traffic | dense attention의 $O(n^2)$ FLOP |
+| KV cache | 과거 token의 K/V projection 재계산 | 매 decode step의 전체 cache read |
+| Speculative decoding | target model의 순차 1-token 호출 수 | target verification과 drafter 비용 |
 
 <details class="qa"><summary>Speculative decoding은 언제 도움이 되고 언제 해가 되나요?</summary>
 <div class="qa-body">

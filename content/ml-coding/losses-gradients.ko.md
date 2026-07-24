@@ -56,6 +56,68 @@ $$
 <figcaption>logit $[1,2,3]$ → softmax → 확률 $[0.09, 0.24, 0.67]$. 점수 차이를 지수로 벌려 "가장 큰 것"에 확률을 몰아주되, 나머지도 0은 아닙니다(soft-max).</figcaption>
 </figure>
 
+### 왜 하필 exponential인가?
+
+목표가 단지 각 값을 0~1에 넣는 것이라면 min–max, sigmoid, ReLU 뒤 정규화 같은 대안도 만들 수 있습니다. 하지만 categorical probability에 필요한 것은 범위만이 아닙니다. softmax는 한 번에 다음 성질을 만족합니다.
+
+- 임의의 실수 logit을 **양수이고 합이 1인** probability simplex 내부로 보냅니다.
+- 순서와 argmax를 보존하며, 모든 곳에서 smooth합니다.
+- 모든 logit에 같은 상수 $c$를 더해도 결과가 같습니다: $\operatorname{softmax}(z+c\mathbf1)=\operatorname{softmax}(z)$. 점수의 절대 원점이 아니라 **차이**만 중요합니다.
+- 두 클래스의 odds가 다른 클래스와 무관하게 두 logit 차이로 정해집니다:
+
+$$
+\frac{p_i}{p_j}=e^{z_i-z_j},\qquad
+\log\frac{p_i}{p_j}=z_i-z_j.
+$$
+
+마지막 식은 **log-odds가 logit 차이에 선형**이라는 뜻입니다. linear layer가 만든 unrestricted score를 categorical probability로 연결하기에 매우 자연스럽습니다.
+
+<figure>
+<svg viewBox="0 0 680 245" xmlns="http://www.w3.org/2000/svg" font-family="Inter, sans-serif" font-size="11" role="img" aria-labelledby="why-exp-title-ko why-exp-desc-ko">
+  <title id="why-exp-title-ko">Softmax의 shift invariance와 exponential odds</title>
+  <desc id="why-exp-desc-ko">왼쪽은 logits에 동일한 상수 100을 더해도 softmax probability가 변하지 않음을 보인다. 오른쪽은 두 logit 차이가 마이너스 2에서 2로 바뀔 때 probability odds가 exponential로 변함을 보인다.</desc>
+  <defs><marker id="why-exp-arrow-ko" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0 0 L6 3 L0 6" fill="#98a3b2"/></marker></defs>
+  <text x="160" y="18" text-anchor="middle" fill="currentColor">공통 baseline은 확률에 영향 없음</text>
+  <rect x="25" y="40" width="115" height="38" rx="5" fill="#6366f1" opacity=".22" stroke="#6366f1"/><text x="82" y="63" text-anchor="middle" fill="currentColor">z = [1, 2, 3]</text>
+  <path d="M145 59H190" stroke="#98a3b2" marker-end="url(#why-exp-arrow-ko)"/>
+  <rect x="200" y="40" width="125" height="38" rx="5" fill="#12a150" opacity=".2" stroke="#12a150"/><text x="262" y="63" text-anchor="middle" fill="currentColor">[.09, .24, .67]</text>
+  <rect x="25" y="103" width="115" height="38" rx="5" fill="#6366f1" opacity=".22" stroke="#6366f1"/><text x="82" y="126" text-anchor="middle" fill="currentColor">z+100·1</text>
+  <path d="M145 122H190" stroke="#98a3b2" marker-end="url(#why-exp-arrow-ko)"/>
+  <rect x="200" y="103" width="125" height="38" rx="5" fill="#12a150" opacity=".2" stroke="#12a150"/><text x="262" y="126" text-anchor="middle" fill="currentColor">[.09, .24, .67]</text>
+  <text x="175" y="169" text-anchor="middle" fill="#98a3b2">e^(zᵢ+c)=e^c·e^zᵢ → 공통 e^c가 소거</text>
+  <line x1="345" y1="25" x2="345" y2="212" stroke="#98a3b2" opacity=".45"/>
+  <text x="515" y="18" text-anchor="middle" fill="currentColor">logit 차이 Δ → odds e^Δ</text>
+  <line x1="390" y1="190" x2="650" y2="190" stroke="#98a3b2"/><line x1="390" y1="190" x2="390" y2="38" stroke="#98a3b2"/>
+  <g fill="#98a3b2" font-size="10">
+    <text x="400" y="207" text-anchor="middle">−2</text><text x="460" y="207" text-anchor="middle">−1</text><text x="520" y="207" text-anchor="middle">0</text><text x="580" y="207" text-anchor="middle">1</text><text x="640" y="207" text-anchor="middle">2</text>
+    <text x="380" y="192" text-anchor="end">0</text><text x="380" y="140" text-anchor="end">2.5</text><text x="380" y="88" text-anchor="end">5</text><text x="380" y="42" text-anchor="end">7.4</text>
+  </g>
+  <path d="M400 187 C438 184,470 177,520 169 C565 154,607 103,640 40" fill="none" stroke="#e0533f" stroke-width="2.5"/>
+  <g fill="#e0533f"><circle cx="400" cy="187" r="3"/><circle cx="460" cy="182" r="3"/><circle cx="520" cy="169" r="3"/><circle cx="580" cy="134" r="3"/><circle cx="640" cy="40" r="3"/></g>
+  <text x="520" y="231" text-anchor="middle" fill="#98a3b2">Δ=zᵢ−zⱼ · 0이면 odds=1, +1이면 e≈2.72</text>
+</svg>
+<figcaption>softmax는 절대 점수가 아니라 상대적인 logit 차이를 모델링합니다. 반면 temperature처럼 logit을 <em>곱하거나 나누는</em> 변화는 차이를 바꾸므로 확률의 sharpness를 바꿉니다.</figcaption>
+</figure>
+
+조금 더 수학적으로, $p_i=f(z_i)/\sum_j f(z_j)$라는 componentwise normalizer가 공통 shift에 불변이려면 $f(z+c)=a(c)f(z)$가 필요합니다. 연속이고 항상 양수라는 조건 아래 이 함수방정식의 해는 $f(z)=Ce^{\beta z}$ 꼴입니다. $\beta=1/T$가 바로 inverse temperature입니다. 따라서 exponential은 임의로 고른 장식이 아니라 **shift-invariant한 상대 점수 모델**에서 자연스럽게 나옵니다.
+
+또한 softmax는 categorical exponential family의 inverse link이며, log-sum-exp의 gradient입니다.
+
+$$
+\nabla_z\log\sum_j e^{z_j}=\operatorname{softmax}(z)
+$$
+
+주어진 expected score 아래 entropy를 최대화해도 Gibbs distribution $p_i\propto e^{z_i/T}$가 나옵니다. 그래서 maximum entropy, energy-based modeling, categorical likelihood가 같은 형태로 만납니다.
+
+> [!IMPORTANT] “미분이 단순해서”는 절반만 맞습니다
+> softmax 자체의 Jacobian은 $J=\operatorname{diag}(p)-pp^\top$이라 결코 scalar처럼 단순하지 않습니다. 특별히 **cross-entropy와 결합할 때** $\nabla_zL=p-y$로 항이 상쇄되는 것이 큰 최적화 장점입니다. softmax가 calibrated probability를 자동 보장한다는 뜻도 아닙니다.
+
+| 대안 | 언제 유용한가 | softmax와 다른 점 |
+| --- | --- | --- |
+| 독립 sigmoid | multi-label Bernoulli | 합이 1일 필요가 없고 클래스가 서로 경쟁하지 않음 |
+| min–max / ReLU 후 normalize | 제한적인 heuristic | extrema/zero에서 비매끄럽고 exact zero로 gradient가 끊길 수 있음 |
+| sparsemax / entmax | sparse attention·해석 가능한 exact zero | 유효한 대안이지만 piecewise gradient와 다른 loss/optimization trade-off |
+
 이제 **cross-entropy(교차 엔트로피)** 는 아주 단순합니다: **정답 클래스에 모델이 준 확률에 $-\log$를 씌운 것**. 정답에 0.9를 줬으면 손실 $-\log 0.9\approx 0.1$(작음, 좋음), 0.1밖에 안 줬으면 $-\log 0.1\approx 2.3$(큼, 나쁨).
 
 $$

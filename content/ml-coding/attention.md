@@ -99,7 +99,68 @@ Then implement **scaled dot-product attention**: score → scale → mask → so
 
 ### Why divide by $\sqrt{d}$?
 
-Under the initialization approximation that the components of $q$ and $k$ are roughly independent with mean 0 and variance 1, the variance of $q\cdot k=\sum_{i=1}^d q_ik_i$ is approximately $d$. Without scaling, logits grow with dimension, pushing softmax toward saturation and potentially making gradients very small. Dividing by $\sqrt{d}$ keeps the score variance near 1 under this approximation. This motivates a stable initial scale; it does not claim that learned components remain perfectly independent. See [Linear Algebra & Calculus](#/foundations/linear-algebra-calculus).
+Assume at initialization that the components of $q$ and $k$ are approximately independent, each with mean 0 and variance 1. For one coordinate,
+
+$$
+\mathbb E[q_i k_i]=0,\qquad
+\operatorname{Var}(q_i k_i)=\mathbb E[q_i^2]\mathbb E[k_i^2]=1,
+$$
+
+and variances add across $d$ independent terms:
+
+$$
+\operatorname{Var}(q\cdot k)
+=\operatorname{Var}\!\left(\sum_{i=1}^{d}q_i k_i\right)
+\approx d.
+$$
+
+The important distinction is that **variance $d$ means a standard deviation, or typical magnitude, of $\sqrt d$**. Positive and negative terms partially cancel, so the sum does not typically grow like $d$. Therefore,
+
+$$
+\operatorname{Std}(q\cdot k)\approx\sqrt d,\qquad
+\operatorname{Var}\!\left(\frac{q\cdot k}{\sqrt d}\right)\approx 1.
+$$
+
+This is why the divisor is $\sqrt d$ rather than $d$: it returns the **standard deviation of the logits** to a constant scale.
+
+<figure>
+<svg viewBox="0 0 680 270" xmlns="http://www.w3.org/2000/svg" font-family="Inter, sans-serif" font-size="11" role="img" aria-labelledby="scale-title-en scale-desc-en">
+  <title id="scale-title-en">Attention score scaling and softmax saturation</title>
+  <desc id="scale-desc-en">The left plot shows that the unscaled score standard deviation grows with the square root of dimension while the scaled standard deviation remains one. The right compares a logit gap of eight at dimension 64 with a scaled gap of one.</desc>
+  <text x="175" y="18" text-anchor="middle" fill="currentColor">Score standard deviation as dimension grows</text>
+  <line x1="48" y1="215" x2="310" y2="215" stroke="#98a3b2"/>
+  <line x1="48" y1="215" x2="48" y2="35" stroke="#98a3b2"/>
+  <g fill="#98a3b2" font-size="10">
+    <text x="48" y="232" text-anchor="middle">1</text><text x="117" y="232" text-anchor="middle">16</text>
+    <text x="190" y="232" text-anchor="middle">64</text><text x="285" y="232" text-anchor="middle">256</text>
+    <text x="38" y="218" text-anchor="end">0</text><text x="38" y="173" text-anchor="end">4</text>
+    <text x="38" y="128" text-anchor="end">8</text><text x="38" y="83" text-anchor="end">12</text>
+    <text x="38" y="39" text-anchor="end">16</text><text x="175" y="252" text-anchor="middle">head dimension d</text>
+  </g>
+  <polyline points="48,204 117,170 190,125 285,35" fill="none" stroke="#e0533f" stroke-width="2.5"/>
+  <g fill="#e0533f"><circle cx="48" cy="204" r="3"/><circle cx="117" cy="170" r="3"/><circle cx="190" cy="125" r="3"/><circle cx="285" cy="35" r="3"/></g>
+  <text x="220" y="69" fill="#e0533f">unscaled: √d</text>
+  <line x1="48" y1="204" x2="285" y2="204" stroke="#12a150" stroke-width="2.5"/>
+  <text x="151" y="197" fill="#12a150">÷√d: 1</text>
+  <line x1="335" y1="28" x2="335" y2="235" stroke="#98a3b2" opacity=".45"/>
+  <text x="510" y="18" text-anchor="middle" fill="currentColor">d=64: same signal, different softmax</text>
+  <text x="365" y="48" fill="#98a3b2">before scaling, Δ=8</text>
+  <rect x="365" y="61" width="235" height="24" rx="4" fill="none" stroke="#98a3b2"/>
+  <rect x="365" y="61" width="234.9" height="24" rx="4" fill="#e0533f" opacity=".82"/>
+  <text x="668" y="77" text-anchor="end" fill="currentColor">0.9997 / 0.0003</text>
+  <text x="365" y="106" fill="#98a3b2">after ÷√64=8, Δ=1</text>
+  <rect x="365" y="119" width="235" height="24" rx="4" fill="none" stroke="#98a3b2"/>
+  <rect x="365" y="119" width="172" height="24" rx="4" fill="#12a150" opacity=".82"/>
+  <text x="668" y="135" text-anchor="end" fill="currentColor">0.731 / 0.269</text>
+  <path d="M365 178 H600" stroke="#98a3b2"/>
+  <circle cx="375" cy="178" r="5" fill="#e0533f"/><text x="388" y="182" fill="currentColor">Δ=8: p(1−p)≈0.0003</text>
+  <circle cx="375" cy="207" r="5" fill="#12a150"/><text x="388" y="211" fill="currentColor">Δ=1: p(1−p)≈0.197</text>
+  <text x="482" y="238" text-anchor="middle" fill="#98a3b2">large logit gap → nearly one-hot → small gradient</text>
+</svg>
+<figcaption>At $d=64$, the unscaled score standard deviation is about 8. A two-logit gap of 8 makes softmax nearly one-hot and drives the binary-softmax sensitivity $p(1-p)$ near zero. Dividing by $\sqrt{64}=8$ restores a gap near 1 and leaves a useful gradient.</figcaption>
+</figure>
+
+Scaling does not force attention to stay uniform. The model can still learn large attention scores when useful; the divisor merely prevents **dimension alone** from saturating the initial distribution. The independence and unit-variance assumptions are initialization approximations, not claims about every learned component of $q$ and $k$. See [Linear Algebra & Calculus](#/foundations/linear-algebra-calculus).
 
 ## Masking
 
@@ -109,6 +170,72 @@ Under the initialization approximation that the components of $q$ and $k$ are ro
 </script>
 </div>
 
+Let row $i$ be a query position and column $j$ a key position. Position $i$ may see the past and itself ($j\le i$), but not the future ($j>i$). Boolean and additive masks encode the same allowed region in different ways:
+
+$$
+\text{allowed}_{ij}=[j\le i],\qquad
+M_{ij}=
+\begin{cases}
+0,&j\le i\\
+-\infty,&j>i
+\end{cases},\qquad
+A=\operatorname{softmax}(S+M).
+$$
+
+<figure>
+<svg viewBox="0 0 720 275" xmlns="http://www.w3.org/2000/svg" font-family="Inter, sans-serif" font-size="10.5" role="img" aria-labelledby="mask-title-en mask-desc-en">
+  <title id="mask-title-en">How a causal attention mask turns scores into attention weights</title>
+  <desc id="mask-desc-en">Rows are queries and columns are keys. The diagonal and lower-left region of the additive mask contain zero and are allowed. Future positions in the upper-right contain negative infinity and have zero probability after softmax.</desc>
+  <defs><marker id="mask-arrow-en" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0 0 L6 3 L0 6" fill="#98a3b2"/></marker></defs>
+  <text x="120" y="18" text-anchor="middle" fill="currentColor">① raw scores S</text>
+  <text x="360" y="18" text-anchor="middle" fill="currentColor">② additive mask M</text>
+  <text x="610" y="18" text-anchor="middle" fill="currentColor">③ softmax(S+M)</text>
+  <g fill="#98a3b2">
+    <text x="120" y="38" text-anchor="middle">key j →</text><text x="360" y="38" text-anchor="middle">key j →</text><text x="610" y="38" text-anchor="middle">key j →</text>
+    <text x="31" y="136" text-anchor="middle" transform="rotate(-90 31 136)">query i →</text>
+    <text x="271" y="136" text-anchor="middle" transform="rotate(-90 271 136)">query i →</text>
+    <text x="521" y="136" text-anchor="middle" transform="rotate(-90 521 136)">query i →</text>
+  </g>
+  <g transform="translate(50 48)">
+    <rect width="140" height="140" fill="none" stroke="#0ea5e9" stroke-width="1.4"/>
+    <g stroke="#98a3b2" opacity=".45"><path d="M35 0V140M70 0V140M105 0V140M0 35H140M0 70H140M0 105H140"/></g>
+    <g fill="currentColor" text-anchor="middle">
+      <text x="17.5" y="22">s₀₀</text><text x="52.5" y="22">s₀₁</text><text x="87.5" y="22">s₀₂</text><text x="122.5" y="22">s₀₃</text>
+      <text x="17.5" y="57">s₁₀</text><text x="52.5" y="57">s₁₁</text><text x="87.5" y="57">s₁₂</text><text x="122.5" y="57">s₁₃</text>
+      <text x="17.5" y="92">s₂₀</text><text x="52.5" y="92">s₂₁</text><text x="87.5" y="92">s₂₂</text><text x="122.5" y="92">s₂₃</text>
+      <text x="17.5" y="127">s₃₀</text><text x="52.5" y="127">s₃₁</text><text x="87.5" y="127">s₃₂</text><text x="122.5" y="127">s₃₃</text>
+    </g>
+  </g>
+  <g transform="translate(290 48)">
+    <path d="M0 0H35V35H70V70H105V105H140V140H0Z" fill="#12a150" opacity=".2"/>
+    <path d="M35 0H140V105H105V70H70V35H35Z" fill="#e0533f" opacity=".25"/>
+    <rect width="140" height="140" fill="none" stroke="#6366f1" stroke-width="1.4"/>
+    <g stroke="#98a3b2" opacity=".45"><path d="M35 0V140M70 0V140M105 0V140M0 35H140M0 70H140M0 105H140"/></g>
+    <g text-anchor="middle">
+      <g fill="#12a150"><text x="17.5" y="22">0</text><text x="17.5" y="57">0</text><text x="52.5" y="57">0</text><text x="17.5" y="92">0</text><text x="52.5" y="92">0</text><text x="87.5" y="92">0</text><text x="17.5" y="127">0</text><text x="52.5" y="127">0</text><text x="87.5" y="127">0</text><text x="122.5" y="127">0</text></g>
+      <g fill="#e0533f"><text x="52.5" y="22">−∞</text><text x="87.5" y="22">−∞</text><text x="122.5" y="22">−∞</text><text x="87.5" y="57">−∞</text><text x="122.5" y="57">−∞</text><text x="122.5" y="92">−∞</text></g>
+    </g>
+  </g>
+  <g transform="translate(540 48)">
+    <path d="M0 0H35V35H70V70H105V105H140V140H0Z" fill="#12a150" opacity=".2"/>
+    <path d="M35 0H140V105H105V70H70V35H35Z" fill="#e0533f" opacity=".12"/>
+    <rect width="140" height="140" fill="none" stroke="#12a150" stroke-width="1.4"/>
+    <g stroke="#98a3b2" opacity=".45"><path d="M35 0V140M70 0V140M105 0V140M0 35H140M0 70H140M0 105H140"/></g>
+    <g text-anchor="middle">
+      <g fill="currentColor"><text x="17.5" y="22">1</text><text x="17.5" y="57">a</text><text x="52.5" y="57">b</text><text x="17.5" y="92">a</text><text x="52.5" y="92">b</text><text x="87.5" y="92">c</text><text x="17.5" y="127">a</text><text x="52.5" y="127">b</text><text x="87.5" y="127">c</text><text x="122.5" y="127">d</text></g>
+      <g fill="#e0533f"><text x="52.5" y="22">0</text><text x="87.5" y="22">0</text><text x="122.5" y="22">0</text><text x="87.5" y="57">0</text><text x="122.5" y="57">0</text><text x="122.5" y="92">0</text></g>
+    </g>
+  </g>
+  <path d="M200 118H270" stroke="#98a3b2" marker-end="url(#mask-arrow-en)"/><text x="235" y="108" text-anchor="middle" fill="#98a3b2">add</text>
+  <path d="M440 118H520" stroke="#98a3b2" marker-end="url(#mask-arrow-en)"/><text x="480" y="108" text-anchor="middle" fill="#98a3b2">row softmax</text>
+  <text x="360" y="215" text-anchor="middle" fill="#12a150">diagonal + lower left: past/current → allowed</text>
+  <text x="360" y="236" text-anchor="middle" fill="#e0533f">upper right: future → −∞ → exp(−∞)=0</text>
+  <text x="360" y="259" text-anchor="middle" fill="#98a3b2">allowed weights in each output row sum to 1</text>
+</svg>
+<figcaption>The lower-left region is not removed; the <b>lower-left region and diagonal are allowed</b>. Those are the `True` entries from `np.tril(...)`. In additive form, add 0 at allowed positions and $-\infty$ at future positions.</figcaption>
+</figure>
+
+- `score=0` is not a mask: $e^0=1$, so softmax still assigns it positive probability. To obtain exactly zero attention weight, insert $-\infty$—or a sufficiently negative finite value appropriate for the dtype—**before** softmax.
 - A **causal mask** blocks position $t$ from seeing the future ($>t$), which is required for autoregressive next-token decoding.
 - A **key-padding mask** blocks attention to `[PAD]` keys. Its shape is `(B,1,1,Tk)`, broadcasting over heads and queries.
 - Combine them with logical **AND**, since both must permit an entry. Apply a mask **before** softmax. Set blocked Boolean entries to `-inf`, but note that a row with every key blocked is meaningless: callers must allow at least one key or define an explicit zero-output policy.
@@ -116,6 +243,61 @@ Under the initialization approximation that the components of $q$ and $k$ are ro
 ## Multi-head attention
 
 Why use several heads instead of one large attention operation? Intuitively, one head consults tokens from only one “point of view.” Splitting the $d$ dimensions into $h$ smaller subspaces allows several perspectives—such as syntax, position, and meaning—to operate simultaneously at the **same asymptotic compute**, before their outputs are recombined.
+
+### What changes as `num_heads` increases?
+
+First state what is held fixed. The standard comparison fixes model width $D=d_{\text{model}}$ and changes only head count $H$. The head dimension is then
+
+$$
+d_h=\frac{D}{H},
+$$
+
+so more heads mean narrower heads. Ignoring bias, the projection parameters of standard MHA are
+
+$$
+\underbrace{3D^2}_{W^Q,W^K,W^V}+\underbrace{D^2}_{W^O}=4D^2,
+$$
+
+which is **independent of $H$**. Even if the projections are written as separate per-head matrices, their total column count is $H d_h=D$.
+
+Compute cancels in the same way. For batch $B$ and sequence length $T$, counting multiply–accumulates (MACs):
+
+$$
+\text{projections}\approx4BTD^2,\qquad
+\text{attention matmuls}
+=H\cdot2BT^2d_h
+=2BT^2D.
+$$
+
+With fixed $D$, increasing `num_heads` from 8 to 16 therefore leaves the dominant theoretical matmul count nearly unchanged. **Intermediate memory does change**, however: every head has its own $T\times T$ score/weight matrix, so naive attention materializes $O(BHT^2)$ elements.
+
+| As $H$ increases with fixed $D$ | Change |
+| --- | --- |
+| head dimension $d_h=D/H$ | decreases |
+| Q/K/V/O parameters $\approx4D^2$ | nearly unchanged |
+| projection MACs $4BTD^2$ | unchanged |
+| QKᵀ + AV MACs $2BT^2D$ | unchanged |
+| naive score/weight memory $BHT^2$ | grows linearly with $H$ |
+| actual wall-clock time | may rise or fall with hardware and kernel shape |
+
+Equal FLOPs do not imply equal speed. More heads expose parallelism, but very small $d_h$ can produce tiny matmuls, more softmax rows, and greater scheduling overhead, reducing GPU utilization. Too few heads can also yield unfavorable shapes or insufficient parallel work. FlashAttention avoids writing the $BHT^2$ matrix to HBM, but it does not remove head-dependent tile scheduling and shape efficiency. `num_heads` is therefore not a knob that monotonically reduces latency; it is an **architecture hyperparameter to benchmark for quality and target hardware**.
+
+> [!WARNING] Change the fixed quantity and the conclusion changes
+> If $d_h$ is held fixed while $H$ increases, then $D=Hd_h$ also grows. Parameters scale approximately as $4D^2$, and projection compute grows with $D^2$. “More heads cost the same” applies only when **$D$ is fixed and merely repartitioned**.
+
+### Is MHA a parameter-saving approximation?
+
+No. Standard MHA and single-head attention at the same $D$ have nearly the same projection parameters and dominant matmul budget. MHA does not cheaply approximate one large attention operation; it lets **one query carry several attention distributions in different learned subspaces at once**.
+
+A single head produces one weight vector $A_i$ per query and applies that same token-mixing pattern to every value channel. MHA can produce
+
+$$
+A_i^{(1)},A_i^{(2)},\ldots,A_i^{(H)},
+$$
+
+so one head may capture a nearby syntactic relation while another tracks distant coreference or position. Splitting $D$ across heads obtains this structured expressivity **within a fixed total width and compute budget**; it is not parameter reduction. Some trained heads can be redundant or pruneable, but that observation does not turn MHA's original role into approximation.
+
+**MQA/GQA** are the explicitly efficiency-oriented variants: they preserve many query heads while sharing fewer K/V heads, reducing some parameters and, most importantly, the inference KV cache. They are a quality–efficiency trade-off distinct from standard MHA.
 
 <figure>
 <svg viewBox="0 0 640 190" xmlns="http://www.w3.org/2000/svg" font-family="Inter, sans-serif" font-size="12">
@@ -155,7 +337,7 @@ Implement `mha`; the harness `run_mha` builds a fixed, seeded `(B,T,D)=(1,3,4)` 
 </script>
 </div>
 
-Splitting heads into the batch-like axis lets one `@` compute all heads at once. **Complexity:** $O(T^2 d)$ compute and $O(T^2)$ memory for the score matrix, per head—the fundamental reason attention becomes expensive on long sequences.
+Splitting heads into the batch-like axis lets one `@` compute all heads at once. Each head costs $O(T^2d_h)$ compute and $O(T^2)$ score memory; in total this is $O(T^2D)$ compute and, for a naive implementation, $O(HT^2)$ score memory—the fundamental reason attention becomes expensive on long sequences.
 
 ## PyTorch module
 
@@ -204,7 +386,7 @@ if __name__ == "__main__":
 
 **Short:** heads let the model attend to different relationships (syntax, position, coreference) in different learned subspaces simultaneously, then combine them.
 
-**Deep:** a single head produces one softmax distribution per query — one "reason" to attend. Splitting $d$ into $h$ subspaces of $d/h$ gives $h$ independent attention patterns at the *same* total compute (the projections shrink proportionally). Empirically different heads specialize; it's a cheap form of ensembling in representation space. The cost is unchanged because $h\cdot(d/h)=d$.
+**Deep:** A single head produces one softmax distribution per query and applies the same token-mixing pattern to every value channel. Splitting $D$ into $H$ subspaces of $D/H$ gives $H$ patterns at nearly the same parameter/FLOP budget when $D$ is fixed. This adds structured expressivity; it is not a parameter-saving approximation. Naive score memory is still $O(BHT^2)$, and actual speed depends on head dimension and kernel shape. If the goal is to shrink the KV cache, distinguish MQA/GQA, which share K/V heads.
 </div></details>
 
 <details class="qa"><summary>What's the memory bottleneck and how does FlashAttention fix it?</summary>
@@ -238,7 +420,8 @@ if __name__ == "__main__":
 | Softmax axis | over **keys** (`axis=-1`) |
 | Masking | apply **before** softmax, fill $-\infty$; combine with AND |
 | Head split | $(B,T,D)\!\to\!(B,H,T,D/h)$ |
-| Complexity | $O(T^2 d)$ time, $O(T^2)$ score memory |
+| Head count | fixed $D$: nearly unchanged parameters/FLOPs, smaller $d_h$, naive score memory $O(BHT^2)$ |
+| Complexity | total attention $O(T^2D)$ time, naive score memory $O(BHT^2)$ |
 | Prod kernel | `F.scaled_dot_product_attention` selects Flash/memory-efficient/math backends when eligible |
 
 **Cross-links:** [NumPy Primer](#/ml-coding/numpy-primer) · [Positional Encoding & RoPE](#/ml-coding/positional-encoding-rope) · [A Transformer Block](#/ml-coding/transformer) · [CNNs, RNNs & Transformers](#/foundations/architectures) · [LLM Fundamentals](#/llm/fundamentals)

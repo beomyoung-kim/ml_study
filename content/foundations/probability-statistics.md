@@ -116,6 +116,63 @@ The first test gives KL = 0 for identical distributions. In the second, **target
 > [!EXAMPLE] Softmax stability and KL asymmetry
 > $\operatorname{softmax}(z)_k=e^{z_k}/\sum_j e^{z_j}$ overflows for large $z$. Use the **log-sum-exp trick** and subtract the maximum: $\log\sum_j e^{z_j}=m+\log\sum_j e^{z_j-m}$. Temperature $T$, using $z/T$, is a control that interpolates from argmax as $T\to0$ to uniform as $T\to\infty$; it appears in distillation and sampling. For **KL asymmetry**, forward KL $D_{\mathrm{KL}}(p_\text{data}\|q)$ is *mode-covering*, tending to cover every mode and become blurry, while reverse KL is *mode-seeking*, tending to concentrate on one mode. This is a common VAE and variational-inference topic.
 
+### A statistical comparison of CE and MSE for classification
+
+First distinguish what receives the squared error. Squared error between a probability vector $q$ and a one-hot label is the **Brier score**, a valid proper scoring rule. MSE on raw logits is different: it ignores that $z$ and $z+c\mathbf1$ represent the same categorical distribution, so it is not a natural probability loss.
+
+Suppose the true binary label follows $Y\sim\operatorname{Bernoulli}(r)$ and the model predicts positive probability $q$. The population expected risks are
+
+$$
+R_{\mathrm{CE}}(q)=-r\log q-(1-r)\log(1-q),
+\qquad
+R_{\mathrm{Brier}}(q)=r(1-q)^2+(1-r)q^2.
+$$
+
+Differentiating either risk gives a unique minimum at $q=r$. With enough data and capacity, both are therefore strictly proper scoring rules that encourage the model to **report the true conditional probability honestly**.
+
+<figure>
+<svg viewBox="0 0 700 285" xmlns="http://www.w3.org/2000/svg" font-family="Inter, sans-serif" font-size="11" role="img" aria-labelledby="ce-mse-title-en ce-mse-desc-en">
+  <title id="ce-mse-title-en">Expected risk and logit gradients for cross-entropy and Brier score</title>
+  <desc id="ce-mse-desc-en">The left shows that with true positive probability 0.7, both cross-entropy and Brier excess risk are minimized by predicting 0.7. The right shows that for a positive label, cross-entropy keeps a large logit gradient on confidently wrong predictions while MSE after a sigmoid has a gradient approaching zero.</desc>
+  <text x="175" y="18" text-anchor="middle" fill="currentColor">statistics: expected excess risk (r=0.7)</text>
+  <line x1="48" y1="230" x2="315" y2="230" stroke="#98a3b2"/><line x1="48" y1="230" x2="48" y2="42" stroke="#98a3b2"/>
+  <g fill="#98a3b2" font-size="10">
+    <text x="48" y="247" text-anchor="middle">0</text><text x="115" y="247" text-anchor="middle">.25</text><text x="181" y="247" text-anchor="middle">.5</text><text x="234" y="247" text-anchor="middle">.7</text><text x="315" y="247" text-anchor="middle">1</text>
+    <text x="181" y="269" text-anchor="middle">predicted probability q</text>
+  </g>
+  <path d="M58 47 C85 95,125 145,181 195 C207 216,224 228,234 230 C251 227,276 196,305 61" fill="none" stroke="#e0533f" stroke-width="2.5"/>
+  <path d="M58 118 C104 161,163 207,234 230 C266 220,289 202,305 181" fill="none" stroke="#6366f1" stroke-width="2.5"/>
+  <circle cx="234" cy="230" r="5" fill="#12a150"/>
+  <text x="90" y="65" fill="#e0533f">CE−H(r)=KL(r‖q)</text>
+  <text x="72" y="135" fill="#6366f1">Brier−min=(q−r)²</text>
+  <text x="234" y="215" text-anchor="middle" fill="#12a150">both q*=r=.7</text>
+  <line x1="350" y1="28" x2="350" y2="250" stroke="#98a3b2" opacity=".45"/>
+  <text x="525" y="18" text-anchor="middle" fill="currentColor">optimization: true class y=1</text>
+  <line x1="390" y1="230" x2="665" y2="230" stroke="#98a3b2"/><line x1="390" y1="230" x2="390" y2="42" stroke="#98a3b2"/>
+  <g fill="#98a3b2" font-size="10">
+    <text x="390" y="247" text-anchor="middle">0</text><text x="459" y="247" text-anchor="middle">.25</text><text x="528" y="247" text-anchor="middle">.5</text><text x="596" y="247" text-anchor="middle">.75</text><text x="665" y="247" text-anchor="middle">1</text>
+    <text x="528" y="269" text-anchor="middle">true-class probability p</text>
+  </g>
+  <path d="M390 48 L665 230" fill="none" stroke="#e0533f" stroke-width="2.5"/>
+  <path d="M390 230 C420 207,451 191,482 198 C530 209,589 225,665 230" fill="none" stroke="#6366f1" stroke-width="2.5"/>
+  <circle cx="396" cy="52" r="4" fill="#e0533f"/><circle cx="396" cy="229" r="4" fill="#6366f1"/>
+  <text x="475" y="70" fill="#e0533f">CE: |∂L/∂z|=1−p</text>
+  <text x="480" y="190" fill="#6366f1">MSE: ∝p(1−p)²</text>
+  <text x="525" y="112" text-anchor="middle" fill="#98a3b2">confidently wrong as p→0:</text>
+  <text x="525" y="129" text-anchor="middle" fill="#98a3b2">CE signal remains; MSE signal vanishes</text>
+</svg>
+<figcaption><b>Statistically</b>, both CE and probability-space MSE (Brier) minimize expected risk at the true probability $r$. Their main differences lie in likelihood interpretation and <b>logit-space optimization geometry</b>. CE gives a large correction to a model saturated on the wrong class; MSE after softmax or sigmoid multiplies by an additional Jacobian and can produce a tiny signal.</figcaption>
+</figure>
+
+| View | Cross-entropy | MSE on probabilities (Brier) |
+| --- | --- | --- |
+| probabilistic model | Bernoulli/categorical NLL | squared probability error; proper score |
+| confidently wrong prediction | $-\log q_y\to\infty$—strong penalty | bounded—more gradual |
+| logit gradient | softmax/sigmoid Jacobian cancels, giving $q-y$ | another Jacobian remains, shrinking saturated gradients |
+| practical interpretation | natural default for likelihood training | useful for calibration evaluation and some prediction problems |
+
+The right answer is therefore not “MSE is invalid for classification.” **CE is the default because it exactly matches categorical likelihood and provides a useful logit gradient even for confidently wrong predictions.** Because Brier is bounded, it can be less aggressive under label noise or outliers and is useful for studying calibration. Conversely, CE's unbounded penalty does not guarantee better calibration or robustness. See [Loss & Gradient](#/ml-coding/losses-gradients) for why softmax uses an exponential and how its derivative combines with CE.
+
 ## §4 · Expectation, variance, and the CLT (Advanced)
 
 - **Law of large numbers (LLN):** the sample mean converges to $\mathbb E[X]$. This is why empirical risk $\hat R=\frac1n\sum_i \ell_i$ approximates true risk.

@@ -56,6 +56,68 @@ $$
 <figcaption>Logits $[1,2,3]$ become probabilities $[0.09,0.24,0.67]$ through softmax. Exponentiation concentrates probability on the largest score without forcing the others to exactly zero—a soft maximum.</figcaption>
 </figure>
 
+### Why exponential, specifically?
+
+If the only goal were to put every value in $[0,1]$, one could invent min–max scaling, sigmoids, or normalization after a ReLU. Categorical probabilities need more than a range, however. Softmax simultaneously:
+
+- maps unrestricted real logits into the interior of the **positive, sum-one probability simplex**;
+- preserves ordering and argmax and is smooth everywhere;
+- is unchanged when every logit receives the same constant: $\operatorname{softmax}(z+c\mathbf1)=\operatorname{softmax}(z)$, so differences—not an arbitrary score origin—matter;
+- makes the odds between two classes depend only on their logit difference:
+
+$$
+\frac{p_i}{p_j}=e^{z_i-z_j},\qquad
+\log\frac{p_i}{p_j}=z_i-z_j.
+$$
+
+The last identity makes **log-odds linear in logit differences**, a natural connection from unrestricted scores produced by a linear layer to categorical probabilities.
+
+<figure>
+<svg viewBox="0 0 680 245" xmlns="http://www.w3.org/2000/svg" font-family="Inter, sans-serif" font-size="11" role="img" aria-labelledby="why-exp-title-en why-exp-desc-en">
+  <title id="why-exp-title-en">Shift invariance and exponential odds in softmax</title>
+  <desc id="why-exp-desc-en">The left shows that adding the same constant 100 to every logit leaves softmax probabilities unchanged. The right shows how probability odds change exponentially as a two-logit difference moves from negative two to positive two.</desc>
+  <defs><marker id="why-exp-arrow-en" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0 0 L6 3 L0 6" fill="#98a3b2"/></marker></defs>
+  <text x="160" y="18" text-anchor="middle" fill="currentColor">a common baseline has no effect</text>
+  <rect x="25" y="40" width="115" height="38" rx="5" fill="#6366f1" opacity=".22" stroke="#6366f1"/><text x="82" y="63" text-anchor="middle" fill="currentColor">z = [1, 2, 3]</text>
+  <path d="M145 59H190" stroke="#98a3b2" marker-end="url(#why-exp-arrow-en)"/>
+  <rect x="200" y="40" width="125" height="38" rx="5" fill="#12a150" opacity=".2" stroke="#12a150"/><text x="262" y="63" text-anchor="middle" fill="currentColor">[.09, .24, .67]</text>
+  <rect x="25" y="103" width="115" height="38" rx="5" fill="#6366f1" opacity=".22" stroke="#6366f1"/><text x="82" y="126" text-anchor="middle" fill="currentColor">z+100·1</text>
+  <path d="M145 122H190" stroke="#98a3b2" marker-end="url(#why-exp-arrow-en)"/>
+  <rect x="200" y="103" width="125" height="38" rx="5" fill="#12a150" opacity=".2" stroke="#12a150"/><text x="262" y="126" text-anchor="middle" fill="currentColor">[.09, .24, .67]</text>
+  <text x="175" y="169" text-anchor="middle" fill="#98a3b2">e^(zᵢ+c)=e^c·e^zᵢ → common e^c cancels</text>
+  <line x1="345" y1="25" x2="345" y2="212" stroke="#98a3b2" opacity=".45"/>
+  <text x="515" y="18" text-anchor="middle" fill="currentColor">logit difference Δ → odds e^Δ</text>
+  <line x1="390" y1="190" x2="650" y2="190" stroke="#98a3b2"/><line x1="390" y1="190" x2="390" y2="38" stroke="#98a3b2"/>
+  <g fill="#98a3b2" font-size="10">
+    <text x="400" y="207" text-anchor="middle">−2</text><text x="460" y="207" text-anchor="middle">−1</text><text x="520" y="207" text-anchor="middle">0</text><text x="580" y="207" text-anchor="middle">1</text><text x="640" y="207" text-anchor="middle">2</text>
+    <text x="380" y="192" text-anchor="end">0</text><text x="380" y="140" text-anchor="end">2.5</text><text x="380" y="88" text-anchor="end">5</text><text x="380" y="42" text-anchor="end">7.4</text>
+  </g>
+  <path d="M400 187 C438 184,470 177,520 169 C565 154,607 103,640 40" fill="none" stroke="#e0533f" stroke-width="2.5"/>
+  <g fill="#e0533f"><circle cx="400" cy="187" r="3"/><circle cx="460" cy="182" r="3"/><circle cx="520" cy="169" r="3"/><circle cx="580" cy="134" r="3"/><circle cx="640" cy="40" r="3"/></g>
+  <text x="520" y="231" text-anchor="middle" fill="#98a3b2">Δ=zᵢ−zⱼ · zero gives odds=1; +1 gives e≈2.72</text>
+</svg>
+<figcaption>Softmax models relative logit differences, not an absolute score origin. Multiplying or dividing logits—as temperature does—changes those differences and therefore changes the distribution's sharpness.</figcaption>
+</figure>
+
+More formally, suppose a componentwise normalizer has $p_i=f(z_i)/\sum_j f(z_j)$. Invariance to a common shift requires $f(z+c)=a(c)f(z)$. Under continuity and strict positivity, the solutions have the form $f(z)=Ce^{\beta z}$, where $\beta=1/T$ is inverse temperature. The exponential is therefore not arbitrary decoration; it follows naturally from a **shift-invariant relative-score model**.
+
+Softmax is also the inverse link of the categorical exponential family and the gradient of log-sum-exp:
+
+$$
+\nabla_z\log\sum_j e^{z_j}=\operatorname{softmax}(z).
+$$
+
+Maximizing entropy under a fixed expected-score constraint yields the same Gibbs distribution $p_i\propto e^{z_i/T}$. Maximum entropy, energy-based modeling, and categorical likelihood therefore meet at the same form.
+
+> [!IMPORTANT] “Because the derivative is simple” is only half right
+> The softmax Jacobian itself is $J=\operatorname{diag}(p)-pp^\top$, not a scalar-simple derivative. The major optimization benefit appears specifically when softmax is paired with **cross-entropy**, whose terms cancel to give $\nabla_zL=p-y$. Nor does a softmax automatically guarantee calibrated probabilities.
+
+| Alternative | Useful for | How it differs from softmax |
+| --- | --- | --- |
+| independent sigmoids | multi-label Bernoulli outputs | probabilities need not sum to one; classes do not compete |
+| min–max / normalize after ReLU | limited heuristics | nonsmooth at extrema/zero; exact zeros can cut gradients |
+| sparsemax / entmax | sparse attention and interpretable exact zeros | valid alternatives with piecewise gradients and different loss/optimization trade-offs |
+
 **Cross-entropy** is now simple: take the probability assigned to the correct class and apply $-\log$. If the correct class gets 0.9, the loss is $-\log 0.9\approx0.1$, which is small; if it gets only 0.1, the loss is $-\log 0.1\approx2.3$, which is large.
 
 $$
